@@ -39,3 +39,10 @@
 
 # debug information files
 *.dwo
+
+# directories
+/bin/*
+/model/*
+
+# scripts/notes
+*.py
