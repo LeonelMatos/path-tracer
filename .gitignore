@@ -43,6 +43,7 @@
 # directories
 /bin/*
 /model/*
+/build/*
 
 # scripts/notes
 *.py
