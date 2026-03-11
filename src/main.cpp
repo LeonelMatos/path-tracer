@@ -38,7 +38,63 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
-static const int W = 1000, H = 1000;
+#include "common/shader.hpp"
 
+using namespace std;
 
+//Global Variables
+GLuint program_id;
+GLFWwindow* window;
 
+static const int WINDOW_WIDTH = 1000, WINDOW_HEIGHT = 1000;
+
+bool transferDataToGPU(void);
+void cleanupDataFromGPU();
+void draw(void);
+
+int main(void) {
+    if (!glfwInit()) { fprintf(stderr, "Failed to init GLFW\n"); return -1; }
+    glfwWindowHint(GLFW_SAMPLES, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+    window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Path Tracer - Brute-Force", NULL, NULL);
+    if (!window) { glfwTerminate(); return -1; }
+    glfwMakeContextCurrent(window);
+
+    glewExperimental = GL_TRUE;
+    glewInit();
+
+    glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
+
+    if(!transferDataToGPU())
+        return -1;
+
+    while (!glfwWindowShouldClose(window) && glfwGetKey(window, GLFW_KEY_ESCAPE) != GLFW_PRESS) {
+        
+        draw();
+    }
+    cleanupDataFromGPU();
+    glfwTerminate();
+
+    return 0;
+}
+
+bool transferDataToGPU(void) {
+    program_id = LoadShaders({
+        { GL_VERTEX_SHADER,   "shaders/common.vertexshader"    },
+        { GL_FRAGMENT_SHADER, "shaders/display.fragmentshader" },
+    });
+    if(!program_id) { glfwTerminate(); return false; }
+    return true;
+}
+
+void cleanDataFromGPU() {
+    glDeleteProgram(program_id);
+}
+
+void draw(void) {
+
+}

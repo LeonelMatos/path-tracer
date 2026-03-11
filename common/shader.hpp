@@ -2,6 +2,8 @@
 #define SHADER_HPP
 
 #include <GL/glew.h>
+#include <initializer_list>
+#include <utility>
 
 /*Uso
     LoadShaders({
