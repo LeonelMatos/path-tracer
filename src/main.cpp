@@ -44,6 +44,7 @@ using namespace std;
 
 //Global Variables
 GLuint program_id;
+GLuint pathtr_id;
 GLFWwindow* window;
 
 static const int WINDOW_WIDTH = 1000, WINDOW_HEIGHT = 1000;
@@ -87,7 +88,11 @@ bool transferDataToGPU(void) {
         { GL_VERTEX_SHADER,   "shaders/common.vertexshader"    },
         { GL_FRAGMENT_SHADER, "shaders/display.fragmentshader" },
     });
-    if(!program_id) { glfwTerminate(); return false; }
+    pathtr_id = LoadShaders({
+        { GL_VERTEX_SHADER,   "shaders/common.vertexshader"       },
+        { GL_FRAGMENT_SHADER, "shaders/path_trace.fragmentshader" },
+    });
+    if(!program_id || !pathtr_id)  { glfwTerminate(); return false; }
     return true;
 }
 
