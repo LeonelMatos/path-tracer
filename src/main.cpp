@@ -7,7 +7,7 @@
 //    • Cornell box analítica (5 paredes axis-aligned)
 //    • 1 esfera emissiva junto ao tecto (área de luz, emission=15)
 //    • 2 esferas difusas no chão
-//    • Mesma câmera: pos=(0,-4.75,0), lookAt=origem, up=Z, FOV=30°
+//    • câmera: lookAt=origem, up=Z, FOV=30°
 //
 //  1 sample/pixel/frame, acumulação progressiva 
 // ============================================================
