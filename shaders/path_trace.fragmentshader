@@ -1,21 +1,20 @@
-#version 330 core
+#version 460 core
 
-in vec2 vUv;
+in vec2 vUV;
 out vec4 frag_color;
 
 uniform vec2 resolution;
 uniform int frame_id;
 uniform sampler2D prev_frame;
 
-const float PI = 3.14159;
+const float PI  = 3.14159;
 const float INF = 1e30;
 const float EPS = 0.001;
-const float LOW = 1e-8;
-const int DEPTH = 5;
+const int   DEPTH = 5;
 
 const vec3 camera_position = vec3(0.0, -5.0, 0.0);
-const vec3 camera_lookat = vec3(0.0, 0.0, 0.0);
-const vec3 camera_up = vec3(0.0, 0.0, 1.0);
+const vec3 camera_lookat   = vec3(0.0,  0.0, 0.0);
+const vec3 camera_up       = vec3(0.0,  0.0, 1.0);
 
 const vec3 WHITE = vec3(0.90, 0.90, 0.90);
 const vec3 RED   = vec3(0.90, 0.05, 0.05);
@@ -35,7 +34,7 @@ vec3 rand3(int bounce) {
     uvec2 px = uvec2(gl_FragCoord.xy);
     uint fid = uint(frame_id);
     return pcg3d(uvec3(
-        px.x ^ (fid * 2654435761u), //TODO why fixed nums
+        px.x ^ (fid * 2654435761u),
         px.y ^ (fid * 2246822519u),
         uint(bounce + 1)
     ));
@@ -47,33 +46,29 @@ mat3 onb(vec3 n) {
     return mat3(t, cross(n, t), n);
 }
 
-vec3 cameraRay(vec3 uv) {
+vec3 cameraRay(vec2 uv) {
     float aspect = resolution.x / resolution.y;
     float f_len = 1.0 / tan(0.5 * 30.0 * PI / 180.0);
     vec2 p = 2.0 * uv - 1.0;
     vec3 ray_cam = vec3(p.x * aspect, p.y, -f_len);
 
     vec3 cam_z = normalize(camera_position - camera_lookat);
-    vec3 cam_x = normalize(cross(camera_up, cam-cam_z));
+    vec3 cam_x = normalize(cross(camera_up, cam_z));
     vec3 cam_y = cross(cam_z, cam_x);
 
     return normalize(cam_x * ray_cam.x + cam_y * ray_cam.y + cam_z * ray_cam.z);
 }
-
-//Ray struct
 
 struct Hit { float t; vec3 pos, normal, albedo, emission; };
 
 float sphereT(vec3 ro, vec3 rd, vec3 c, float r) {
     vec3 oc = ro - c;
     float b = dot(oc, rd);
-    float disc = b*b - dot(oc, oc) + r*r;
+    float disc = b*b - dot(oc,oc) + r*r;
     if (disc < 0.0) return INF;
     float sq = sqrt(disc);
-
     float t = -b - sq;
     if (t > EPS) return t;
-    
     t = -b + sq;
     return (t > EPS) ? t : INF;
 }
@@ -85,49 +80,78 @@ bool intersects(vec3 ro, vec3 rd, out Hit h) {
     h.albedo = WHITE;
     h.emission = vec3(0);
 
-    //Ambiente
+    float t; vec3 p;
 
     //Chão (z = -1) Teto (z = +1)
     if (abs(rd.z) > 1e-8) {
         t = (-1.0 - ro.z) / rd.z;
-        if (t > EPS && t < h.t) { p = ro+t*rd;
-            if (abs(p.x)<=1.0 && p.y>=-1.0 && p.y<=1.0)
-                {
-                    h.t=t;
-                    h.pos=p;
-                    h.normal=vec3(0,0,1);
-                    h.albedo=WHITE;
-                    h.emission=vec3(0); 
-                } 
+        if (t > EPS && t < h.t) {
+            p = ro+t*rd;
+            if (abs(p.x)<=1.0 && p.y>=-1.0 && p.y<=1.0) {
+                h.t=t;
+                h.pos=p;
+                h.normal=vec3(0,0,1);
+                h.albedo=WHITE;
+                h.emission=vec3(0);
+                }
             }
         t = (1.0 - ro.z) / rd.z;
         if (t > EPS && t < h.t) {
             p = ro+t*rd;
-            if (abs(p.x)<=1.0 && p.y>=-1.0 && p.y<=1.0)
-                { h.t=t; h.pos=p; h.normal=vec3(0,0,-1); h.albedo=WHITE; h.emission=vec3(0); } }
-    }
-    //Parece de fundo (y=1)
-    if (abs(rd.y) > 1e-8) {
-        t = (1.0 - ro.y) / rd.y;
-        if (t > EPS && t < h.t) {
-            p = ro+t*rd;
-            if (abs(p.x)<=1.0 && p.z>=-1.0 && p.z<=1.0) {
+            if (abs(p.x)<=1.0 && p.y>=-1.0 && p.y<=1.0) {
                 h.t=t;
                 h.pos=p;
-                h.normal=vec3(0,-1,0);
+                h.normal=vec3(0,0,-1);
                 h.albedo=WHITE;
                 h.emission=vec3(0);
-            } 
+            }
         }
     }
 
     // Esfera de luz
-    t = sphereT(ro, rd, vec3(0.0, 0.0, 0.78), 0.035);
+    t = sphereT(ro, rd, vec3(0.0, 0.0, 0.78), 0.18);
     if (t < h.t) {
-         h.t=t; h.pos=ro+t*rd;
+        h.t=t;
+        h.pos=ro+t*rd;
         h.normal=normalize(h.pos-vec3(0,0,0.78));
-        h.albedo=vec3(0); h.emission=vec3(15.0); 
+        h.albedo=vec3(0); h.emission=vec3(15.0);
     }
-
     return h.t < INF;
+}
+
+vec3 pathTrace(vec2 uv) {
+    vec3 ro = camera_position;
+    vec3 rd = cameraRay(uv);
+    vec3 color = vec3(0);
+    vec3 throughput = vec3(1);
+
+    for (int b = 0; b < DEPTH; b++) {
+        Hit h;
+        if (!intersects(ro, rd, h)) break;
+
+        color += throughput * h.emission;
+        if (dot(h.emission, h.emission) > 0.0) break;
+
+        vec3 r = rand3(b);
+        float cosT = sqrt(r.x);
+        float sinT = sqrt(1.0 - r.x);
+        float phi = 2.0 * PI * r.y;
+        rd = onb(h.normal) * vec3(sinT*cos(phi), sinT*sin(phi), cosT);
+        throughput *= h.albedo;
+        ro = h.pos + h.normal * EPS;
+    }
+    return color;
+}
+
+void main() {
+    vec2 jitter = (rand3(-1).xy - 0.5) / resolution;
+    vec3 linear = pathTrace(vUV + jitter);
+
+    if (frame_id == 0) {
+        frag_color = vec4(pow(linear, vec3(1.0/2.2)), 1.0);
+    } else {
+        vec3 prev = pow(texture(prev_frame, vUV).rgb, vec3(2.2));
+        vec3 new_avg = mix(prev, linear, 1.0 / float(frame_id + 1));
+        frag_color = vec4(pow(new_avg, vec3(1.0/2.2)), 1.0);
+    }
 }

@@ -49,8 +49,16 @@ GLFWwindow* window;
 
 static const int WINDOW_WIDTH = 1000, WINDOW_HEIGHT = 1000;
 
+GLuint tex[2], fbo[2];
+GLuint vao;
+
+GLint loc_res, loc_frame, loc_prev, loc_tex;
+
+int frame_id = 0;
+int cur = 0, prev = 1;
+
 bool transferDataToGPU(void);
-void cleanupDataFromGPU();
+void cleanDataFromGPU();
 void draw(void);
 
 int main(void) {
@@ -77,7 +85,7 @@ int main(void) {
         
         draw();
     }
-    cleanupDataFromGPU();
+    cleanDataFromGPU();
     glfwTerminate();
 
     return 0;
@@ -93,13 +101,75 @@ bool transferDataToGPU(void) {
         { GL_FRAGMENT_SHADER, "shaders/path_trace.fragmentshader" },
     });
     if(!program_id || !pathtr_id)  { glfwTerminate(); return false; }
+
+    loc_res = glGetUniformLocation(pathtr_id, "resolution");
+    loc_frame = glGetUniformLocation(pathtr_id, "frame_id");
+    loc_prev = glGetUniformLocation(pathtr_id, "prev_frame");
+    loc_tex = glGetUniformLocation(pathtr_id, "tex");
+
+    //TODO Adicionar verificação dos uniforms
+
+    glGenTextures(2, tex);
+    glGenFramebuffers(2, fbo);
+
+    for (int i = 0; i < 2; i++) {
+        glBindTexture(GL_TEXTURE_2D, tex[i]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, WINDOW_WIDTH, WINDOW_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo[0]);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex[i], 0);
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
+
     return true;
 }
 
 void cleanDataFromGPU() {
+    glDeleteVertexArrays(1, &vao);
+    glDeleteTextures(2, tex);
+    glDeleteFramebuffers(2, fbo);
+    glDeleteProgram(pathtr_id);
     glDeleteProgram(program_id);
+    
 }
 
 void draw(void) {
+    //1 path tracing para FBO atual
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo[cur]);
+    glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+    glUseProgram(pathtr_id);
+    glUniform2f(loc_res, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT);
+    glUniform1i(loc_frame, frame_id);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, tex[prev]);
+    glUniform1i(loc_prev, 0);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
+    //2 textura acumulada no ecrã
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+    glUseProgram(program_id);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, tex[cur]);
+    glUniform1i(loc_tex, 0);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+    glfwSwapBuffers(window);
+    glfwPollEvents();
+
+    int tmp = cur; cur = prev; prev = tmp;
+    frame_id++;
+
+    if (frame_id % 100 == 0) {
+        printf("\rSamples por pixel : %d", frame_id);
+        fflush(stdout);
+    }
 }
