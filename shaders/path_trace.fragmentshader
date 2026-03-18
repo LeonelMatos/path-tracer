@@ -61,46 +61,59 @@ vec3 cameraRay(vec2 uv) {
 
 struct Hit { float t; vec3 pos, normal, albedo, emission; };
 
-float sphereT(vec3 ro, vec3 rd, vec3 c, float r) {
-    vec3 oc = ro - c;
-    float b = dot(oc, rd);
-    float disc = b*b - dot(oc,oc) + r*r;
+float sphereT(vec3 ray_origin, vec3 ray_direction, vec3 center, float radius) {
+    vec3 origin_to_ctr = ray_origin - center;
+    
+    // |P - center|^2 = radius^2
+    float b = dot(origin_to_ctr, ray_direction);
+
+    //distância^2 entre origem do raio e centro da esfera - raio^2
+    float disc = b*b - dot(origin_to_ctr,origin_to_ctr) + radius*radius;
     if (disc < 0.0) return INF;
-    float sq = sqrt(disc);
-    float t = -b - sq;
+    float sqrt_disc = sqrt(disc);
+
+    //soluções de interseção à entrada ou saída da esfera
+    float t;
+
+    //entrada da esfera
+    t = -b - sqrt_disc;
     if (t > EPS) return t;
-    t = -b + sq;
+
+    //saída da esfera (câmara dentro de esfera)
+    t = -b + sqrt_disc;
     return (t > EPS) ? t : INF;
 }
 
-bool intersects(vec3 ro, vec3 rd, out Hit h) {
+bool intersects(vec3 ray_origin, vec3 ray_dir, out Hit h) {
     h.t = INF;
     h.pos = vec3(0);
     h.normal = vec3(0,0,1);
     h.albedo = WHITE;
     h.emission = vec3(0);
 
-    float t; vec3 p;
+    float ray_dist; vec3 hit_p;
 
-    //Chão (z = -1) Teto (z = +1)
-    if (abs(rd.z) > 1e-8) {
-        t = (-1.0 - ro.z) / rd.z;
-        if (t > EPS && t < h.t) {
-            p = ro+t*rd;
-            if (abs(p.x)<=1.0 && p.y>=-1.0 && p.y<=1.0) {
-                h.t=t;
-                h.pos=p;
+    //Definição do ambiente hardcoded//
+
+    //Chão (z=-1), teto (z=+1)
+    if (abs(ray_dir.z) > 1e-8) {
+        ray_dist = (-1.0 - ray_origin.z) / ray_dir.z;
+        if (ray_dist > EPS && ray_dist < h.t) {
+            hit_p = ray_origin + ray_dist * ray_dir;
+            if (abs(hit_p.x) <= 1.0 && hit_p.y >= -1.0 && hit_p.y <= 1.0) {
+                h.t=ray_dist;
+                h.pos=hit_p;
                 h.normal=vec3(0,0,1);
                 h.albedo=WHITE;
                 h.emission=vec3(0);
                 }
             }
-        t = (1.0 - ro.z) / rd.z;
-        if (t > EPS && t < h.t) {
-            p = ro+t*rd;
-            if (abs(p.x)<=1.0 && p.y>=-1.0 && p.y<=1.0) {
-                h.t=t;
-                h.pos=p;
+        ray_dist = (1.0 - ray_origin.z) / ray_dir.z;
+        if (ray_dist > EPS && ray_dist < h.t) {
+            hit_p = ray_origin + ray_dist * ray_dir;
+            if (abs(hit_p.x) <= 1.0 && hit_p.y >= -1.0 && hit_p.y <= 1.0) {
+                h.t=ray_dist;
+                h.pos=hit_p;
                 h.normal=vec3(0,0,-1);
                 h.albedo=WHITE;
                 h.emission=vec3(0);
@@ -108,14 +121,77 @@ bool intersects(vec3 ro, vec3 rd, out Hit h) {
         }
     }
 
-    // Esfera de luz
-    t = sphereT(ro, rd, vec3(0.0, 0.0, 0.78), 0.18);
-    if (t < h.t) {
-        h.t=t;
-        h.pos=ro+t*rd;
-        h.normal=normalize(h.pos-vec3(0,0,0.78));
-        h.albedo=vec3(0); h.emission=vec3(15.0);
+    //Parede traseira (y=+1)
+    if (abs(ray_dir.y) > 1e-8) {
+        ray_dist = (1.0 - ray_origin.y) / ray_dir.y;
+        if (ray_dist > EPS && ray_dist < h.t) {
+            hit_p = ray_origin + ray_dist * ray_dir;
+            if(abs(hit_p.x) <= 1.0 && hit_p.z >= -1.0 && hit_p.z <= 1.0) {
+                h.t = ray_dist;
+                h.pos = hit_p;
+                h.normal = vec3(0, -1, 0);
+                h.albedo = WHITE;
+                h.emission = vec3(0);
+            }
+        }
     }
+
+    //Paredes esquerda (x=-1), direita(x=-1)
+    if (abs(ray_dir.x) > 1e-8) {
+        ray_dist = (-1.0 - ray_origin.x) / ray_dir.x;
+        if (ray_dist > EPS && ray_dist < h.t) {
+            hit_p = ray_origin + ray_dist * ray_dir;
+            if(hit_p.y >= -1.0 && hit_p.y <= 1.0 && hit_p.z >= -1.0 && hit_p.z <= 1.0) {
+                h.t = ray_dist;
+                h.pos = hit_p;
+                h.normal = vec3(1,0,0);
+                h.albedo = RED;
+                h.emission = vec3(0);
+            }
+        }
+        ray_dist = (1.0 - ray_origin.x) / ray_dir.x;
+        if (ray_dist > EPS && ray_dist < h.t) {
+            hit_p = ray_origin + ray_dist * ray_dir;
+            if(hit_p.y >= -1.0 && hit_p.y <= 1.0 && hit_p.z >= -1.0 && hit_p.z <= 1.0) {
+                h.t = ray_dist;
+                h.pos = hit_p;
+                h.normal = vec3(-1,0,0);
+                h.albedo = GREEN;
+                h.emission = vec3(0);
+            }
+        }
+        
+    }
+
+    // Esfera de luz
+    ray_dist = sphereT(ray_origin, ray_dir, vec3(0.0, 0.0, 0.80), 0.20);
+    if (ray_dist < h.t) {
+        h.t=ray_dist;
+        h.pos=ray_origin + ray_dist * ray_dir;
+        h.normal=normalize(h.pos-vec3(0,0,0.78));
+        h.albedo=vec3(0);
+        h.emission=vec3(10.0);
+    }
+
+    // Esfera de base
+    ray_dist = sphereT(ray_origin, ray_dir, vec3(-0.5, 0.0, -0.65), 0.35);
+    if (ray_dist < h.t) {
+        h.t=ray_dist;
+        h.pos=ray_origin + ray_dist * ray_dir;
+        h.normal=normalize(h.pos-vec3(0,0,0.78));
+        h.albedo=WHITE;
+        h.emission=vec3(0);
+    }
+    ray_dist = sphereT(ray_origin, ray_dir, vec3(0.3, 0.5, -0.50), 0.50);
+    if (ray_dist < h.t) {
+        h.t=ray_dist;
+        h.pos=ray_origin + ray_dist * ray_dir;
+        h.normal=normalize(h.pos-vec3(0,0,0.78));
+        h.albedo=WHITE;
+        h.emission=vec3(0);
+    }
+
+
     return h.t < INF;
 }
 

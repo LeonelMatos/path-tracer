@@ -11,7 +11,14 @@ find_package(OpenGL REQUIRED)
 find_package(GLEW   REQUIRED)
 find_package(glfw3  REQUIRED)
 
-file(COPY ${CMAKE_SOURCE_DIR}/shaders DESTINATION ${CMAKE_BINARY_DIR})
+# Copia os shaders para build
+#file(COPY ${CMAKE_SOURCE_DIR}/shaders DESTINATION ${CMAKE_BINARY_DIR})
+
+# Cria symlink para ter edições em tempo real
+execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink
+    ${CMAKE_SOURCE_DIR}/shaders
+    ${CMAKE_BINARY_DIR}/shaders
+)
 
 find_package(PkgConfig REQUIRED)
 

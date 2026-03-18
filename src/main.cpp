@@ -84,6 +84,14 @@ int main(void) {
     while (!glfwWindowShouldClose(window) && glfwGetKey(window, GLFW_KEY_ESCAPE) != GLFW_PRESS) {
         
         draw();
+
+        int tmp = cur; cur = prev; prev = tmp;
+        frame_id++;
+
+        if (frame_id % 100 == 0) {
+            printf("\rSamples por pixel : %d", frame_id);
+            fflush(stdout);
+        }
     }
     cleanDataFromGPU();
     glfwTerminate();
@@ -105,7 +113,7 @@ bool transferDataToGPU(void) {
     loc_res = glGetUniformLocation(pathtr_id, "resolution");
     loc_frame = glGetUniformLocation(pathtr_id, "frame_id");
     loc_prev = glGetUniformLocation(pathtr_id, "prev_frame");
-    loc_tex = glGetUniformLocation(pathtr_id, "tex");
+    loc_tex = glGetUniformLocation(program_id, "tex");
 
     //TODO Adicionar verificação dos uniforms
 
@@ -120,7 +128,7 @@ bool transferDataToGPU(void) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo[0]);
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo[i]);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex[i], 0);
     }
 
@@ -165,11 +173,4 @@ void draw(void) {
     glfwSwapBuffers(window);
     glfwPollEvents();
 
-    int tmp = cur; cur = prev; prev = tmp;
-    frame_id++;
-
-    if (frame_id % 100 == 0) {
-        printf("\rSamples por pixel : %d", frame_id);
-        fflush(stdout);
-    }
 }
