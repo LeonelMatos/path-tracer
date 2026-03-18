@@ -34,6 +34,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #define GLEW_NO_GLU
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -117,6 +118,7 @@ bool transferDataToGPU(void) {
 
     //TODO Adicionar verificação dos uniforms
 
+    //FBO ping-pong
     glGenTextures(2, tex);
     glGenFramebuffers(2, fbo);
 
