@@ -8,8 +8,16 @@ set(OpenGL_GL_PREFERENCE GLVND)
 set(CMAKE_CXX_STANDARD 17)
 
 find_package(OpenGL REQUIRED)
-find_package(GLEW   REQUIRED)
-find_package(glfw3  REQUIRED)
+
+find_package(GLEW)
+if (NOT GLEW_FOUND)
+    message(FATAL_ERROR "GLEW not found. Install with:\nsudo apt install libglew-dev")
+endif()
+
+find_package(glfw3)
+if (NOT glfw3_FOUND)
+    message(FATAL_ERROR "GLFW not found. Install with:\nsudo apt install libglfw3-dev")
+endif()
 
 # Copia os shaders para build
 #file(COPY ${CMAKE_SOURCE_DIR}/shaders DESTINATION ${CMAKE_BINARY_DIR})

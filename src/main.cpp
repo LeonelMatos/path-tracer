@@ -1,18 +1,4 @@
-// ============================================================
-//  Brute-Force Path Tracer
-//
-// Leonel Matos
-//
-//  Reproduz a mesma cena do shader da aula:
-//    • Cornell box analítica (5 paredes axis-aligned)
-//    • 1 esfera emissiva junto ao tecto (área de luz, emission=15)
-//    • 2 esferas difusas no chão
-//    • câmera: lookAt=origem, up=Z, FOV=30°
-//
-//  1 sample/pixel/frame, acumulação progressiva 
-// ============================================================
-
-/* ----------------------------------------------
+/*----------------------------------------------------------
     Brute-Force Path Tracer
     Leonel Matos 48284
 
@@ -20,7 +6,6 @@
     Image Synthesis (Summer Term 2026) Prof. Dr. Thorsten Thormählen
     Capítulo 3.2 Path Tracing, Brute-Force Evaluation of the Rendering Equation (8/32)
     (https://www.uni-marburg.de/en/fb12/research-groups/grafikmultimedia/lectures/graphics2)
-    Adaptado para OpenGL.
 
     Cornell box, 1 esfera emissiva perto do topo, 2 esferas no chão, acumulação progressiva de frames
 
@@ -29,7 +14,7 @@
         common
         display
         path_trace
-*/
+----------------------------------------------------------*/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,7 +28,9 @@
 
 using namespace std;
 
-//Global Variables
+/*----------------------------------------------------------
+  Global Variables
+*/
 GLuint program_id;
 GLuint pathtr_id;
 GLFWwindow* window;
@@ -58,10 +45,18 @@ GLint loc_res, loc_frame, loc_prev, loc_tex;
 int frame_id = 0;
 int cur = 0, prev = 1;
 
+//Time metrics
+double start_time = 0.0;
+uint total_frames = 0;
+
+/*----------------------------------------------------------
+  Function Declarations
+*/
 bool transferDataToGPU(void);
 void cleanDataFromGPU();
 void draw(void);
 
+//----------------------------------------------------------
 int main(void) {
     if (!glfwInit()) { fprintf(stderr, "Failed to init GLFW\n"); return -1; }
     glfwWindowHint(GLFW_SAMPLES, 4);
@@ -73,6 +68,7 @@ int main(void) {
     window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Path Tracer - Brute-Force", NULL, NULL);
     if (!window) { glfwTerminate(); return -1; }
     glfwMakeContextCurrent(window);
+    glfwSwapInterval(0);
 
     glewExperimental = GL_TRUE;
     glewInit();
@@ -82,17 +78,14 @@ int main(void) {
     if(!transferDataToGPU())
         return -1;
 
+    //Time init
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    start_time = ts.tv_sec + ts.tv_nsec * 1e-9;
+
     while (!glfwWindowShouldClose(window) && glfwGetKey(window, GLFW_KEY_ESCAPE) != GLFW_PRESS) {
         
         draw();
-
-        int tmp = cur; cur = prev; prev = tmp;
-        frame_id++;
-
-        if (frame_id % 100 == 0) {
-            printf("\rSamples por pixel : %d", frame_id);
-            fflush(stdout);
-        }
     }
     cleanDataFromGPU();
     glfwTerminate();
@@ -116,7 +109,7 @@ bool transferDataToGPU(void) {
     loc_prev = glGetUniformLocation(pathtr_id, "prev_frame");
     loc_tex = glGetUniformLocation(program_id, "tex");
 
-    //TODO Adicionar verificação dos uniforms
+    //TODO Add uniform verifications
 
     //FBO ping-pong
     glGenTextures(2, tex);
@@ -151,6 +144,9 @@ void cleanDataFromGPU() {
     
 }
 
+/*----------------------------------------------------------
+  Draw to GPU
+*/
 void draw(void) {
     //1 path tracing para FBO atual
     glBindFramebuffer(GL_FRAMEBUFFER, fbo[cur]);
@@ -175,4 +171,22 @@ void draw(void) {
     glfwSwapBuffers(window);
     glfwPollEvents();
 
+    int tmp = cur; cur = prev; prev = tmp;
+        frame_id++;
+
+    if (frame_id % 60 == 0) {
+        struct timespec ts;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+
+        double time_now = ts.tv_sec + ts.tv_nsec * 1e-9;
+        double time_elapsed = time_now - start_time;
+        
+        double fps = frame_id / time_elapsed;
+        double samples_per_s = (double)frame_id * WINDOW_WIDTH * WINDOW_HEIGHT / time_elapsed;
+        double ms_frame = time_elapsed / frame_id * 1000.0;
+
+        printf("\rSamples/pixel: %d | FPS: %.1f | %.1fms/frame | %.1fM samples/s | Time:%.1fs",
+            frame_id, fps, ms_frame, samples_per_s / 1e6, time_elapsed);
+        fflush(stdout);
+    }
 }
