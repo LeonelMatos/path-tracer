@@ -37,6 +37,8 @@ GLFWwindow* window;
 
 static const int WINDOW_WIDTH = 1000, WINDOW_HEIGHT = 1000;
 
+const int V_SYNC = 0;
+
 GLuint tex[2], fbo[2];
 GLuint vao;
 
@@ -68,7 +70,7 @@ int main(void) {
     window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Path Tracer - Brute-Force", NULL, NULL);
     if (!window) { glfwTerminate(); return -1; }
     glfwMakeContextCurrent(window);
-    glfwSwapInterval(0);
+    glfwSwapInterval(V_SYNC);
 
     glewExperimental = GL_TRUE;
     glewInit();
