@@ -26,6 +26,8 @@
 
 #include "common/shader.hpp"
 
+#define VERSION "1.0.0"
+
 using namespace std;
 
 /*----------------------------------------------------------
@@ -79,6 +81,8 @@ int main(void) {
 
     if(!transferDataToGPU())
         return -1;
+
+    printf("-----------------------\nPathTracer v%s\nPress ESC to quit\n-----------------------\n", VERSION);
 
     //Time init
     struct timespec ts;
