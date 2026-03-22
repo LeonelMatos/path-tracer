@@ -40,6 +40,7 @@ GLFWwindow* window;
 static const int WINDOW_WIDTH = 1000, WINDOW_HEIGHT = 1000;
 
 const int V_SYNC = 0;
+const uint MAX_SAMPLES = 500;
 
 GLuint tex[2], fbo[2];
 GLuint vao;
@@ -53,11 +54,14 @@ int cur = 0, prev = 1;
 double start_time = 0.0;
 uint total_frames = 0;
 
+const char* txt_sep = "----------------------------";
+
 /*----------------------------------------------------------
   Function Declarations
 */
 bool transferDataToGPU(void);
 void cleanDataFromGPU();
+void display(void);
 void draw(void);
 
 //----------------------------------------------------------
@@ -82,7 +86,7 @@ int main(void) {
     if(!transferDataToGPU())
         return -1;
 
-    printf("-----------------------\nPathTracer v%s\nPress ESC to quit\n-----------------------\n", VERSION);
+    printf("%s\nPathTracer v%s\nPress ESC to quit\n%s\n", txt_sep, VERSION, txt_sep);
 
     //Time init
     struct timespec ts;
@@ -150,22 +154,7 @@ void cleanDataFromGPU() {
     
 }
 
-/*----------------------------------------------------------
-  Draw to GPU
-*/
-void draw(void) {
-    //1 path tracing para FBO atual
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo[cur]);
-    glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
-    glUseProgram(pathtr_id);
-    glUniform2f(loc_res, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT);
-    glUniform1i(loc_frame, frame_id);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, tex[prev]);
-    glUniform1i(loc_prev, 0);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-    //2 textura acumulada no ecrã
+void display(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
     glUseProgram(program_id);
@@ -177,15 +166,43 @@ void draw(void) {
     glfwSwapBuffers(window);
     glfwPollEvents();
 
-    int tmp = cur; cur = prev; prev = tmp;
+}
+/*----------------------------------------------------------
+  Draw to GPU
+*/
+void draw(void) {
+    double time_now, time_elapsed;
+    
+    if (MAX_SAMPLES == 0 || frame_id < MAX_SAMPLES) {
+        
+        //Step 2 Path Tracing: to current FBO
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo[cur]);
+        glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+        glUseProgram(pathtr_id);
+        glUniform2f(loc_res, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT);
+        glUniform1i(loc_frame, frame_id);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, tex[prev]);
+        glUniform1i(loc_prev, 0);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        
+        int tmp = cur; cur = prev; prev = tmp;
         frame_id++;
 
+        if(frame_id >= MAX_SAMPLES)
+            printf("\n%s\nRender complete - %d samples/pixel in %.1fs\n", txt_sep, frame_id, time_elapsed);
+    }
+    
+    //Step 1 Display : accumulated texture to screen
+    display();
+
+    // Metrics
     if (frame_id % 60 == 0) {
         struct timespec ts;
         clock_gettime(CLOCK_MONOTONIC, &ts);
 
-        double time_now = ts.tv_sec + ts.tv_nsec * 1e-9;
-        double time_elapsed = time_now - start_time;
+        time_now = ts.tv_sec + ts.tv_nsec * 1e-9;
+        time_elapsed = time_now - start_time;
         
         double fps = frame_id / time_elapsed;
         double samples_per_s = (double)frame_id * WINDOW_WIDTH * WINDOW_HEIGHT / time_elapsed;
