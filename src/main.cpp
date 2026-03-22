@@ -94,7 +94,11 @@ int main(void) {
     start_time = ts.tv_sec + ts.tv_nsec * 1e-9;
 
     while (!glfwWindowShouldClose(window) && glfwGetKey(window, GLFW_KEY_ESCAPE) != GLFW_PRESS) {
-        
+        //Suspend the rendering after completion to avoid useless GPU processing
+        if (MAX_SAMPLES > 0 && frame_id >= MAX_SAMPLES) {
+            glfwWaitEvents(); //Gets input events and avoids program freezing
+            continue;
+        }
         draw();
     }
     cleanDataFromGPU();
