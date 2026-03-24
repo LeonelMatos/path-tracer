@@ -86,7 +86,7 @@ int main(void) {
     if(!transferDataToGPU())
         return -1;
 
-    printf("%s\nPathTracer v%s\nPress ESC to quit\n%s\n", txt_sep, VERSION, txt_sep);
+    printf("%s\nPathTracer v%s\nResolution: %dx%d\n\nPress ESC to quit\n%s\n", txt_sep, VERSION, WINDOW_WIDTH, WINDOW_HEIGHT, txt_sep);
 
     //Time init
     struct timespec ts;
@@ -175,29 +175,26 @@ void display(void) {
   Draw to GPU
 */
 void draw(void) {
-    double time_now, time_elapsed;
+    double time_now, time_elapsed = 0.0f;
     
-    if (MAX_SAMPLES == 0 || frame_id < MAX_SAMPLES) {
-        
-        //Step 2 Path Tracing: to current FBO
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo[cur]);
-        glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
-        glUseProgram(pathtr_id);
-        glUniform2f(loc_res, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT);
-        glUniform1i(loc_frame, frame_id);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, tex[prev]);
-        glUniform1i(loc_prev, 0);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-        
-        int tmp = cur; cur = prev; prev = tmp;
-        frame_id++;
+    //Step 1 Path Tracing: to current FBO
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo[cur]);
+    glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+    glUseProgram(pathtr_id);
+    glUniform2f(loc_res, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT);
+    glUniform1i(loc_frame, frame_id);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, tex[prev]);
+    glUniform1i(loc_prev, 0);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-        if(frame_id >= MAX_SAMPLES)
-            printf("\n%s\nRender complete - %d samples/pixel in %.1fs\n", txt_sep, frame_id, time_elapsed);
-    }
+    int tmp = cur; cur = prev; prev = tmp;
+    frame_id++;
+
+    if(frame_id >= MAX_SAMPLES)
+        printf("\n%s\nRender complete - %d samples/pixel in %.1fs\n", txt_sep, frame_id, time_elapsed);
     
-    //Step 1 Display : accumulated texture to screen
+    //Step 2 Display : accumulated texture to screen
     display();
 
     // Metrics
@@ -212,7 +209,7 @@ void draw(void) {
         double samples_per_s = (double)frame_id * WINDOW_WIDTH * WINDOW_HEIGHT / time_elapsed;
         double ms_frame = time_elapsed / frame_id * 1000.0;
 
-        printf("\rSamples/pixel: %d | FPS: %.1f | %.1fms/frame | %.1fM samples/s | Time:%.1fs",
+        printf("\rSamples/pixel: %d | FPS: %.1f | %.1fms/frame | %.1f | Time:%.1fs",
             frame_id, fps, ms_frame, samples_per_s / 1e6, time_elapsed);
         fflush(stdout);
     }
