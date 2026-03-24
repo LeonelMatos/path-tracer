@@ -1,4 +1,11 @@
-/*----------------------------------------------------------
+/**
+ * \file main.cpp
+ * \author Leonel Matos
+ * \date 2026-03-24
+ * \brief Test
+ * \copyright Copyright (c) 2026
+ */
+/*
     Brute-Force Path Tracer
     Leonel Matos 48284
 
@@ -14,7 +21,7 @@
         common
         display
         path_trace
-----------------------------------------------------------*/
+*/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,7 +47,7 @@ GLFWwindow* window;
 static const int WINDOW_WIDTH = 1000, WINDOW_HEIGHT = 1000;
 
 const int V_SYNC = 0;
-const uint MAX_SAMPLES = 500;
+const uint MAX_SAMPLES = 5000;
 
 GLuint tex[2], fbo[2];
 GLuint vao;
@@ -175,7 +182,7 @@ void display(void) {
   Draw to GPU
 */
 void draw(void) {
-    double time_now, time_elapsed = 0.0f;
+    double time_now, time_elapsed;
     
     //Step 1 Path Tracing: to current FBO
     glBindFramebuffer(GL_FRAMEBUFFER, fbo[cur]);

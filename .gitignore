@@ -44,6 +44,7 @@
 /bin/*
 /model/*
 /build/*
+/docs/*
 
 # scripts/notes
 *.py

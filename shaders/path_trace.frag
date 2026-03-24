@@ -10,7 +10,7 @@ uniform sampler2D prev_frame;
 const float PI  = 3.14159265359;
 const float INF = 1e30;
 const float EPS = 0.001;
-const int DEPTH = 5;
+const int DEPTH = 50;
 
 const vec3 camera_position = vec3(0.0, -5.0, 0.0);
 const vec3 camera_lookat   = vec3(0.0,  0.0, 0.0);
@@ -108,6 +108,7 @@ float sphereT(vec3 ray_origin, vec3 ray_dir, vec3 center, float radius) {
     return (t > EPS) ? t : INF;
 }
 
+/// \todo simplify environment build
 bool intersects(vec3 ray_origin, vec3 ray_dir, out Hit h) {
     h.t = INF;
     h.pos = vec3(0);
