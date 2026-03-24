@@ -60,25 +60,50 @@ vec3 cameraRay(vec2 uv) {
 
 struct Hit { float t; vec3 pos, normal, albedo, emission; };
 
-float sphereT(vec3 ray_origin, vec3 ray_direction, vec3 center, float radius) {
+/*
+ Interseção raio-esfera
+    ||o + t·v - c||² = r²
+ Expande para
+    t²(v·v) + 2t(v·(o-c)) + (||o-c||² - r²) = 0
+ Onde
+    o = ray_origin
+    v = ray_dir
+    c = center
+    r = radius
+ Solução
+    t = (-b ±sqrt(b² - 4ac)) / (2a)
+ Em que coeficientes são
+    a = v·v
+    b = 2v·(o - c)
+    c = ||o - c||² - r²
+ Simplificado para
+    b' = v·(o - c)          → float b
+    t = -b' ±sqrt(b'² - c)  → float t
+ Assumindo que ray_dir está normalizado v·v=1 → a=1
+*/
+float sphereT(vec3 ray_origin, vec3 ray_dir, vec3 center, float radius) {
+    //vetor centro da esfera até origem do raio
     vec3 origin_to_ctr = ray_origin - center;
     
-    // |P - center|^2 = radius^2
-    float b = dot(origin_to_ctr, ray_direction);
+    //projeção do vetor origin_to_ctr na direção ray_dir
+    float b = dot(origin_to_ctr, ray_dir);
 
-    //distância^2 entre origem do raio e centro da esfera - raio^2
-    float disc = b*b - dot(origin_to_ctr,origin_to_ctr) + radius*radius;
+    //constante da equação quadrática
+    float c = dot(origin_to_ctr, origin_to_ctr) - radius * radius;
+
+    float disc = b*b - c;
     if (disc < 0.0) return INF;
+
     float sqrt_disc = sqrt(disc);
 
     //soluções de interseção à entrada ou saída da esfera
+    // (t>EPS) evita auto-interseção e t negativo
     float t;
-
-    //entrada da esfera
+    //interseção próxima (entrada da esfera)
     t = -b - sqrt_disc;
     if (t > EPS) return t;
 
-    //saída da esfera (câmara dentro de esfera)
+    //interseção longe (saída da esfera)
     t = -b + sqrt_disc;
     return (t > EPS) ? t : INF;
 }
