@@ -36,25 +36,40 @@ vec3 cameraRay(vec2 uv) {
 ///\todo check brdf
 ///deve ser como uma árvore
 vec3 pathTrace(vec2 uv) {
-    vec3 ro = camera_position;
-    vec3 rd = cameraRay(uv);
+    vec3 ray_origin = camera_position;
+    vec3 ray_dir = cameraRay(uv);
     vec3 color = vec3(0);
     vec3 throughput = vec3(1);
 
     for (int b = 0; b < DEPTH; b++) {
         Hit h;
-        if (!intersects(ro, rd, h)) break;
+        if (!intersects(ray_origin, ray_dir, h)) break;
 
         color += throughput * h.emission;
         if (dot(h.emission, h.emission) > 0.0) break;
 
         vec3 r = rand3(b);
-        float cosT = sqrt(r.x);
-        float sinT = sqrt(1.0 - r.x);
-        float phi = 2.0 * PI * r.y;
-        rd = onb(h.normal) * vec3(sinT*cos(phi), sinT*sin(phi), cosT);
-        throughput *= h.albedo;
-        ro = h.pos + h.normal * EPS;
+
+        switch(h.material) {
+            //Diffuse Materials
+            case MAT_DIFFUSE:
+                //Cosine-weighted hemisphere
+                float cosT = sqrt(r.x);
+                float sinT = sqrt(1.0 - r.x);
+                float phi = 2.0 * PI * r.y;
+                ray_dir = onb(h.normal) * vec3(sinT*cos(phi), sinT*sin(phi), cosT);
+                throughput *= h.albedo;
+                ray_origin = h.pos + h.normal * EPS;
+            break;
+            case MAT_MIRROR:
+                ray_dir = reflect(ray_dir, h.normal);
+                throughput += h.albedo;
+                ray_origin = h.pos + h.normal * EPS;
+            break;
+            case MAT_GLASS:
+                ///\todo Glass material math
+            break;
+        }
     }
     return color;
 }
