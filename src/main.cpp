@@ -33,7 +33,7 @@
 
 #include "common/shader.hpp"
 
-#define VERSION "1.0.0"
+#define VERSION "1.0.1"
 
 using namespace std;
 

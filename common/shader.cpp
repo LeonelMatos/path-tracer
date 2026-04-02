@@ -30,11 +30,37 @@ static bool readShaderFile(const char* path, string& out_code) {
     return true;
 }
 
+static string preProcess(const string& code, const string& base_dir) {
+    string result, line;
+    istringstream stream(code);
+
+    while (getline(stream, line)) {
+        if (line.find("#include") == 0) {
+            size_t start = line.find('"') + 1;
+            size_t end = line.rfind('"');
+            string include_path = base_dir + "/" + line.substr(start, end-start);
+
+            string include_code;
+            if (!readShaderFile(include_path.c_str(), include_code)) return "";
+            result += preProcess(include_code, base_dir) + "\n";
+        }
+        else {
+            result += line + "\n";
+        }
+    }
+    return result;
+}
+
 static GLuint compileShader(GLenum type, const char* path, const string& code) {
+    string base_dir = string(path);
+    base_dir = base_dir.substr(0, base_dir.find('/'));
+
+    string processed = preProcess(code, base_dir);
+
     GLuint id = glCreateShader(type);
     
     printf("Compiling '%s'", path);
-    const char* src = code.c_str();
+    const char* src = processed.c_str();
     glShaderSource(id, 1, &src, NULL);
     glCompileShader(id);
 
