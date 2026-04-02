@@ -1,3 +1,11 @@
+/**
+ * \file display.frag
+ * \author Leonel Matos
+ * \date 2026-03-24
+ * \brief Screen Display Fragment Shader
+ * \copyright Copyright (c) 2026
+ */
+
 #version 460 core
 
 in vec2 vUV;

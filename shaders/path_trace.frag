@@ -1,3 +1,11 @@
+/**
+ * \file path_trace.frag
+ * \author Leonel Matos
+ * \date 2026-03-24
+ * \brief Path Tracer Shader
+ * \copyright Copyright (c) 2026
+ */
+
 #version 460 core
 
 in vec2 vUV;
@@ -10,7 +18,7 @@ uniform sampler2D prev_frame;
 const float PI  = 3.14159265359;
 const float INF = 1e30;
 const float EPS = 0.001;
-const int DEPTH = 50;
+const int DEPTH = 10;
 
 const vec3 camera_position = vec3(0.0, -5.0, 0.0);
 const vec3 camera_lookat   = vec3(0.0,  0.0, 0.0);
@@ -220,6 +228,8 @@ bool intersects(vec3 ray_origin, vec3 ray_dir, out Hit h) {
     return h.t < INF;
 }
 
+///\todo check brdf
+///deve ser como uma árvore
 vec3 pathTrace(vec2 uv) {
     vec3 ro = camera_position;
     vec3 rd = cameraRay(uv);

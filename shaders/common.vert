@@ -1,3 +1,11 @@
+/**
+ * \file common.vert
+ * \author Leonel Matos
+ * \date 2026-03-24
+ * \brief Common Vertex Shader
+ * \copyright Copyright (c) 2026
+ */
+
 #version 460 core
 
 out vec2 vUV;

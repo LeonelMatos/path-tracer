@@ -2,7 +2,7 @@
  * \file main.cpp
  * \author Leonel Matos
  * \date 2026-03-24
- * \brief Test
+ * \brief Main code
  * \copyright Copyright (c) 2026
  */
 /*
@@ -47,7 +47,7 @@ GLFWwindow* window;
 static const int WINDOW_WIDTH = 1000, WINDOW_HEIGHT = 1000;
 
 const int V_SYNC = 0;
-const uint MAX_SAMPLES = 5000;
+const uint MAX_SAMPLES = 1000;
 
 GLuint tex[2], fbo[2];
 GLuint vao;
@@ -116,12 +116,12 @@ int main(void) {
 
 bool transferDataToGPU(void) {
     program_id = LoadShaders({
-        { GL_VERTEX_SHADER,   "shaders/common.vertexshader"    },
-        { GL_FRAGMENT_SHADER, "shaders/display.fragmentshader" },
+        { GL_VERTEX_SHADER,   "shaders/common.vert"    },
+        { GL_FRAGMENT_SHADER, "shaders/display.frag" },
     });
     pathtr_id = LoadShaders({
-        { GL_VERTEX_SHADER,   "shaders/common.vertexshader"       },
-        { GL_FRAGMENT_SHADER, "shaders/path_trace.fragmentshader" },
+        { GL_VERTEX_SHADER,   "shaders/common.vert"       },
+        { GL_FRAGMENT_SHADER, "shaders/path_trace.frag" },
     });
     if(!program_id || !pathtr_id)  { glfwTerminate(); return false; }
 

@@ -1,3 +1,10 @@
+/**
+ * @file shader.cpp
+ * @author Leonel Matos
+ * @brief OpenGL shader compilation on runtime
+ * @date 2026-04-02
+ * @copyright Copyright (c) 2026
+ */
 #include <stdio.h>
 #include <string>
 #include <vector>
@@ -74,7 +81,7 @@ static GLuint linkProgram(const vector<GLuint>& shader_IDs) {
 GLuint LoadShaders(std::initializer_list<std::pair<GLenum, const char*>> shaders) {
     vector<GLuint> compiled;
     
-    //TODO Garantir que o standart é C++17
+    //TODO Garantee that the standart is C++17
     for (auto& [type, path] : shaders) {
         string code;
         if(!readShaderFile(path, code)) return 0;
