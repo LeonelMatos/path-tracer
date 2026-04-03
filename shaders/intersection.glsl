@@ -6,7 +6,7 @@ float planeT(vec3 ray_origin, vec3 ray_direction, vec3 plane_normal, float plane
     return (t > EPS) ? t : INF;
 }
 
-/*
+/**
  Interseção raio-esfera
     ||o + t·v - c||² = r²
  Expande para
@@ -54,11 +54,12 @@ float sphereT(vec3 ray_origin, vec3 ray_dir, vec3 center, float radius) {
     return (t > EPS) ? t : INF;
 }
 
+/**AABBIntersect from https://alelievr.github.io/Modern-Rendering-Introduction/AABBIntersection/ \n
+   Also based on knightcrawler25's GLSL-PATHTRACER.
+   But applied OBB for rotation.
+   Rotation is calculated from pitch and yaw for simplification
+*/
 float boxT(vec3 ray_origin, vec3 ray_dir, vec3 center, vec3 half_size, float pitch, float yaw, out vec3 out_normal) {
-   //AABBIntersect from https://alelievr.github.io/Modern-Rendering-Introduction/AABBIntersection/
-   //Also based on knightcrawler25's GLSL-PATHTRACER 
-   //But applied OBB for rotation
-   //Rotation is calculated from pitch and yaw for simplification
 
    //calculate local axis from angles
    float c_yaw = cos(radians(yaw)), s_yaw = sin(radians(yaw));

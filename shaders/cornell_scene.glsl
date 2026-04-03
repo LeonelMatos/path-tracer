@@ -126,7 +126,7 @@ bool intersects(vec3 ray_origin, vec3 ray_dir, out Hit h) {
     ray_dist = boxT(ray_origin, ray_dir,
                     vec3(-0.40, -0.40, -0.6),
                     vec3(0.30, 0.30, 0.40),
-                    0.0, 15.0,
+                    10.0, 30.0,
                     box_normal);
     if(ray_dist < h.t) {
         h.t = ray_dist;
