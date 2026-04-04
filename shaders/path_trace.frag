@@ -43,7 +43,22 @@ vec3 pathTrace(vec2 uv) {
 
     for (int b = 0; b < DEPTH; b++) {
         Hit h;
-        if (!intersects(ray_origin, ray_dir, h)) break;
+        //Background Alternative Colors
+        if (!intersects(ray_origin, ray_dir, h)) {
+            switch(BACKGROUND) {
+                case BG_BLACK:
+                    color += vec3(0);
+                break;
+                case BG_WHITE:
+                    color += throughput * vec3(0.9);
+                break;
+                case BG_GRADIENT: //skybox-like
+                    float t = clamp(ray_dir.z * 0.5 + 0.5, 0.0, 1.0);
+                    color += throughput * mix(vec3(0.5, 0.55, 0.6), vec3(0.8, 0.8, 0.8), t);
+                break;
+            }
+            break;
+        }
 
         color += throughput * h.emission;
         if (dot(h.emission, h.emission) > 0.0) break;
