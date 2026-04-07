@@ -36,15 +36,14 @@ vec3 cameraRay(vec2 uv) {
 ///\todo check brdf
 ///deve ser como uma árvore
 vec3 pathTrace(vec2 uv) {
-    vec3 ray_origin = camera_position;
-    vec3 ray_dir = cameraRay(uv);
+    Ray ray = Ray(camera_position, cameraRay(uv));
     vec3 color = vec3(0);
     vec3 throughput = vec3(1);
 
     for (int b = 0; b < DEPTH; b++) {
         Hit h;
         //Background Alternative Colors
-        if (!intersects(ray_origin, ray_dir, h)) {
+        if (!intersects(ray, h)) {
             switch(BACKGROUND) {
                 case BG_BLACK:
                     color += vec3(0);
@@ -53,7 +52,7 @@ vec3 pathTrace(vec2 uv) {
                     color += throughput * vec3(0.9);
                 break;
                 case BG_GRADIENT: //skybox-like
-                    float t = clamp(ray_dir.z * 0.5 + 0.5, 0.0, 1.0);
+                    float t = clamp(ray.direction.z * 0.5 + 0.5, 0.0, 1.0);
                     color += throughput * mix(vec3(0.5, 0.55, 0.6), vec3(0.8, 0.8, 0.8), t);
                 break;
             }
@@ -72,23 +71,23 @@ vec3 pathTrace(vec2 uv) {
                 float cosT = sqrt(r.x);
                 float sinT = sqrt(1.0 - r.x);
                 float phi = 2.0 * PI * r.y;
-                ray_dir = onb(h.normal) * vec3(sinT*cos(phi), sinT*sin(phi), cosT);
+                ray.direction = onb(h.normal) * vec3(sinT*cos(phi), sinT*sin(phi), cosT);
                 throughput *= h.albedo;
-                ray_origin = h.pos + h.normal * EPS;
+                ray.origin = h.pos + h.normal * EPS;
                 break;
             }
             case MAT_MIRROR: {
-                ray_dir = reflect(ray_dir, h.normal);
+                ray.direction = reflect(ray.direction, h.normal);
                 throughput *= h.albedo;
-                ray_origin = h.pos + h.normal * EPS;
+                ray.origin = h.pos + h.normal * EPS;
                 break;
             }
             case MAT_GLASS: {
-                bool h_entering = dot(ray_dir, h.normal) < 0.0;
+                bool h_entering = dot(ray.direction, h.normal) < 0.0;
                 vec3 normal = h_entering ? h.normal : -h.normal;
                 float eta = h_entering ? (1.0 / h.ior) : h.ior;
 
-                float cos_theta = abs(dot(-ray_dir, normal));
+                float cos_theta = abs(dot(-ray.direction, normal));
                 float r0 =  (1.0 - eta) / (1.0 + eta);
                 r0 *= r0; //r0²
                 float fresnel = r0 + (1.0 - r0) * pow(1.0 - cos_theta, 5.0);
@@ -97,12 +96,12 @@ vec3 pathTrace(vec2 uv) {
                 bool total_reflect = sin_theta_sq > 1.0;
 
                 if (total_reflect || r.z < fresnel) {
-                    ray_dir = reflect(ray_dir, normal);
-                    ray_origin = h.pos + normal * EPS;
+                    ray.direction = reflect(ray.direction, normal);
+                    ray.origin = h.pos + normal * EPS;
                 }
                 else {
-                    ray_dir = refract(ray_dir, normal, eta);
-                    ray_origin = h.pos - normal * EPS;
+                    ray.direction = refract(ray.direction, normal, eta);
+                    ray.origin = h.pos - normal * EPS;
                 }
                 throughput *= h.albedo;
                 break;

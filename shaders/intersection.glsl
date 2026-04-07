@@ -1,8 +1,8 @@
 
-float planeT(vec3 ray_origin, vec3 ray_direction, vec3 plane_normal, float plane_offset) {
-    float denom = dot(plane_normal, ray_direction);
+float planeT(Ray ray, vec3 normal, float offset) {
+    float denom = dot(normal, ray.direction);
     if (abs(denom) < 1e-8) return INF;
-    float t = (plane_offset - dot(plane_normal, ray_origin)) / denom;
+    float t = (offset - dot(normal, ray.origin)) / denom;
     return (t > EPS) ? t : INF;
 }
 
@@ -25,14 +25,14 @@ float planeT(vec3 ray_origin, vec3 ray_direction, vec3 plane_normal, float plane
  Simplificado para
     b' = v·(o - c)          → float b
     t = -b' ±sqrt(b'² - c)  → float t
- Assumindo que ray_dir está normalizado v·v=1 → a=1
+ Assumindo que ray.direction está normalizado v·v=1 → a=1
 */
-float sphereT(vec3 ray_origin, vec3 ray_dir, vec3 center, float radius) {
+float sphereT(Ray ray, vec3 center, float radius) {
     //vetor centro da esfera até origem do raio
-    vec3 origin_to_ctr = ray_origin - center;
+    vec3 origin_to_ctr = ray.origin - center;
     
-    //projeção do vetor origin_to_ctr na direção ray_dir
-    float b = dot(origin_to_ctr, ray_dir);
+    //projeção do vetor origin_to_ctr na direção ray.direction
+    float b = dot(origin_to_ctr, ray.direction);
 
     //constante da equação quadrática
     float c = dot(origin_to_ctr, origin_to_ctr) - radius * radius;
@@ -59,7 +59,7 @@ float sphereT(vec3 ray_origin, vec3 ray_dir, vec3 center, float radius) {
    But applied OBB for rotation.
    Rotation is calculated from pitch and yaw for simplification
 */
-float boxT(vec3 ray_origin, vec3 ray_dir, vec3 center, vec3 half_size, float pitch, float yaw, out vec3 out_normal) {
+float boxT(Ray ray, vec3 center, vec3 half_size, float pitch, float yaw, out vec3 out_normal) {
 
    //calculate local axis from angles
    float c_yaw = cos(radians(yaw)), s_yaw = sin(radians(yaw));
@@ -70,14 +70,14 @@ float boxT(vec3 ray_origin, vec3 ray_dir, vec3 center, vec3 half_size, float pit
 
    //ray to OBB local space
    vec3 local_origin = vec3(
-      dot(ray_origin - center, axis_x),
-      dot(ray_origin - center, axis_y),
-      dot(ray_origin - center, axis_z)
+      dot(ray.origin - center, axis_x),
+      dot(ray.origin - center, axis_y),
+      dot(ray.origin - center, axis_z)
    );
    vec3 local_dir = vec3(
-      dot(ray_dir, axis_x),
-      dot(ray_dir, axis_y),
-      dot(ray_dir, axis_z)
+      dot(ray.direction, axis_x),
+      dot(ray.direction, axis_y),
+      dot(ray.direction, axis_z)
    );
 
    //AABB intersect box
