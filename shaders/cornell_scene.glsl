@@ -109,7 +109,7 @@ bool intersects(vec3 ray_origin, vec3 ray_dir, out Hit h) {
     }
 
     // Left sphere
-    /*const vec3 sphere_left_center = vec3(-0.5, 0.0, -0.65);
+    const vec3 sphere_left_center = vec3(0.20, -0.3, -0.65);
     ray_dist = sphereT(ray_origin, ray_dir, sphere_left_center, 0.35);
     if (ray_dist < h.t) {
         h.t = ray_dist;
@@ -117,15 +117,15 @@ bool intersects(vec3 ray_origin, vec3 ray_dir, out Hit h) {
         h.normal = normalize(h.pos - sphere_left_center);
         h.albedo = WHITE;
         h.emission = vec3(0);
-        h.material = MAT_DIFFUSE;
-        h.ior = 0.0;
-    }*/
+        h.material = MAT_GLASS;
+        h.ior = 1.1;
+    }
 
     // Cube
     vec3 box_normal;
     ray_dist = boxT(ray_origin, ray_dir,
-                    vec3(-0.40, -0.40, -0.6),
-                    vec3(0.30, 0.30, 0.40),
+                    vec3(-0.50, 0.4, -0.6),
+                    vec3(0.30, 0.30, 0.30),
                     10.0, 30.0,
                     box_normal);
     if(ray_dist < h.t) {
@@ -134,21 +134,21 @@ bool intersects(vec3 ray_origin, vec3 ray_dir, out Hit h) {
         h.normal = box_normal;
         h.albedo = WHITE;
         h.emission = vec3(0);
-        h.material = MAT_DIFFUSE;
+        h.material = MAT_MIRROR;
         h.ior = 0.0;
     }
 
     // Right sphere
-    const vec3 sphere_right_center = vec3(0.3, 0.5, -0.50);
-    ray_dist = sphereT(ray_origin, ray_dir, sphere_right_center, 0.50);
+    const vec3 sphere_right_center = vec3(0.6, 0.5, -0.50);
+    ray_dist = sphereT(ray_origin, ray_dir, sphere_right_center, 0.40);
     if (ray_dist < h.t) {
         h.t = ray_dist;
         h.pos = ray_origin + ray_dist * ray_dir;
         h.normal = normalize(h.pos - sphere_right_center);
-        h.albedo = RED;
+        h.albedo = WHITE;
         h.emission = vec3(0);
-        h.material = MAT_MIRROR;
-        h.ior = 1.5;
+        h.material = MAT_DIFFUSE;
+        h.ior = 0.5;
     }
 
     return h.t < INF;

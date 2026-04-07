@@ -67,7 +67,7 @@ vec3 pathTrace(vec2 uv) {
 
         switch(h.material) {
             //Diffuse Materials
-            case MAT_DIFFUSE:
+            case MAT_DIFFUSE: {
                 //Cosine-weighted hemisphere
                 float cosT = sqrt(r.x);
                 float sinT = sqrt(1.0 - r.x);
@@ -75,15 +75,38 @@ vec3 pathTrace(vec2 uv) {
                 ray_dir = onb(h.normal) * vec3(sinT*cos(phi), sinT*sin(phi), cosT);
                 throughput *= h.albedo;
                 ray_origin = h.pos + h.normal * EPS;
-            break;
-            case MAT_MIRROR:
+                break;
+            }
+            case MAT_MIRROR: {
                 ray_dir = reflect(ray_dir, h.normal);
-                throughput += h.albedo;
+                throughput *= h.albedo;
                 ray_origin = h.pos + h.normal * EPS;
-            break;
-            case MAT_GLASS:
-                ///\todo Glass material math
-            break;
+                break;
+            }
+            case MAT_GLASS: {
+                bool h_entering = dot(ray_dir, h.normal) < 0.0;
+                vec3 normal = h_entering ? h.normal : -h.normal;
+                float eta = h_entering ? (1.0 / h.ior) : h.ior;
+
+                float cos_theta = abs(dot(-ray_dir, normal));
+                float r0 =  (1.0 - eta) / (1.0 + eta);
+                r0 *= r0; //r0²
+                float fresnel = r0 + (1.0 - r0) * pow(1.0 - cos_theta, 5.0);
+
+                float sin_theta_sq = eta * eta * (1.0 - cos_theta * cos_theta);
+                bool total_reflect = sin_theta_sq > 1.0;
+
+                if (total_reflect || r.z < fresnel) {
+                    ray_dir = reflect(ray_dir, normal);
+                    ray_origin = h.pos + normal * EPS;
+                }
+                else {
+                    ray_dir = refract(ray_dir, normal, eta);
+                    ray_origin = h.pos - normal * EPS;
+                }
+                throughput *= h.albedo;
+                break;
+            }
         }
     }
     return color;
