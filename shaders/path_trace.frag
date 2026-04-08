@@ -94,7 +94,7 @@ vec3 pathTrace(vec2 uv) {
                 break;
                 case BG_GRADIENT: //skybox-like
                     float t = clamp(ray.direction.z * 0.5 + 0.5, 0.0, 1.0);
-                    color += throughput * mix(vec3(0.5, 0.55, 0.6), vec3(0.8, 0.8, 0.8), t);
+                    color += throughput * mix(vec3(0), vec3(1), t);
                 break;
             }
             break;

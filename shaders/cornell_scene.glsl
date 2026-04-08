@@ -120,7 +120,7 @@ bool intersects(const Ray ray, out Hit h) {
 
     // Cube
     vec3 box_normal;
-    ray_dist = boxT(ray,vec3(-0.50, 0.4, -0.6), vec3(0.30, 0.30, 0.30), 10.0, 30.0, box_normal);
+    ray_dist = boxT(ray,vec3(-0.50, 0.4, -0.6), vec3(0.30, 0.30, 0.30), -10.0, 30.0, box_normal);
     if(ray_dist < h.t) {
         h.t = ray_dist;
         h.pos = ray.origin + ray_dist * ray.direction;

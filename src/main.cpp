@@ -66,6 +66,7 @@ const char* txt_sep = "----------------------------";
 /*----------------------------------------------------------
   Function Declarations
 */
+void formatTime(double seconds, char*buf, int buf_size);
 bool transferDataToGPU(void);
 void cleanDataFromGPU();
 void display(void);
@@ -112,6 +113,16 @@ int main(void) {
     glfwTerminate();
 
     return 0;
+}
+
+void formatTime(double seconds, char*buf, int buf_size) {
+    if (seconds < 60.0)
+        snprintf(buf, buf_size, "%.1fs", seconds);
+    else {
+        int min = (int)(seconds/60.0);
+        float sec = seconds - (min * 60.0);
+        snprintf(buf, buf_size, "%dm%.1fs", min, sec);
+    }
 }
 
 bool transferDataToGPU(void) {
@@ -215,9 +226,11 @@ void draw(void) {
         double fps = frame_id / time_elapsed;
         double samples_per_s = (double)frame_id * WINDOW_WIDTH * WINDOW_HEIGHT / time_elapsed;
         double ms_frame = time_elapsed / frame_id * 1000.0;
+        char time_buf[32];
+        formatTime(time_elapsed, time_buf, sizeof(time_buf));
 
-        printf("\rSamples/pixel: %d | FPS: %.1f | %.1fms/frame | %.1f | Time:%.1fs",
-            frame_id, fps, ms_frame, samples_per_s / 1e6, time_elapsed);
+        printf("\rSamples/pixel: %d | FPS: %.1f | %.1fms/frame | %.1f | Time:%s",
+            frame_id, fps, ms_frame, samples_per_s / 1e6, time_buf);
         fflush(stdout);
     }
 }

@@ -2,7 +2,7 @@
 const float PI  = 3.14159265359;
 const float INF = 1e30;
 const float EPS = 0.001;
-const int DEPTH = 4;
+const int DEPTH = 5;
 
 ///\defgroup camera Camera Settings
 ///\{
@@ -27,7 +27,7 @@ const int BG_WHITE = 1;
 const int BG_GRADIENT = 2;
 
 ///Color result if the ray doesn't reach the light
-const int BACKGROUND = BG_BLACK;
+const int BACKGROUND = BG_GRADIENT;
 ///\}
 
 ///\defgroup tone_map Tone Mapping
