@@ -44,10 +44,10 @@ GLuint program_id;
 GLuint pathtr_id;
 GLFWwindow* window;
 
-static const int WINDOW_WIDTH = 1000, WINDOW_HEIGHT = 1000;
+static const int WINDOW_WIDTH = 700, WINDOW_HEIGHT = 700;
 
 const int V_SYNC = 0;
-const uint MAX_SAMPLES = 1000;
+const uint MAX_SAMPLES = 5000;
 
 GLuint tex[2], fbo[2];
 GLuint vao;

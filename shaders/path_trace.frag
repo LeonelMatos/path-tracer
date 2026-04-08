@@ -20,26 +20,67 @@ uniform sampler2D prev_frame;
 #include "intersection.glsl"
 #include "cornell_scene.glsl"
 
-vec3 cameraRay(vec2 uv) {
+
+///\brief Calculates the base of the camera in world-space
+///\param vec3 All camera axes
+void camera_axes(out vec3 cam_x, out vec3 cam_y, out vec3 cam_z) {
+    cam_z = normalize(camera_position - camera_lookat);
+    cam_x = normalize(cross(camera_up, cam_z));
+    cam_y = cross(cam_z, cam_x);
+}
+
+/**Calculates the direction of a ray for a pixel
+\param uv Pixel coordinates
+\param vec3 All camera axes
+\return Normalized direction of ray in worldspace
+*/
+vec3 cameraRay(vec2 uv, vec3 cam_x, vec3 cam_y, vec3 cam_z) {
     float aspect = resolution.x / resolution.y;
     float f_len = 1.0 / tan(0.5 * 30.0 * PI / 180.0);
     vec2 p = 2.0 * uv - 1.0;
     vec3 ray_cam = vec3(p.x * aspect, p.y, -f_len);
-
-    vec3 cam_z = normalize(camera_position - camera_lookat);
-    vec3 cam_x = normalize(cross(camera_up, cam_z));
-    vec3 cam_y = cross(cam_z, cam_x);
-
     return normalize(cam_x * ray_cam.x + cam_y * ray_cam.y + cam_z * ray_cam.z);
 }
 
-///\todo check brdf
-///deve ser como uma árvore
+/**
+\brief Creates a ray with depth of field
+\param uv pixel coordinates [0,1]
+\return Ray with origin at the lens directed to the focal point
+\note CAM_APERTURE = 0.0 is compares to pinhole
+\see CAM_APERTURE, CAM_FOCAL_DISTANCE
+*/
+Ray cameraRayDOF(vec2 uv) {
+    vec3 cam_x, cam_y, cam_z;
+    camera_axes(cam_x, cam_y, cam_z);
+
+    //Focal point definition
+    vec3 base_dir = cameraRay(uv, cam_x, cam_y, cam_z);
+    vec3 focal_point = camera_position + base_dir * CAM_FOCAL_DISTANCE;
+
+    vec3 r = rand3(-2);
+    float angle = r.x * 2.0 * PI;
+    float radius = sqrt(r.y) * CAM_APERTURE;
+    vec3 lens_offset = (cos(angle) * cam_x + sin(angle) * cam_y) * radius;
+
+    vec3 origin = camera_position + lens_offset;
+    return Ray(origin, normalize(focal_point - origin));
+}
+
+/**
+Traces a path for each pixel and returns the radiance
+\param uv pixel coordinates [0,1]
+\return vec3 color
+\note Uses cosine-weighted sampling for diffuse materials
+and Fresnel+Snell for glass materials
+\see BACKGROUND, FOCAL_DEBUG
+\todo check brdf, deve ser como uma árvore
+*/
 vec3 pathTrace(vec2 uv) {
-    Ray ray = Ray(camera_position, cameraRay(uv));
+    Ray ray = cameraRayDOF(uv);
     vec3 color = vec3(0);
     vec3 throughput = vec3(1);
 
+    //foreach ray bounce
     for (int b = 0; b < DEPTH; b++) {
         Hit h;
         //Background Alternative Colors
@@ -57,6 +98,12 @@ vec3 pathTrace(vec2 uv) {
                 break;
             }
             break;
+        }
+
+        if (FOCAL_DEBUG && b == 0) {
+            float dist_to_focal = abs(h.t - CAM_FOCAL_DISTANCE);
+            if(dist_to_focal < FOCAL_BAND_DEBUG)
+                color += vec3(0.0, 1.0, 0.0) * 0.5;
         }
 
         color += throughput * h.emission;
