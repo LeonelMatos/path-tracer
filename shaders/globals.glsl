@@ -2,7 +2,7 @@
 const float PI  = 3.14159265359;
 const float INF = 1e30;
 const float EPS = 0.001;
-const int DEPTH = 5;
+const int DEPTH = 4;
 
 ///\defgroup camera Camera Settings
 ///\{
@@ -28,6 +28,15 @@ const int BG_GRADIENT = 2;
 
 ///Color result if the ray doesn't reach the light
 const int BACKGROUND = BG_BLACK;
+///\}
+
+///\defgroup tone_map Tone Mapping
+///\{
+const int TM_NONE = 0;
+const int TM_REINHARD = 1;
+const int TM_ACES = 2;
+
+const int TONE_MAPPING = TM_ACES;
 ///\}
 
 struct Ray {

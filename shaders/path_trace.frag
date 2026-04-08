@@ -162,11 +162,12 @@ void main() {
     vec2 jitter = (rand3(-1).xy - 0.5) / resolution;
     vec3 linear = pathTrace(vUV + jitter);
 
+    vec3 accumulated;   
     if (frame_id == 0) {
-        frag_color = vec4(pow(linear, vec3(1.0/2.2)), 1.0);
+        accumulated = linear;
     } else {
-        vec3 prev = pow(texture(prev_frame, vUV).rgb, vec3(2.2));
-        vec3 new_avg = mix(prev, linear, 1.0 / float(frame_id + 1));
-        frag_color = vec4(pow(new_avg, vec3(1.0/2.2)), 1.0);
+        vec3 prev = texture(prev_frame, vUV).rgb;
+        accumulated = mix(prev, linear, 1.0 / float(frame_id + 1));
     }
+    frag_color = vec4(accumulated, 1.0);
 }
