@@ -2,18 +2,18 @@
 const float PI  = 3.14159265359;
 const float INF = 1e30;
 const float EPS = 0.001;
-const int DEPTH = 5;
+const int DEPTH = 8;
 
 ///\defgroup camera Camera Settings
 ///\{
 ///Lens aperture `0.0` = pinhole, normal values up to `0.3`
-const float CAM_APERTURE = 0.0;
+const float CAM_APERTURE = 0.05;
 
 ///Worldspace distance between camera and focal plane
 const float CAM_FOCAL_DISTANCE = 4.7;
 
 ///Enables debug focal plane viewer
-const bool FOCAL_DEBUG = false;
+const bool FOCAL_DEBUG = true;
 
 ///Thickness of the focal plane line
 const float FOCAL_BAND_DEBUG = 0.05;

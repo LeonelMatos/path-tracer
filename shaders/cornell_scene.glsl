@@ -115,7 +115,7 @@ bool intersects(const Ray ray, out Hit h) {
         h.albedo = WHITE;
         h.emission = vec3(0);
         h.material = MAT_GLASS;
-        h.ior = 1.1;
+        h.ior = 1.5;
     }
 
     // Cube
