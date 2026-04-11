@@ -154,6 +154,18 @@ vec3 pathTrace(vec2 uv) {
                 break;
             }
         }
+
+        // Russian Roulette
+        if (b >= RR_MIN_BOUNCES && RR_MIN_BOUNCES > 0) {
+            float survival = max(throughput.r, max(throughput.g, throughput.b));
+
+            survival = min(survival, RR_MAX_SURVIVAL);
+
+            //Ends path with P = 1 - survival
+            if (rand3(b + DEPTH).x > survival) break;
+
+            throughput /= survival;
+        }
     }
     return color;
 }

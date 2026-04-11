@@ -33,7 +33,7 @@
 
 #include "common/shader.hpp"
 
-#define VERSION "1.0.1"
+#define VERSION "1.0.2"
 
 using namespace std;
 
@@ -47,7 +47,7 @@ GLFWwindow* window;
 static const int WINDOW_WIDTH = 700, WINDOW_HEIGHT = 700;
 
 const int V_SYNC = 0;
-const uint MAX_SAMPLES = 5000;
+const uint MAX_SAMPLES = 1000;
 
 GLuint tex[2], fbo[2];
 GLuint vao;
@@ -81,19 +81,19 @@ int main(void) {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Path Tracer - Brute-Force", NULL, NULL);
+    window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Path Tracer", NULL, NULL);
     if (!window) { glfwTerminate(); return -1; }
     glfwMakeContextCurrent(window);
     glfwSwapInterval(V_SYNC);
-
+    
     glewExperimental = GL_TRUE;
     glewInit();
-
+    
     glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
-
+    
     if(!transferDataToGPU())
-        return -1;
-
+    return -1;
+    
     printf("%s\nPathTracer v%s\nResolution: %dx%d\n\nPress ESC to quit\n%s\n", txt_sep, VERSION, WINDOW_WIDTH, WINDOW_HEIGHT, txt_sep);
 
     //Time init
