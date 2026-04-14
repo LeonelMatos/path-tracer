@@ -33,7 +33,7 @@
 
 #include "common/shader.hpp"
 
-#define VERSION "1.0.2"
+#define VERSION "1.0.3"
 
 using namespace std;
 
@@ -44,7 +44,7 @@ GLuint program_id;
 GLuint pathtr_id;
 GLFWwindow* window;
 
-static const int WINDOW_WIDTH = 1920, WINDOW_HEIGHT = 1080;
+static const int WINDOW_WIDTH = 1000, WINDOW_HEIGHT = 1000;
 
 const int V_SYNC = 0;
 const uint MAX_SAMPLES = 1000;

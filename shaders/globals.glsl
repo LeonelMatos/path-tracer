@@ -54,7 +54,7 @@ struct Hit {
     float ior;
 };
 
-const int SAMPLES_PER_PIXEL = 16;
+const int SAMPLES_PER_PIXEL = 4;
 
 /**\brief Russian Roulette, minimum bounces before enabling.
 Changing to more or less gives minimal performance changes
