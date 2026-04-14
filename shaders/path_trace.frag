@@ -46,20 +46,25 @@ vec3 cameraRay(vec2 uv, vec3 cam_x, vec3 cam_y, vec3 cam_z) {
 \brief Creates a ray with depth of field
 \param uv pixel coordinates [0,1]
 \return Ray with origin at the lens directed to the focal point
+\note random jitter generated here, for each spp
 \note CAM_APERTURE = 0.0 is compares to pinhole
 \see CAM_APERTURE, CAM_FOCAL_DISTANCE
 */
-Ray cameraRayDOF(vec2 uv) {
+Ray cameraRayDOF(vec2 uv, int spp_index) {
     vec3 cam_x, cam_y, cam_z;
     camera_axes(cam_x, cam_y, cam_z);
 
+    vec3 rj = rand3(-2, spp_index);
+    vec2 jitter = (rj.xz - 0.5) / resolution;
+
     //Focal point definition
-    vec3 base_dir = cameraRay(uv, cam_x, cam_y, cam_z);
+    vec3 base_dir = cameraRay(uv + jitter, cam_x, cam_y, cam_z);
     vec3 focal_point = camera_position + base_dir * CAM_FOCAL_DISTANCE;
 
-    vec3 r = rand3(-2);
-    float angle = r.x * 2.0 * PI;
-    float radius = sqrt(r.y) * CAM_APERTURE;
+    //Lens disk
+    float angle = rj.x * 2.0 * PI;
+    vec3 rDOF = rand3(-3, spp_index); //needs different random seed
+    float radius = sqrt(rDOF.x) * CAM_APERTURE;
     vec3 lens_offset = (cos(angle) * cam_x + sin(angle) * cam_y) * radius;
 
     vec3 origin = camera_position + lens_offset;
@@ -72,11 +77,11 @@ Traces a path for each pixel and returns the radiance
 \return vec3 color
 \note Uses cosine-weighted sampling for diffuse materials
 and Fresnel+Snell for glass materials
-\see BACKGROUND, FOCAL_DEBUG
+\see BACKGROUND, FOCAL_DEBUG, RR_MAX_SURVIVAL
 \todo check brdf, deve ser como uma árvore
 */
-vec3 pathTrace(vec2 uv) {
-    Ray ray = cameraRayDOF(uv);
+vec3 pathTrace(vec2 uv, int spp_index) {
+    Ray ray = cameraRayDOF(uv, spp_index);
     vec3 color = vec3(0);
     vec3 throughput = vec3(1);
 
@@ -108,7 +113,7 @@ vec3 pathTrace(vec2 uv) {
         color += throughput * h.emission;
         if (dot(h.emission, h.emission) > 0.0) break;
 
-        vec3 r = rand3(b);
+        vec3 r = rand3(b, spp_index);
 
         switch(h.material) {
             //Diffuse Materials
@@ -161,7 +166,7 @@ vec3 pathTrace(vec2 uv) {
             survival = min(survival, RR_MAX_SURVIVAL);
 
             //Ends path with P = 1 - survival
-            if (rand3(b + DEPTH).x > survival) break;
+            if (rand3(b + DEPTH, spp_index).x > survival) break;
 
             throughput /= survival;
         }
@@ -173,8 +178,7 @@ void main() {
     vec3 linear = vec3(0);
 
     for (int s = 0; s < SAMPLES_PER_PIXEL; s++) {
-        vec2 jitter = (rand3(-(s+1)).xy - 0.5) / resolution;
-        linear += pathTrace(vUV + jitter);
+        linear += pathTrace(vUV, s);
     }
     linear /= float(SAMPLES_PER_PIXEL);
 

@@ -44,7 +44,7 @@ GLuint program_id;
 GLuint pathtr_id;
 GLFWwindow* window;
 
-static const int WINDOW_WIDTH = 700, WINDOW_HEIGHT = 700;
+static const int WINDOW_WIDTH = 1920, WINDOW_HEIGHT = 1080;
 
 const int V_SYNC = 0;
 const uint MAX_SAMPLES = 1000;
@@ -210,7 +210,7 @@ void draw(void) {
     frame_id++;
 
     if(frame_id >= MAX_SAMPLES)
-        printf("\n%s\nRender complete - %d samples/pixel in %.1fs\n", txt_sep, frame_id, time_elapsed);
+        printf("\n%s\nRender complete - %d samples in %.1fs\n", txt_sep, frame_id, time_elapsed);
     
     //Step 2 Display : accumulated texture to screen
     display();

@@ -27,7 +27,7 @@ const int BG_WHITE = 1;
 const int BG_GRADIENT = 2;
 
 ///Color result if the ray doesn't reach the light
-const int BACKGROUND = BG_GRADIENT;
+const int BACKGROUND = BG_BLACK;
 ///\}
 
 ///\defgroup tone_map Tone Mapping
@@ -54,15 +54,22 @@ struct Hit {
     float ior;
 };
 
-const int SAMPLES_PER_PIXEL = 10;
+const int SAMPLES_PER_PIXEL = 16;
 
-///\brief Russian Roulette, minimum bounces before enabling
-///\note Avoids ending paths too early
-///\note Turns off RR if `0`
+/**\brief Russian Roulette, minimum bounces before enabling.
+Changing to more or less gives minimal performance changes
+Avoids ending paths too early.
+Adds noise to the image if turned on.
+\note Turns off RR if `0`
+\note Default value `3`.
+*/
 const int RR_MIN_BOUNCES = 3;
 
-///Russian Roulette, maximum chance at surviving to avoid excessive throughput
-const float RR_MAX_SURVIVAL = 0.95;
+/**Russian Roulette, maximum chance at surviving to avoid excessive throughput.
+The less the value, the more noise appears for cutted rays, but increases performance.
+\note Default value `0.95`.
+*/
+const float RR_MAX_SURVIVAL = 0.85;
 
 ///\}
 
