@@ -87,7 +87,6 @@ vec3 pathTrace(vec2 uv) {
         if (!intersects(ray, h)) {
             switch(BACKGROUND) {
                 case BG_BLACK:
-                    color += vec3(0);
                 break;
                 case BG_WHITE:
                     color += throughput * vec3(0.9);
@@ -156,7 +155,7 @@ vec3 pathTrace(vec2 uv) {
         }
 
         // Russian Roulette
-        if (b >= RR_MIN_BOUNCES && RR_MIN_BOUNCES > 0) {
+        if (RR_MIN_BOUNCES > 0 && b >= RR_MIN_BOUNCES) {
             float survival = max(throughput.r, max(throughput.g, throughput.b));
 
             survival = min(survival, RR_MAX_SURVIVAL);
@@ -171,8 +170,13 @@ vec3 pathTrace(vec2 uv) {
 }
 
 void main() {
-    vec2 jitter = (rand3(-1).xy - 0.5) / resolution;
-    vec3 linear = pathTrace(vUV + jitter);
+    vec3 linear = vec3(0);
+
+    for (int s = 0; s < SAMPLES_PER_PIXEL; s++) {
+        vec2 jitter = (rand3(-(s+1)).xy - 0.5) / resolution;
+        linear += pathTrace(vUV + jitter);
+    }
+    linear /= float(SAMPLES_PER_PIXEL);
 
     vec3 accumulated;   
     if (frame_id == 0) {

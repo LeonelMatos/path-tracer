@@ -54,7 +54,9 @@ struct Hit {
     float ior;
 };
 
-///Russian Roulette, minimum bounces before enabling
+const int SAMPLES_PER_PIXEL = 10;
+
+///\brief Russian Roulette, minimum bounces before enabling
 ///\note Avoids ending paths too early
 ///\note Turns off RR if `0`
 const int RR_MIN_BOUNCES = 3;
