@@ -36,7 +36,7 @@ void camera_axes(out vec3 cam_x, out vec3 cam_y, out vec3 cam_z) {
 */
 vec3 cameraRay(vec2 uv, vec3 cam_x, vec3 cam_y, vec3 cam_z) {
     float aspect = resolution.x / resolution.y;
-    float f_len = 1.0 / tan(0.5 * 30.0 * PI / 180.0);
+    float f_len = 1.0 / tan(0.5 * CAM_FOV_RAD);
     vec2 p = 2.0 * uv - 1.0;
     vec3 ray_cam = vec3(p.x * aspect, p.y, -f_len);
     return normalize(cam_x * ray_cam.x + cam_y * ray_cam.y + cam_z * ray_cam.z);
@@ -62,7 +62,7 @@ Ray cameraRayDOF(vec2 uv, int spp_index) {
     vec3 focal_point = camera_position + base_dir * CAM_FOCAL_DISTANCE;
 
     //Lens disk
-    float angle = rj.x * 2.0 * PI;
+    float angle = rj.x * TWO_PI;
     vec3 rDOF = rand3(-3, spp_index); //needs different random seed
     float radius = sqrt(rDOF.x) * CAM_APERTURE;
     vec3 lens_offset = (cos(angle) * cam_x + sin(angle) * cam_y) * radius;
@@ -121,7 +121,7 @@ vec3 pathTrace(vec2 uv, int spp_index) {
                 //Cosine-weighted hemisphere
                 float cosT = sqrt(r.x);
                 float sinT = sqrt(1.0 - r.x);
-                float phi = 2.0 * PI * r.y;
+                float phi = TWO_PI * r.y;
                 ray.direction = onb(h.normal) * vec3(sinT*cos(phi), sinT*sin(phi), cosT);
                 throughput *= h.albedo;
                 ray.origin = h.pos + h.normal * EPS;

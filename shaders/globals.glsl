@@ -1,5 +1,7 @@
 
 const float PI  = 3.14159265359;
+const float TWO_PI = 2.0 * PI;
+const float INV_PI = 1.0 / PI;
 const float INF = 1e30;
 const float EPS = 0.001;
 const int DEPTH = 20;
@@ -17,6 +19,9 @@ const bool FOCAL_DEBUG = false;
 
 ///Thickness of the focal plane line
 const float FOCAL_BAND_DEBUG = 0.05;
+
+///Camera FOV converted to radians
+const float CAM_FOV_RAD = 30.0 * PI / 180.0;
 ///\}
 
 ///\defgroup ambient Ambient Settings
@@ -54,8 +59,8 @@ struct Hit {
     float ior;
 };
 
-const int SAMPLES_PER_PIXEL = 4;
-
+const int SAMPLES_PER_PIXEL = 10;
+                                                                                                                    
 /**\brief Russian Roulette, minimum bounces before enabling.
 Changing to more or less gives minimal performance changes
 Avoids ending paths too early.
@@ -67,9 +72,9 @@ const int RR_MIN_BOUNCES = 3;
 
 /**Russian Roulette, maximum chance at surviving to avoid excessive throughput.
 The less the value, the more noise appears for cutted rays, but increases performance.
-\note Default value `0.95`.
+\note Default value `0.95`. Safest number without noise is ~0.75.
 */
-const float RR_MAX_SURVIVAL = 0.85;
+const float RR_MAX_SURVIVAL = 0.95;
 
 ///\}
 
