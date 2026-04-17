@@ -114,7 +114,7 @@ float boxT(Ray ray, vec3 center, vec3 half_size, float pitch, float yaw, out vec
 
 /**Möller-Trumbore ray-triangle intersect.
 */
-float triangleT(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec3 out_normal) {
+float triangleT(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec3 out_normal, out vec3 out_bary) {
    vec3 edge1 = v1 - v0;
    vec3 edge2 = v2 - v0;
    vec3 h = cross(ray.direction, edge2);
@@ -135,5 +135,11 @@ float triangleT(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec3 out_normal) {
    if (t < EPS) return INF;
 
    out_normal = normalize(cross(edge1, edge2));
+   out_bary = vec3(u, v, 1.0 - u - v);
    return t;
+}
+
+float triangleT(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec3 out_normal) {
+   vec3 bary;
+   return triangleT(ray, v0, v1, v2, out_normal, bary);
 }

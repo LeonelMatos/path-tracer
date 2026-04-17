@@ -28,7 +28,7 @@ bool intersects(const Ray ray, out Hit h) {
     vec3  hit_p;
 
     // Light
-    ray_dist = planeT(ray, vec3(0, 0, -1), -0.99);
+    ray_dist = planeT(ray, vec3(0, 0, 1), 1);
     if (ray_dist < h.t) {
         hit_p = ray.origin + ray_dist * ray.direction;
         if (abs(hit_p.x) <= 0.5 && hit_p.y >= -0.5 && hit_p.y <= 0.5) {
@@ -52,7 +52,7 @@ bool intersects(const Ray ray, out Hit h) {
             h.emission = vec3(0);
         }
     }
-    /*
+
     // Roof
     ray_dist = planeT(ray, vec3(0, 0, -1), -1.0);
     if (ray_dist < h.t) {
@@ -143,18 +143,22 @@ bool intersects(const Ray ray, out Hit h) {
         h.material = MAT_DIFFUSE;
         h.ior = 0.5;
     }
-    */
+
     // Triangle
     vec3 tri_normal;
-    ray_dist = triangleT(ray, vec3(-0.5, 0.0, -0.5), vec3(0.5, -0.5, 0.5), vec3(0.5, 0.5, -0.5), tri_normal);
+    vec3 tri_bary;
+    ray_dist = triangleT(ray, vec3(-0.8, -0.8, -0.6), vec3( 0.8, -0.8, -0.6), vec3( 0.0,  0.8, -0.4), tri_normal, tri_bary);
     if(ray_dist < h.t) {
         h.t = ray_dist;
         h.pos = ray.origin + ray_dist * ray.direction;
         h.normal = tri_normal;
-        h.albedo = vec3(0, 0, 1);
+        h.albedo = 
+            vec3(1.0, 0.0, 0.0) * tri_bary.x +
+            vec3(0.0, 1.0, 0.0) * tri_bary.y +
+            vec3(0.0, 0.0, 1.0) * tri_bary.z;
         h.emission = vec3(0);
-        h.material = MAT_DIFFUSE;
-        h.ior = 0.0;
+        h.material = MAT_TINTED_GLASS;
+        h.ior = 1;
     }
 
     return h.t < INF;

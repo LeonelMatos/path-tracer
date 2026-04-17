@@ -157,6 +157,11 @@ vec3 pathTrace(vec2 uv, int spp_index) {
                 throughput *= h.albedo;
                 break;
             }
+            case MAT_TINTED_GLASS: { //ray passes directly, no Fresnel reflection
+                throughput *= h.albedo;
+                ray.origin = h.pos + ray.direction * EPS;
+                break;
+            }
         }
 
         // Russian Roulette

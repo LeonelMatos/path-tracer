@@ -83,4 +83,5 @@ const float RR_MAX_SURVIVAL = 0.95;
 const int MAT_DIFFUSE = 0;
 const int MAT_MIRROR = 1;
 const int MAT_GLASS = 2;
+const int MAT_TINTED_GLASS = 3;
 ///\}
