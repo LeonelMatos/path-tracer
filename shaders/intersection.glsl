@@ -110,5 +110,30 @@ float boxT(Ray ray, vec3 center, vec3 half_size, float pitch, float yaw, out vec
       out_normal = normalize(local_normal.x * axis_x + local_normal.y * axis_y + local_normal.z * axis_z);
 
       return t;
+}
 
+/**Möller-Trumbore ray-triangle intersect.
+*/
+float triangleT(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec3 out_normal) {
+   vec3 edge1 = v1 - v0;
+   vec3 edge2 = v2 - v0;
+   vec3 h = cross(ray.direction, edge2);
+   float a = dot(edge1, h);
+
+   if (abs(a) < EPS) return INF;
+
+   float f = 1.0 / a;
+   vec3 s = ray.origin - v0;
+   float u = f * dot(s, h);
+   if (u < 0.0 || u > 1.0) return INF;
+
+   vec3 q = cross(s, edge1);
+   float v = f * dot(ray.direction, q);
+   if (v < 0.0 || u + v > 1.0) return INF;
+
+   float t = f * dot(edge2, q);
+   if (t < EPS) return INF;
+
+   out_normal = normalize(cross(edge1, edge2));
+   return t;
 }

@@ -27,6 +27,19 @@ bool intersects(const Ray ray, out Hit h) {
     float ray_dist;
     vec3  hit_p;
 
+    // Light
+    ray_dist = planeT(ray, vec3(0, 0, -1), -0.99);
+    if (ray_dist < h.t) {
+        hit_p = ray.origin + ray_dist * ray.direction;
+        if (abs(hit_p.x) <= 0.5 && hit_p.y >= -0.5 && hit_p.y <= 0.5) {
+            h.t = ray_dist;
+            h.pos = hit_p;
+            h.normal = vec3(0, 0, -1);
+            h.albedo = WHITE;
+            h.emission = vec3(5.0);
+        }
+    }
+
     // Floor
     ray_dist = planeT(ray, vec3(0, 0, 1), -1.0);
     if (ray_dist < h.t) {
@@ -39,7 +52,7 @@ bool intersects(const Ray ray, out Hit h) {
             h.emission = vec3(0);
         }
     }
-
+    /*
     // Roof
     ray_dist = planeT(ray, vec3(0, 0, -1), -1.0);
     if (ray_dist < h.t) {
@@ -92,19 +105,6 @@ bool intersects(const Ray ray, out Hit h) {
         }
     }
 
-    // Light
-    ray_dist = planeT(ray, vec3(0, 0, -1), -0.99);
-    if (ray_dist < h.t) {
-        hit_p = ray.origin + ray_dist * ray.direction;
-        if (abs(hit_p.x) <= 0.5 && hit_p.y >= -0.5 && hit_p.y <= 0.5) {
-            h.t = ray_dist;
-            h.pos = hit_p;
-            h.normal = vec3(0, 0, -1);
-            h.albedo = WHITE;
-            h.emission = vec3(5.0);
-        }
-    }
-
     // Left sphere
     const vec3 sphere_left_center = vec3(0.20, -0.3, -0.65);
     ray_dist = sphereT(ray, sphere_left_center, 0.35);
@@ -142,6 +142,19 @@ bool intersects(const Ray ray, out Hit h) {
         h.emission = vec3(0);
         h.material = MAT_DIFFUSE;
         h.ior = 0.5;
+    }
+    */
+    // Triangle
+    vec3 tri_normal;
+    ray_dist = triangleT(ray, vec3(-0.5, 0.0, -0.5), vec3(0.5, -0.5, 0.5), vec3(0.5, 0.5, -0.5), tri_normal);
+    if(ray_dist < h.t) {
+        h.t = ray_dist;
+        h.pos = ray.origin + ray_dist * ray.direction;
+        h.normal = tri_normal;
+        h.albedo = vec3(0, 0, 1);
+        h.emission = vec3(0);
+        h.material = MAT_DIFFUSE;
+        h.ior = 0.0;
     }
 
     return h.t < INF;
