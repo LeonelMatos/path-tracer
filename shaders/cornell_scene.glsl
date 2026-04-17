@@ -104,7 +104,7 @@ bool intersects(const Ray ray, out Hit h) {
             h.emission = vec3(0);
         }
     }
-
+/*
     // Left sphere
     const vec3 sphere_left_center = vec3(0.20, -0.3, -0.65);
     ray_dist = sphereT(ray, sphere_left_center, 0.35);
@@ -130,10 +130,10 @@ bool intersects(const Ray ray, out Hit h) {
         h.material = MAT_MIRROR;
         h.ior = 0.0;
     }
-
+*/
     // Right sphere
-    const vec3 sphere_right_center = vec3(0.6, 0.5, -0.50);
-    ray_dist = sphereT(ray, sphere_right_center, 0.40);
+    const vec3 sphere_right_center = vec3(0.1, -0.0, -0.20);
+    ray_dist = sphereT(ray, sphere_right_center, 0.30);
     if (ray_dist < h.t) {
         h.t = ray_dist;
         h.pos = ray.origin + ray_dist * ray.direction;
@@ -143,7 +143,7 @@ bool intersects(const Ray ray, out Hit h) {
         h.material = MAT_DIFFUSE;
         h.ior = 0.5;
     }
-
+/*
     // Triangle
     vec3 tri_normal;
     vec3 tri_bary;
@@ -160,6 +160,27 @@ bool intersects(const Ray ray, out Hit h) {
         h.material = MAT_TINTED_GLASS;
         h.ior = 1;
     }
-
+*/
+    //Draw Triangle loop for all triangles in buffer
+    for (int i = 0; i < triangles.length(); i++) {
+        vec3 tri_normal, tri_bary;
+        float t = triangleT(
+            ray,
+            triangles[i].v0.position,
+            triangles[i].v1.position,
+            triangles[i].v2.position,
+            tri_normal, tri_bary
+        );
+        if (t < h.t) {
+            int m_id = triangles[i].material_id;
+            h.t = t;
+            h.pos = ray.origin + t * ray.direction;
+            h.normal = tri_normal;
+            h.albedo = gpu_materials[m_id].albedo.rgb;
+            h.emission = gpu_materials[m_id].emission.rgb;
+            h.material = gpu_materials[m_id].type;
+            h.ior = gpu_materials[m_id].ior;
+        }
+    }
     return h.t < INF;
 }

@@ -4,7 +4,8 @@ const float TWO_PI = 2.0 * PI;
 const float INV_PI = 1.0 / PI;
 const float INF = 1e30;
 const float EPS = 0.001;
-const int DEPTH = 20;
+const float EPS_TRI = 0.0001;
+const int DEPTH = 10;
 
 ///\defgroup camera Camera Settings
 ///\{
@@ -32,7 +33,7 @@ const int BG_WHITE = 1;
 const int BG_GRADIENT = 2;
 
 ///Color result if the ray doesn't reach the light
-const int BACKGROUND = BG_BLACK;
+const int BACKGROUND = BG_WHITE;
 ///\}
 
 ///\defgroup tone_map Tone Mapping
@@ -59,7 +60,7 @@ struct Hit {
     float ior;
 };
 
-const int SAMPLES_PER_PIXEL = 10;
+const int SAMPLES_PER_PIXEL = 4;
                                                                                                                     
 /**\brief Russian Roulette, minimum bounces before enabling.
 Changing to more or less gives minimal performance changes
@@ -68,7 +69,7 @@ Adds noise to the image if turned on.
 \note Turns off RR if `0`
 \note Default value `3`.
 */
-const int RR_MIN_BOUNCES = 3;
+const int RR_MIN_BOUNCES = 0;
 
 /**Russian Roulette, maximum chance at surviving to avoid excessive throughput.
 The less the value, the more noise appears for cutted rays, but increases performance.
@@ -84,4 +85,41 @@ const int MAT_DIFFUSE = 0;
 const int MAT_MIRROR = 1;
 const int MAT_GLASS = 2;
 const int MAT_TINTED_GLASS = 3;
+///\}
+
+///\defgroup mesh mesh
+///\{
+struct GPUVertex {
+    vec3 position;
+    float _pad0;
+    vec3 normal;
+    float _pad1;
+    vec2 texcoord;
+    vec2 _pad2;
+};
+
+struct GPUTriangle {
+    GPUVertex v0, v1, v2;
+    int material_id;
+    float _pad[3];
+};
+
+struct GPUMaterial {
+    vec4 albedo;
+    vec4 emission;
+    int type;
+    float ior;
+    float _pad[2];
+};
+
+///Shader Storage Buffer Objects SSBO (GL 4.3+)
+///See https://ktstephano.github.io/rendering/opengl/ssbos
+layout(std430, binding = 2) buffer TriangleBuffer {
+    GPUTriangle triangles[];
+};
+
+layout(std430, binding = 3) buffer MaterialBuffer {
+    GPUMaterial gpu_materials[];
+};
+
 ///\}

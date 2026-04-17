@@ -19,6 +19,11 @@ if (NOT glfw3_FOUND)
     message(FATAL_ERROR "GLFW not found. Install with:\nsudo apt install libglfw3-dev")
 endif()
 
+find_package(glm REQUIRED)
+if (NOT glm_FOUND)
+    message(FATAL_ERROR "GLFW not found. Install with:\nsudo apt install libglm-dev")
+endif()
+
 # Copia os shaders para build
 #file(COPY ${CMAKE_SOURCE_DIR}/shaders DESTINATION ${CMAKE_BINARY_DIR})
 
@@ -41,4 +46,5 @@ target_link_libraries(pathtracer
     GLEW::GLEW
     glfw
     m
+    glm::glm
 )

@@ -120,7 +120,7 @@ float triangleT(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec3 out_normal, out vec
    vec3 h = cross(ray.direction, edge2);
    float a = dot(edge1, h);
 
-   if (abs(a) < EPS) return INF;
+   if (abs(a) < EPS_TRI) return INF;
 
    float f = 1.0 / a;
    vec3 s = ray.origin - v0;
@@ -132,9 +132,11 @@ float triangleT(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec3 out_normal, out vec
    if (v < 0.0 || u + v > 1.0) return INF;
 
    float t = f * dot(edge2, q);
-   if (t < EPS) return INF;
+   if (t < EPS_TRI) return INF;
 
    out_normal = normalize(cross(edge1, edge2));
+   if (dot(ray.direction, out_normal) > 0.0)
+      out_normal = -out_normal;
    out_bary = vec3(u, v, 1.0 - u - v);
    return t;
 }
