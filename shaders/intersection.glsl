@@ -1,10 +1,31 @@
-
+///General plane function using normal vector to give facing direction
 float planeT(Ray ray, vec3 normal, float offset) {
-    float denom = dot(normal, ray.direction);
-    if (abs(denom) < 1e-8) return INF;
-    float t = (offset - dot(normal, ray.origin)) / denom;
-    return (t > EPS) ? t : INF;
+   float denom = dot(normal, ray.direction);
+   if (abs(denom) < 1e-8) return INF;
+   float t = (offset - dot(normal, ray.origin)) / denom;
+   return (t > EPS) ? t : INF;
 }
+
+///Specific Z-axis plane, with only offset
+///\note More optimized than planeT that needs extra normal vec operations
+float planeT_Z(Ray ray, float offset) {
+   if (abs(ray.direction.z) < 1e-8) return INF;
+   float t = (offset - ray.origin.z) / ray.direction.z;
+   return (t > EPS) ? t : INF;
+}
+
+float planeT_X(Ray ray, float offset) {
+   if (abs(ray.direction.x) < 1e-8) return INF;
+   float t = (offset - ray.origin.x) / ray.direction.x;
+   return (t > EPS) ? t : INF;
+}
+
+float planeT_Y(Ray ray, float offset) {
+   if (abs(ray.direction.y) < 1e-8) return INF;
+   float t = (offset - ray.origin.y) / ray.direction.y;
+   return (t > EPS) ? t : INF;
+}
+
 
 /**
  Interseção raio-esfera

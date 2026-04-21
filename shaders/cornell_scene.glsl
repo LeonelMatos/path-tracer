@@ -41,7 +41,7 @@ bool intersects(const Ray ray, out Hit h) {
     }
 
     // Floor
-    ray_dist = planeT(ray, vec3(0, 0, 1), -1.0);
+    ray_dist = planeT_Z(ray, -1.0);
     if (ray_dist < h.t) {
         hit_p = ray.origin + ray_dist * ray.direction;
         if (abs(hit_p.x) <= 1.0 && hit_p.y >= -1.0 && hit_p.y <= 1.0) {
@@ -54,7 +54,7 @@ bool intersects(const Ray ray, out Hit h) {
     }
 
     // Roof
-    ray_dist = planeT(ray, vec3(0, 0, -1), -1.0);
+    ray_dist = planeT_Z(ray, 1.0);
     if (ray_dist < h.t) {
         hit_p = ray.origin + ray_dist * ray.direction;
         if (abs(hit_p.x) <= 1.0 && hit_p.y >= -1.0 && hit_p.y <= 1.0) {
@@ -67,7 +67,7 @@ bool intersects(const Ray ray, out Hit h) {
     }
 
     // Front Wall
-    ray_dist = planeT(ray, vec3(0, -1, 0), -1.0);
+    ray_dist = planeT_Y(ray, 1.0);
     if (ray_dist < h.t) {
         hit_p = ray.origin + ray_dist * ray.direction;
         if (abs(hit_p.x) <= 1.0 && hit_p.z >= -1.0 && hit_p.z <= 1.0) {
@@ -80,7 +80,7 @@ bool intersects(const Ray ray, out Hit h) {
     }
 
     // Left wall
-    ray_dist = planeT(ray, vec3(1, 0, 0), -1.0);
+    ray_dist = planeT_X(ray, -1.0);
     if (ray_dist < h.t) {
         hit_p = ray.origin + ray_dist * ray.direction;
         if (hit_p.y >= -1.0 && hit_p.y <= 1.0 && hit_p.z >= -1.0 && hit_p.z <= 1.0) {
@@ -93,7 +93,7 @@ bool intersects(const Ray ray, out Hit h) {
     }
 
     // Right Wall
-    ray_dist = planeT(ray, vec3(-1, 0, 0), -1.0);
+    ray_dist = planeT_X(ray, 1.0);
     if (ray_dist < h.t) {
         hit_p = ray.origin + ray_dist * ray.direction;
         if (hit_p.y >= -1.0 && hit_p.y <= 1.0 && hit_p.z >= -1.0 && hit_p.z <= 1.0) {
