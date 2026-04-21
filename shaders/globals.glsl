@@ -118,6 +118,10 @@ layout(std430, binding = 2) buffer TriangleBuffer {
     GPUTriangle triangles[];
 };
 
+///Pre-calculated count to avoid unnecessary operations in the GPU runtime
+///Used in intersects triangles loop
+uniform int triangle_count;
+
 layout(std430, binding = 3) buffer MaterialBuffer {
     GPUMaterial gpu_materials[];
 };

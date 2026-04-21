@@ -162,7 +162,7 @@ bool intersects(const Ray ray, out Hit h) {
     }
 */
     //Draw Triangle loop for all triangles in buffer
-    for (int i = 0; i < triangles.length(); i++) {
+    for (int i = 0; i < triangle_count; i++) {
         vec3 tri_normal, tri_bary;
         float t = triangleT(
             ray,

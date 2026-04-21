@@ -50,17 +50,19 @@ GLuint program_id;
 GLuint pathtr_id;
 GLFWwindow* window;
 
-static const int WINDOW_WIDTH = 1000, WINDOW_HEIGHT = 1000;
+static const int WINDOW_WIDTH = 700, WINDOW_HEIGHT = 700;
 
 #define WINDOW_TITLE "Path Tracer"
 
 const int V_SYNC = 0;
-const uint MAX_SAMPLES = 10;
+const uint MAX_SAMPLES = 50;
 
 GLuint tex[2], fbo[2];
 GLuint vao;
 
 GLint loc_res, loc_frame, loc_prev, loc_tex;
+///Triangle count fixed value passed pre-calculated
+GLint loc_tri_count;
 
 int frame_id = 0;
 int cur_f = 0, prev_f = 1;
@@ -159,6 +161,8 @@ bool transferDataToGPU(void) {
     loc_prev = glGetUniformLocation(pathtr_id, "prev_frame");
     loc_tex = glGetUniformLocation(program_id, "tex");
 
+    loc_tri_count = glGetUniformLocation(pathtr_id, "triangle_count");
+
     ///\TODO Add uniform verifications
 
     //Textures DSA
@@ -200,6 +204,9 @@ bool transferDataToGPU(void) {
         mat.type = 0;
     }
     uploadMesh(tris, mats, triangle_ssbo, material_ssbo);
+
+    glUseProgram(pathtr_id);
+    glUniform1i(loc_tri_count, (int)tris.size());
 
     printf("sizeof GPUMaterial: %zu\n", sizeof(GPUMaterial));
     printf("sizeof GPUTriangle: %zu\n", sizeof(GPUTriangle));
