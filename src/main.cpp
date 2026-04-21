@@ -32,7 +32,10 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
+#include "mesh.hpp"
 #include "common/shader.hpp"
 
 #define VERSION "1.0.3"
@@ -52,7 +55,7 @@ static const int WINDOW_WIDTH = 1000, WINDOW_HEIGHT = 1000;
 #define WINDOW_TITLE "Path Tracer"
 
 const int V_SYNC = 0;
-const uint MAX_SAMPLES = 2000;
+const uint MAX_SAMPLES = 10;
 
 GLuint tex[2], fbo[2];
 GLuint vao;
@@ -71,28 +74,6 @@ const char* txt_sep = "----------------------------";
 /*----------------------------------------------------------
   GPU
 */
-struct GPUVertex {
-    glm::vec3 position;
-    float _pad0;
-    glm::vec3 normal;
-    float _pad1;
-    glm::vec2 texcoord;
-    glm::vec2 _pad2;
-};
-
-struct GPUTriangle {
-    GPUVertex v0, v1, v2;
-    int material_id;
-    float _pad[3];
-};
-
-struct GPUMaterial {
-    glm::vec4 albedo;
-    glm::vec4 emission;
-    int type; //material
-    float ior;
-    float _pad[2];
-};
 
 GLuint triangle_ssbo;
 GLuint material_ssbo;
@@ -102,8 +83,6 @@ GLuint material_ssbo;
   Function Declarations
 */
 void formatTime(double seconds, char*buf, int buf_size);
-bool uploadMesh(const vector<GPUTriangle>& triangles, const vector<GPUMaterial>& materials);
-vector<GPUTriangle> makeTestMesh();
 bool transferDataToGPU(void);
 void cleanDataFromGPU();
 void display(void);
@@ -162,50 +141,6 @@ void formatTime(double seconds, char*buf, int buf_size) {
     }
 }
 
-/*----------------------------------------------------------
-  Meshes Loading
-*/
-
-bool uploadMesh(const vector<GPUTriangle>& triangles, const vector<GPUMaterial>& materials) {
-    //Triangles DSA
-    glCreateBuffers(1, &triangle_ssbo);
-    glNamedBufferData(triangle_ssbo, triangles.size() * sizeof(GPUTriangle), triangles.data(), GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, triangle_ssbo);
-
-    //Materialss
-    glCreateBuffers(1, &material_ssbo);
-    glNamedBufferData(material_ssbo, materials.size() * sizeof(GPUMaterial), materials.data(), GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, material_ssbo);
-
-    return true;
-}
-
-vector<GPUTriangle> makeTestMesh() {
-    GPUMaterial mat;
-    mat.albedo = vec4(0.0f, 0.0f, 0.0f, 1.0f);
-    mat.emission = vec4(0.0f);
-    mat.type = 0;
-    mat.ior = 0.0f;
-
-    vec3 A = vec3(-0.4, 0.0, 0.1);
-    vec3 B = vec3(-0.9, 0.5, -0.9);
-    vec3 C = vec3(0.2, 0.5, -0.9);
-    vec3 D = vec3(-0.4, -0.5, -0.9);
-
-    auto makeTriangle = [](vec3 p0, vec3 p1, vec3 p2, int mat_id) {
-        GPUTriangle t;
-        t.v0.position = p0; t.v0.normal = vec3(0);
-        t.v1.position = p1; t.v1.normal = vec3(0);
-        t.v2.position = p2; t.v2.normal = vec3(0);
-        t.material_id = mat_id;
-        return t;
-    };
-
-    return {
-        makeTriangle(A, B, C, 0), makeTriangle(A, C, D, 0), makeTriangle(A, D, B, 0), makeTriangle(B, D, C, 0)
-    };
-}
-
 //----------------------------------------------------------
 
 bool transferDataToGPU(void) {
@@ -250,8 +185,21 @@ bool transferDataToGPU(void) {
     glBindVertexArray(vao);
 
     auto test_triangles = makeTestMesh();
-    vector<GPUMaterial> test_material = {{{1.0f, 1.0f, 1.0f, 1}, {0,0,0,0}, 1, 0.0f, {0,0}}};
-    uploadMesh(test_triangles, test_material);
+    vector<GPUMaterial> test_materials = {{{1.0f, 1.0f, 1.0f, 1}, {0,0,0,0}, 0, 0, {0,0}}};
+
+    vector<GPUTriangle> tris; vector<GPUMaterial> mats;
+
+    mat4 transform = translate(mat4(1.0f), vec3(0, 0, -1));
+    transform = scale(transform, vec3(0.01f));
+    transform = rotate(transform, radians(90.0f), vec3(1, 0, 0));
+    //transform = rotate(transform, radians(180.0f), vec3(0, 1, 0));
+
+    loadMesh("../models/stanford_bunny_pbr/scene.gltf", tris, mats, transform);
+    for (auto& mat : mats) {
+        mat.albedo = vec4(0.8f, 0.3f, 0.1f, 1.0f);  // laranja
+        mat.type = 0;
+    }
+    uploadMesh(tris, mats, triangle_ssbo, material_ssbo);
 
     printf("sizeof GPUMaterial: %zu\n", sizeof(GPUMaterial));
     printf("sizeof GPUTriangle: %zu\n", sizeof(GPUTriangle));
@@ -311,7 +259,7 @@ void draw(void) {
     display();
 
     // Metrics
-    if (frame_id % 60 == 0) {
+    if (frame_id % 10 == 0) {
         struct timespec ts;
         clock_gettime(CLOCK_MONOTONIC, &ts);
 

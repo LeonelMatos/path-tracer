@@ -24,6 +24,11 @@ if (NOT glm_FOUND)
     message(FATAL_ERROR "GLFW not found. Install with:\nsudo apt install libglm-dev")
 endif()
 
+find_package(assimp REQUIRED)
+if (NOT glm_FOUND)
+    message(FATAL_ERROR "ASSIMP not found. Install with:\nsudo apt install libassimp-dev")
+endif()
+
 # Copia os shaders para build
 #file(COPY ${CMAKE_SOURCE_DIR}/shaders DESTINATION ${CMAKE_BINARY_DIR})
 
@@ -37,6 +42,7 @@ find_package(PkgConfig REQUIRED)
 
 add_executable(pathtracer 
     src/main.cpp
+    src/mesh.cpp
     common/shader.cpp)
 
 target_include_directories(pathtracer PRIVATE .)
@@ -47,4 +53,5 @@ target_link_libraries(pathtracer
     glfw
     m
     glm::glm
+    assimp
 )

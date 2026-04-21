@@ -130,7 +130,7 @@ bool intersects(const Ray ray, out Hit h) {
         h.material = MAT_MIRROR;
         h.ior = 0.0;
     }
-*/
+
     // Right sphere
     const vec3 sphere_right_center = vec3(0.1, -0.0, -0.20);
     ray_dist = sphereT(ray, sphere_right_center, 0.30);
@@ -143,7 +143,7 @@ bool intersects(const Ray ray, out Hit h) {
         h.material = MAT_DIFFUSE;
         h.ior = 0.5;
     }
-/*
+
     // Triangle
     vec3 tri_normal;
     vec3 tri_bary;

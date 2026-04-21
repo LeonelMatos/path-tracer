@@ -5,11 +5,11 @@ const float INV_PI = 1.0 / PI;
 const float INF = 1e30;
 const float EPS = 0.001;
 const float EPS_TRI = 0.0001;
-const int DEPTH = 10;
+const int DEPTH = 5;
 
 ///\defgroup camera Camera Settings
 ///\{
-///Lens aperture `0.0` = pinhole, normal values up to `0.3`
+///Lens aperture `0.0` = pinhole (no DOF), normal values up to `0.3`
 const float CAM_APERTURE = 0.00;
 
 ///Worldspace distance between camera and focal plane
@@ -33,7 +33,7 @@ const int BG_WHITE = 1;
 const int BG_GRADIENT = 2;
 
 ///Color result if the ray doesn't reach the light
-const int BACKGROUND = BG_WHITE;
+const int BACKGROUND = BG_BLACK;
 ///\}
 
 ///\defgroup tone_map Tone Mapping
@@ -60,7 +60,7 @@ struct Hit {
     float ior;
 };
 
-const int SAMPLES_PER_PIXEL = 4;
+const int SAMPLES_PER_PIXEL = 1;
                                                                                                                     
 /**\brief Russian Roulette, minimum bounces before enabling.
 Changing to more or less gives minimal performance changes
@@ -69,13 +69,13 @@ Adds noise to the image if turned on.
 \note Turns off RR if `0`
 \note Default value `3`.
 */
-const int RR_MIN_BOUNCES = 0;
+const int RR_MIN_BOUNCES = 3;
 
 /**Russian Roulette, maximum chance at surviving to avoid excessive throughput.
 The less the value, the more noise appears for cutted rays, but increases performance.
 \note Default value `0.95`. Safest number without noise is ~0.75.
 */
-const float RR_MAX_SURVIVAL = 0.95;
+const float RR_MAX_SURVIVAL = 0.75;
 
 ///\}
 
