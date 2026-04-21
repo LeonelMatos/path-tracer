@@ -8,7 +8,13 @@
 using namespace std;
 using namespace glm;
 
-bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMaterial>& materials, mat4 transform = mat4(1.0f)) {
+bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMaterial>& materials, mat4 transform, MeshBounds* bounds) {\
+    //Initialize bounds
+    if (bounds) {
+        bounds->min_bound = vec3(FLT_MAX);
+        bounds->max_bound = vec3(-FLT_MAX);
+    }
+
     Assimp::Importer importer;
     const aiScene* scene = importer.ReadFile(path,
          aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_FlipUVs | aiProcess_JoinIdenticalVertices);
@@ -65,12 +71,23 @@ bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMate
                 
                 if(mesh->HasTextureCoords(0))
                     verts[v]->texcoord = vec2(mesh->mTextureCoords[0][idx].x, mesh->mTextureCoords[0][idx].y);
+
+                if(bounds) {
+                    bounds->min_bound = min(bounds->min_bound, verts[v]->position);
+                    bounds->max_bound = max(bounds->max_bound, verts[v]->position);
+                }
             }
             tri.material_id = mesh->mMaterialIndex;
             triangles.push_back(tri);
         }
     }
     printf("\tTotal %zu triangles, %zu materials", triangles.size(), materials.size());
+
+    if(bounds)
+        printf("\tBounds: (%.2f,%.2f,%.2f) to (%.2f,%.2f,%.2f)\n",
+             bounds->min_bound.x, bounds->min_bound.y, bounds->min_bound.z,
+             bounds->max_bound.x, bounds->max_bound.y, bounds->max_bound.z);
+
     return true;
 }
 

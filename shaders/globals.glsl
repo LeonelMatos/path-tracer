@@ -87,7 +87,7 @@ const int MAT_GLASS = 2;
 const int MAT_TINTED_GLASS = 3;
 ///\}
 
-///\defgroup mesh mesh
+///\defgroup mesh Mesh
 ///\{
 struct GPUVertex {
     vec3 position;
@@ -118,12 +118,24 @@ layout(std430, binding = 2) buffer TriangleBuffer {
     GPUTriangle triangles[];
 };
 
-///Pre-calculated count to avoid unnecessary operations in the GPU runtime
-///Used in intersects triangles loop
-uniform int triangle_count;
 
 layout(std430, binding = 3) buffer MaterialBuffer {
     GPUMaterial gpu_materials[];
 };
+
+///\}
+
+///\defgroup mesh_aabb AABB Early rejection
+///\brief Bounding box of the loaded mesh to skip the triangle loop for
+///rays that don't interact with the model. Improves performance
+///\see intersects, loadMesh
+///\{
+
+uniform vec3 mesh_aabb_min;
+uniform vec3 mesh_aabb_max;
+
+///Pre-calculated count to avoid unnecessary operations in the GPU runtime
+///Used in intersects triangles loop
+uniform int triangle_count;
 
 ///\}

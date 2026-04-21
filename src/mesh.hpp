@@ -32,7 +32,27 @@ struct GPUMaterial {
     float _pad[2];
 };
 
-bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMaterial>& materials, mat4 transform);
+/**\brief Loaded mesh bounding box, axis-aligned, used for AABB early rejection
+Calculated during loadMesh. Used for AABB early rejection for rays that miss the bouding box
+\see loadMesh, intersects
+*/
+struct MeshBounds {
+    ///Minimum corner in world position
+    vec3 min_bound;
+    ///Maximum corner in world position
+    vec3 max_bound;
+};
+
+/**\brief Loads a mesh and calculates its bounding box
+\param path Path to the mesh file (any file format supported by ASSIMP)
+\param triangles Output triangle buffer
+\param materials Output material buffer
+\param transform Transform matrix applied to all vertices (default: Identity)
+\param bounds Optional output bounding box - nullptr to skip
+\return true if loaded correctly
+\see MeshBounds, uploadMesh
+ */
+bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMaterial>& materials, mat4 transform = mat4(1.0f), MeshBounds* bounds = nullptr);
 
 bool uploadMesh(const vector<GPUTriangle>& triangles, const vector<GPUMaterial>& materials, GLuint& tri_ssbo, GLuint& mat_ssbo);
 

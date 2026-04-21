@@ -38,7 +38,7 @@
 #include "mesh.hpp"
 #include "common/shader.hpp"
 
-#define VERSION "1.0.3"
+#define VERSION "1.0.4"
 
 using namespace std;
 using namespace glm;
@@ -61,8 +61,6 @@ GLuint tex[2], fbo[2];
 GLuint vao;
 
 GLint loc_res, loc_frame, loc_prev, loc_tex;
-///Triangle count fixed value passed pre-calculated
-GLint loc_tri_count;
 
 int frame_id = 0;
 int cur_f = 0, prev_f = 1;
@@ -74,11 +72,13 @@ uint total_frames = 0;
 const char* txt_sep = "----------------------------";
 
 /*----------------------------------------------------------
-  GPU
+GPU Mesh Render
 */
-
 GLuint triangle_ssbo;
 GLuint material_ssbo;
+///Triangle count fixed value passed pre-calculated
+GLint loc_tri_count;
+GLint loc_aabb_min, loc_aabb_max;
 
 
 /*----------------------------------------------------------
@@ -162,6 +162,8 @@ bool transferDataToGPU(void) {
     loc_tex = glGetUniformLocation(program_id, "tex");
 
     loc_tri_count = glGetUniformLocation(pathtr_id, "triangle_count");
+    loc_aabb_min = glGetUniformLocation(pathtr_id, "mesh_aabb_min");
+    loc_aabb_max = glGetUniformLocation(pathtr_id, "mesh_aabb_max");
 
     ///\TODO Add uniform verifications
 
@@ -193,12 +195,14 @@ bool transferDataToGPU(void) {
 
     vector<GPUTriangle> tris; vector<GPUMaterial> mats;
 
+    MeshBounds bounds;
+
     mat4 transform = translate(mat4(1.0f), vec3(0, 0, -1));
     transform = scale(transform, vec3(0.01f));
     transform = rotate(transform, radians(90.0f), vec3(1, 0, 0));
     //transform = rotate(transform, radians(180.0f), vec3(0, 1, 0));
 
-    loadMesh("../models/stanford_bunny_pbr/scene.gltf", tris, mats, transform);
+    loadMesh("../models/stanford_bunny_pbr/scene.gltf", tris, mats, transform, &bounds);
     for (auto& mat : mats) {
         mat.albedo = vec4(0.8f, 0.3f, 0.1f, 1.0f);  // laranja
         mat.type = 0;
@@ -207,6 +211,8 @@ bool transferDataToGPU(void) {
 
     glUseProgram(pathtr_id);
     glUniform1i(loc_tri_count, (int)tris.size());
+    glUniform3f(loc_aabb_min, bounds.min_bound.x, bounds.min_bound.y, bounds.min_bound.z);
+    glUniform3f(loc_aabb_max, bounds.max_bound.x, bounds.max_bound.y, bounds.max_bound.z);
 
     printf("sizeof GPUMaterial: %zu\n", sizeof(GPUMaterial));
     printf("sizeof GPUTriangle: %zu\n", sizeof(GPUTriangle));

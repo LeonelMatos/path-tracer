@@ -161,25 +161,34 @@ bool intersects(const Ray ray, out Hit h) {
         h.ior = 1;
     }
 */
-    //Draw Triangle loop for all triangles in buffer
-    for (int i = 0; i < triangle_count; i++) {
-        vec3 tri_normal, tri_bary;
-        float t = triangleT(
-            ray,
-            triangles[i].v0.position,
-            triangles[i].v1.position,
-            triangles[i].v2.position,
-            tri_normal, tri_bary
-        );
-        if (t < h.t) {
-            int m_id = triangles[i].material_id;
-            h.t = t;
-            h.pos = ray.origin + t * ray.direction;
-            h.normal = tri_normal;
-            h.albedo = gpu_materials[m_id].albedo.rgb;
-            h.emission = gpu_materials[m_id].emission.rgb;
-            h.material = gpu_materials[m_id].type;
-            h.ior = gpu_materials[m_id].ior;
+
+    //AABB Early Rejection
+    //Converts uniform min/max corners to center/half_size for boxT
+    //Avoids O(triangle_count) tests for most rays
+    vec3 aabb_center = (mesh_aabb_min + mesh_aabb_max) * 0.5;
+    vec3 aabb_half_size = (mesh_aabb_max - mesh_aabb_min) * 0.5;
+    vec3 aabb_normal;
+    float aabb_t = boxT(ray, aabb_center, aabb_half_size, 0.0, 0.0, aabb_normal);
+    if (aabb_t < h.t) {
+        //Draw Triangle loop for all triangles in buffer
+        for (int i = 0; i < triangle_count; i++) {
+            vec3 tri_normal, tri_bary;
+            float t = triangleT(
+                ray,
+                triangles[i].v0.position,
+                triangles[i].v1.position,
+                triangles[i].v2.position,
+                tri_normal, tri_bary);
+            if(t < h.t) {
+                int m_id = triangles[i].material_id;
+                h.t = t;
+                h.pos = ray.origin + t * ray.direction;
+                h.normal = tri_normal;
+                h.albedo = gpu_materials[m_id].albedo.rgb;
+                h.emission = gpu_materials[m_id].emission.rgb;
+                h.material = gpu_materials[m_id].type;
+                h.ior = gpu_materials[m_id].ior;
+            }
         }
     }
     return h.t < INF;
