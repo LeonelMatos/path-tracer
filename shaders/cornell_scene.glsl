@@ -144,7 +144,7 @@ bool intersects(const Ray ray, out Hit h) {
         h.ior = 0.5;
     }
 
-    // Triangle
+    // 1 Triangle
     vec3 tri_normal;
     vec3 tri_bary;
     ray_dist = triangleT(ray, vec3(-0.8, -0.8, -0.6), vec3( 0.8, -0.8, -0.6), vec3( 0.0,  0.8, -0.4), tri_normal, tri_bary);

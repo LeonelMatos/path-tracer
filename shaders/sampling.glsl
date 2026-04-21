@@ -9,13 +9,13 @@ vec3 pcg3d(uvec3 v) {
 }
 
 ///\note using frame_id as seed gives same output
-vec3 rand3(int bounce, int seed) {
+vec3 rand3(int bounce, int path_id) {
     uvec2 px = uvec2(gl_FragCoord.xy);
-    uint fid = uint(frame_id);
-    uint sid = uint(seed);
+    uint fid = uint(frame_id) * 2654435761u;
+    uint sid = uint(path_id) * 3266489917u;
     return pcg3d(uvec3(
-        px.x ^ (fid * 2654435761u) ^ (sid * 3266489917u),
-        px.y ^ (fid * 2246822519u) ^ (sid * 2246822519u),
+        px.x ^ fid ^ sid,
+        px.y ^ fid ^ sid,
         uint(bounce + 1)
     ));
 }
