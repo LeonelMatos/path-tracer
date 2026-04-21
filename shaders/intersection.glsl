@@ -1,4 +1,5 @@
 ///General plane function using normal vector to give facing direction
+///\note needs dot product for normal orientation, slower.
 float planeT(Ray ray, vec3 normal, float offset) {
    float denom = dot(normal, ray.direction);
    if (abs(denom) < 1e-8) return INF;
@@ -14,12 +15,14 @@ float planeT_Z(Ray ray, float offset) {
    return (t > EPS) ? t : INF;
 }
 
+///Specific X-axis plane, with only offset
 float planeT_X(Ray ray, float offset) {
    if (abs(ray.direction.x) < 1e-8) return INF;
    float t = (offset - ray.origin.x) / ray.direction.x;
    return (t > EPS) ? t : INF;
 }
 
+///Specific Y-axis plane, with only offset
 float planeT_Y(Ray ray, float offset) {
    if (abs(ray.direction.y) < 1e-8) return INF;
    float t = (offset - ray.origin.y) / ray.direction.y;
