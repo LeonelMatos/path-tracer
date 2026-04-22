@@ -50,12 +50,12 @@ GLuint program_id;
 GLuint pathtr_id;
 GLFWwindow* window;
 
-static const int WINDOW_WIDTH = 700, WINDOW_HEIGHT = 700;
+static const int WINDOW_WIDTH = 500, WINDOW_HEIGHT = 500;
 
 #define WINDOW_TITLE "Path Tracer"
 
 const int V_SYNC = 0;
-const uint MAX_SAMPLES = 50;
+const uint MAX_SAMPLES = 1000;
 
 GLuint tex[2], fbo[2];
 GLuint vao;
@@ -201,6 +201,7 @@ bool transferDataToGPU(void) {
     transform = scale(transform, vec3(0.01f));
     transform = rotate(transform, radians(90.0f), vec3(1, 0, 0));
     //transform = rotate(transform, radians(180.0f), vec3(0, 1, 0));
+    //transform = rotate(transform, radians(180.0f), vec3(0, 0, 1));
 
     loadMesh("../models/stanford_bunny_pbr/scene.gltf", tris, mats, transform, &bounds);
     for (auto& mat : mats) {

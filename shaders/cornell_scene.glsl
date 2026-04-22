@@ -39,7 +39,6 @@ bool intersects(const Ray ray, out Hit h) {
             h.emission = vec3(5.0);
         }
     }
-
     // Floor
     ray_dist = planeT_Z(ray, -1.0);
     if (ray_dist < h.t) {
@@ -105,6 +104,7 @@ bool intersects(const Ray ray, out Hit h) {
         }
     }
 /*
+
     // Left sphere
     const vec3 sphere_left_center = vec3(0.20, -0.3, -0.65);
     ray_dist = sphereT(ray, sphere_left_center, 0.35);
@@ -160,8 +160,8 @@ bool intersects(const Ray ray, out Hit h) {
         h.material = MAT_TINTED_GLASS;
         h.ior = 1;
     }
-*/
 
+*/
     //AABB Early Rejection
     //Converts uniform min/max corners to center/half_size for boxT
     //Avoids O(triangle_count) tests for most rays
@@ -169,6 +169,7 @@ bool intersects(const Ray ray, out Hit h) {
     vec3 aabb_half_size = (mesh_aabb_max - mesh_aabb_min) * 0.5;
     vec3 aabb_normal;
     float aabb_t = boxT(ray, aabb_center, aabb_half_size, 0.0, 0.0, aabb_normal);
+    
     if (aabb_t < h.t) {
         //Draw Triangle loop for all triangles in buffer
         for (int i = 0; i < triangle_count; i++) {
@@ -180,10 +181,14 @@ bool intersects(const Ray ray, out Hit h) {
                 triangles[i].v2.position,
                 tri_normal, tri_bary);
             if(t < h.t) {
+                //Interpolate vertices normals with bari for smooth shading
+                vec3 smooth_normal = triangles[i].v0.normal * (1.0 - tri_bary.x - tri_bary.y) +
+                    triangles[i].v1.normal * tri_bary.x + triangles[i].v2.normal * tri_bary.y;
+
                 int m_id = triangles[i].material_id;
                 h.t = t;
                 h.pos = ray.origin + t * ray.direction;
-                h.normal = tri_normal;
+                h.normal = length(smooth_normal) > EPS ? normalize(smooth_normal) : tri_normal;
                 h.albedo = gpu_materials[m_id].albedo.rgb;
                 h.emission = gpu_materials[m_id].emission.rgb;
                 h.material = gpu_materials[m_id].type;
