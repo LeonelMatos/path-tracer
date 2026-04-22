@@ -9,8 +9,8 @@ vec3 pcg3d(uvec3 v) {
 }
 
 ///\note using frame_id as seed gives same output
-vec3 rand3(int bounce, int path_id) {
-    uvec2 px = uvec2(gl_FragCoord.xy);
+///\note px coords passed from frag or comp shader
+vec3 rand3(int bounce, int path_id, uvec2 px) {
     uint fid = uint(frame_id) * 2654435761u;
     uint sid = uint(path_id) * 3266489917u;
     return pcg3d(uvec3(

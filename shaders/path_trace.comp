@@ -1,0 +1,48 @@
+/**
+ * \file path_trace.comp
+ * \author Leonel Matos
+ * \date 2026-04-22
+ * \brief Path Tracer Compute Shader
+ * \copyright Copyright (c) 2026
+*/
+
+#version 460 core
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(rgba32f, binding = 0) uniform image2D output_image;
+layout(rgba32f, binding = 1) uniform image2D prev_image;
+
+uniform vec2 resolution;
+uniform int frame_id;
+
+#include "globals.glsl"
+#include "sampling.glsl"
+#include "intersection.glsl"
+#include "cornell_scene.glsl"
+#include "path_trace_core.glsl"
+
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if(pixel.x >= int(resolution.x) || pixel.y >= int(resolution.y)) return;
+
+    vec2 uv = (vec2(pixel) + 0.5) / resolution;
+
+    uvec2 px = uvec2(gl_GlobalInvocationID.xy);
+
+    vec3 linear = vec3(0);
+    for (int s = 0; s < SAMPLES_PER_PIXEL; s++) {
+        linear += pathTrace(uv, s, px);
+    }
+    linear /= float(SAMPLES_PER_PIXEL);
+
+    vec3 accumulated;
+    if (frame_id == 0) {
+        accumulated = linear;
+    } else {
+        vec3 prev = imageLoad(prev_image, pixel).rgb;
+        accumulated = mix(prev, linear, 1.0 / float(frame_id + 1));
+    }
+
+    imageStore(output_image, pixel, vec4(accumulated, 1.0));
+}

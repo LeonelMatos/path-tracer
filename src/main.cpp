@@ -38,7 +38,7 @@
 #include "mesh.hpp"
 #include "common/shader.hpp"
 
-#define VERSION "1.0.4"
+#define VERSION "1.1.0"
 
 using namespace std;
 using namespace glm;
@@ -47,18 +47,29 @@ using namespace glm;
   Global Variables
 */
 GLuint program_id;
-GLuint pathtr_id;
+GLuint pathtr_frg_id;
+//used for compute shader
+GLuint pathtr_cpt_id;
 GLFWwindow* window;
 
-static const int WINDOW_WIDTH = 500, WINDOW_HEIGHT = 500;
+static const int WINDOW_WIDTH = 1000, WINDOW_HEIGHT = 1000;
 
 #define WINDOW_TITLE "Path Tracer"
 
+/**Switches between using fragment or compute shaders
+for the path tracer
+\note false = fragment; true = compute*/
+const bool USE_COMPUTE_SH = true;
+
+static const int COMPUTE_LOCAL_X = 16;
+static const int COMPUTE_LOCAL_Y = 16;
+
 const int V_SYNC = 0;
-const uint MAX_SAMPLES = 1000;
+const uint MAX_SAMPLES = 50;
 
 GLuint tex[2], fbo[2];
 GLuint vao;
+
 
 GLint loc_res, loc_frame, loc_prev, loc_tex;
 
@@ -112,7 +123,8 @@ int main(void) {
     if(!transferDataToGPU())
     return -1;
     
-    printf("%s\n%s v%s\nResolution: %dx%d\n\nPress ESC to quit\n%s\n", txt_sep, WINDOW_TITLE, VERSION, WINDOW_WIDTH, WINDOW_HEIGHT, txt_sep);
+    printf("%s\n%s v%s\nResolution: %dx%d\n", txt_sep, WINDOW_TITLE, VERSION, WINDOW_WIDTH, WINDOW_HEIGHT);
+    printf("Shader: %s\nPress ESC to quit\n%s\n", USE_COMPUTE_SH ? "Compute" : "Fragment", txt_sep);
 
     //Time init
     struct timespec ts;
@@ -150,22 +162,28 @@ bool transferDataToGPU(void) {
         { GL_VERTEX_SHADER,   "shaders/common.vert"    },
         { GL_FRAGMENT_SHADER, "shaders/display.frag" },
     });
-    pathtr_id = LoadShaders({
+    pathtr_frg_id = LoadShaders({
         { GL_VERTEX_SHADER,   "shaders/common.vert"       },
         { GL_FRAGMENT_SHADER, "shaders/path_trace.frag" },
     });
-    if(!program_id || !pathtr_id)  { glfwTerminate(); return false; }
+    pathtr_cpt_id = LoadShaders({
+        { GL_COMPUTE_SHADER, "shaders/path_trace.comp" }
+    });
+    if(!program_id || !pathtr_frg_id || !pathtr_cpt_id)  { glfwTerminate(); return false; }
 
-    loc_res = glGetUniformLocation(pathtr_id, "resolution");
-    loc_frame = glGetUniformLocation(pathtr_id, "frame_id");
-    loc_prev = glGetUniformLocation(pathtr_id, "prev_frame");
-    loc_tex = glGetUniformLocation(program_id, "tex");
+    //Select shader
+    GLuint active_id = USE_COMPUTE_SH ? pathtr_cpt_id : pathtr_frg_id;
 
-    loc_tri_count = glGetUniformLocation(pathtr_id, "triangle_count");
-    loc_aabb_min = glGetUniformLocation(pathtr_id, "mesh_aabb_min");
-    loc_aabb_max = glGetUniformLocation(pathtr_id, "mesh_aabb_max");
+    loc_res = glGetUniformLocation(active_id, "resolution");
+    loc_frame = glGetUniformLocation(active_id, "frame_id");
+    loc_tex = glGetUniformLocation(active_id, "tex");
+    loc_tri_count = glGetUniformLocation(active_id, "triangle_count");
+    loc_aabb_min = glGetUniformLocation(active_id, "mesh_aabb_min");
+    loc_aabb_max = glGetUniformLocation(active_id, "mesh_aabb_max");
 
-    ///\TODO Add uniform verifications
+    if(!USE_COMPUTE_SH) {
+        loc_prev = glGetUniformLocation(pathtr_frg_id, "prev_frame");\
+    }
 
     //Textures DSA
     glCreateTextures(GL_TEXTURE_2D, 2, tex);
@@ -190,6 +208,8 @@ bool transferDataToGPU(void) {
     glCreateVertexArrays(1, &vao);
     glBindVertexArray(vao);
 
+    //Mesh Loading//
+
     auto test_triangles = makeTestMesh();
     vector<GPUMaterial> test_materials = {{{1.0f, 1.0f, 1.0f, 1}, {0,0,0,0}, 0, 0, {0,0}}};
 
@@ -210,14 +230,10 @@ bool transferDataToGPU(void) {
     }
     uploadMesh(tris, mats, triangle_ssbo, material_ssbo);
 
-    glUseProgram(pathtr_id);
+    glUseProgram(active_id);
     glUniform1i(loc_tri_count, (int)tris.size());
     glUniform3f(loc_aabb_min, bounds.min_bound.x, bounds.min_bound.y, bounds.min_bound.z);
     glUniform3f(loc_aabb_max, bounds.max_bound.x, bounds.max_bound.y, bounds.max_bound.z);
-
-    printf("sizeof GPUMaterial: %zu\n", sizeof(GPUMaterial));
-    printf("sizeof GPUTriangle: %zu\n", sizeof(GPUTriangle));
-    printf("offsetof material_id: %zu\n", offsetof(GPUTriangle, material_id));
 
     return true;
 }
@@ -226,7 +242,9 @@ void cleanDataFromGPU() {
     glDeleteVertexArrays(1, &vao);
     glDeleteTextures(2, tex);
     glDeleteFramebuffers(2, fbo);
-    glDeleteProgram(pathtr_id);
+    
+    GLuint active_id = USE_COMPUTE_SH ? pathtr_cpt_id : pathtr_frg_id;
+    glDeleteProgram(active_id);
     glDeleteProgram(program_id);
 
     glDeleteBuffers(1, &triangle_ssbo);
@@ -252,16 +270,35 @@ void display(void) {
 */
 void draw(void) {
     double time_now, time_elapsed;
+    GLuint active_id = USE_COMPUTE_SH ? pathtr_cpt_id : pathtr_frg_id;
     
-    //Step 1 Path Tracing: to current FBO
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo[cur_f]);
-    glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
-    glUseProgram(pathtr_id);
-    glUniform2f(loc_res, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT);
-    glUniform1i(loc_frame, frame_id);
-    glBindTextureUnit(0, tex[prev_f]);
-    glUniform1i(loc_prev, 0);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    //Step 1 Path Tracing
+    if(USE_COMPUTE_SH) {
+        //Compute pass, no fbo, no quad screen
+        glUseProgram(active_id);
+        glUniform2f(loc_res, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT);
+        glUniform1i(loc_frame, frame_id);
+
+        glBindImageTexture(0, tex[cur_f], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+        glBindImageTexture(1, tex[prev_f], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+
+        //Dispatch 16x16 work groups
+        int groups_x = (WINDOW_WIDTH + COMPUTE_LOCAL_X - 1) / 16;
+        int groups_y = (WINDOW_HEIGHT + COMPUTE_LOCAL_Y - 1) / 16;
+        glDispatchCompute(groups_x, groups_y, 1);
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    }
+    else {
+        //Fragment pass
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo[cur_f]);
+        glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+        glUseProgram(active_id);
+        glUniform2f(loc_res, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT);
+        glUniform1i(loc_frame, frame_id);
+        glBindTextureUnit(0, tex[prev_f]);
+        glUniform1i(loc_prev, 0);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    }
 
     int tmp = cur_f; cur_f = prev_f; prev_f = tmp;
     frame_id++;
