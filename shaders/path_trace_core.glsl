@@ -73,8 +73,8 @@ vec3 pathTrace(vec2 uv, int spp_index, uvec2 px) {
     //foreach ray bounce
     for (int b = 0; b < DEPTH; b++) {
         Hit h;
-        //Background Alternative Colors
         if (!intersects(ray, h)) {
+            //Background Alternative Colors
             switch(BACKGROUND) {
                 case BG_BLACK:
                 break;

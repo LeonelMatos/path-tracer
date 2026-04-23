@@ -9,13 +9,44 @@ const vec3 camera_lookat   = vec3(0.0,  0.0, 0.0);
 ///Camera's up vector
 const vec3 camera_up       = vec3(0.0,  0.0, 1.0);
 
+bool intersects_basic(const Ray ray, inout Hit h) {
+    float ray_dist;
+    vec3  hit_p;
+
+    // Light
+    ray_dist = planeT(ray, vec3(0, 0, 1), 1);
+    if (ray_dist < h.t) {
+        hit_p = ray.origin + ray_dist * ray.direction;
+        if (abs(hit_p.x) <= 0.5 && hit_p.y >= -0.5 && hit_p.y <= 0.5) {
+            h.t = ray_dist;
+            h.pos = hit_p;
+            h.normal = vec3(0, 0, -1);
+            h.albedo = WHITE;
+            h.emission = vec3(5.0);
+        }
+    }
+    // Floor
+    ray_dist = planeT_Z(ray, -1.0);
+    if (ray_dist < h.t) {
+        hit_p = ray.origin + ray_dist * ray.direction;
+        if (abs(hit_p.x) <= 1.0 && hit_p.y >= -1.0 && hit_p.y <= 1.0) {
+            h.t = ray_dist;
+            h.pos = hit_p;
+            h.normal = vec3(0, 0, 1);
+            h.albedo = WHITE;
+            h.emission = vec3(0);
+        }
+    }
+    return h.t < INF;
+}
+
 /**
 \brief Tests ray intersection with a described scene
 \param ray Entry ray
 \param h Hit record point
 \return true if ray intersected with scene, false if ray escaped
 */
-bool intersects(const Ray ray, out Hit h) {
+bool intersects_cornell(const Ray ray, out Hit h) {
     h.t        = INF;
     h.pos      = vec3(0);
     h.normal   = vec3(0, 0, 1);

@@ -35,8 +35,9 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "mesh.hpp"
 #include "common/shader.hpp"
+#include "mesh.hpp"
+#include "bvh.hpp"
 
 #define VERSION "1.1.0"
 
@@ -59,13 +60,13 @@ static const int WINDOW_WIDTH = 1000, WINDOW_HEIGHT = 1000;
 /**Switches between using fragment or compute shaders
 for the path tracer
 \note false = fragment; true = compute*/
-const bool USE_COMPUTE_SH = true;
+const bool USE_COMPUTE_SH = false;
 
 static const int COMPUTE_LOCAL_X = 16;
 static const int COMPUTE_LOCAL_Y = 16;
 
 const int V_SYNC = 0;
-const uint MAX_SAMPLES = 50;
+const uint MAX_SAMPLES = 1000;
 
 GLuint tex[2], fbo[2];
 GLuint vao;
@@ -91,6 +92,10 @@ GLuint material_ssbo;
 GLint loc_tri_count;
 GLint loc_aabb_min, loc_aabb_max;
 
+
+//BVH
+GLuint bvh_ssbo;
+GLint loc_bvh_root;
 
 /*----------------------------------------------------------
   Function Declarations
@@ -180,6 +185,7 @@ bool transferDataToGPU(void) {
     loc_tri_count = glGetUniformLocation(active_id, "triangle_count");
     loc_aabb_min = glGetUniformLocation(active_id, "mesh_aabb_min");
     loc_aabb_max = glGetUniformLocation(active_id, "mesh_aabb_max");
+    loc_bvh_root = glGetUniformLocation(active_id, "bvh_root");
 
     if(!USE_COMPUTE_SH) {
         loc_prev = glGetUniformLocation(pathtr_frg_id, "prev_frame");\
@@ -224,14 +230,20 @@ bool transferDataToGPU(void) {
     //transform = rotate(transform, radians(180.0f), vec3(0, 0, 1));
 
     loadMesh("../models/stanford_bunny_pbr/scene.gltf", tris, mats, transform, &bounds);
-    for (auto& mat : mats) {
+    for (auto& mat : mats) { //temp test
         mat.albedo = vec4(0.8f, 0.3f, 0.1f, 1.0f);  // laranja
         mat.type = 0;
     }
+
+    vector<BVHNode> bvh_nodes;
+    buildBVH(tris, bvh_nodes);
+    
     uploadMesh(tris, mats, triangle_ssbo, material_ssbo);
+    uploadBVH(bvh_nodes, bvh_ssbo);
 
     glUseProgram(active_id);
     glUniform1i(loc_tri_count, (int)tris.size());
+    glUniform1i(loc_bvh_root, 0);
     glUniform3f(loc_aabb_min, bounds.min_bound.x, bounds.min_bound.y, bounds.min_bound.z);
     glUniform3f(loc_aabb_max, bounds.max_bound.x, bounds.max_bound.y, bounds.max_bound.z);
 
@@ -249,6 +261,7 @@ void cleanDataFromGPU() {
 
     glDeleteBuffers(1, &triangle_ssbo);
     glDeleteBuffers(1, &material_ssbo);
+    glDeleteBuffers(1, &bvh_ssbo);
     
 }
 

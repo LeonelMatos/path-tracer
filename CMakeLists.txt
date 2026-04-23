@@ -43,6 +43,7 @@ find_package(PkgConfig REQUIRED)
 add_executable(pathtracer 
     src/main.cpp
     src/mesh.cpp
+    src/bvh.cpp
     common/shader.cpp)
 
 target_include_directories(pathtracer PRIVATE .)

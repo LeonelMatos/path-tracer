@@ -59,7 +59,7 @@ static GLuint compileShader(GLenum type, const char* path, const string& code) {
 
     GLuint id = glCreateShader(type);
     
-    printf("Compiling '%s'", path);
+    printf(" Compiling '%s'", path);
     const char* src = processed.c_str();
     glShaderSource(id, 1, &src, NULL);
     glCompileShader(id);
@@ -77,7 +77,7 @@ static GLuint compileShader(GLenum type, const char* path, const string& code) {
 }
 
 static GLuint linkProgram(const vector<GLuint>& shader_IDs) {
-    printf("Linking program\n");
+    printf(" -> Linking program\n");
     GLuint program_id = glCreateProgram();
 
     for(GLuint id : shader_IDs)

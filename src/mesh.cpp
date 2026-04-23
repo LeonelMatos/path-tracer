@@ -84,7 +84,7 @@ bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMate
     printf("\tTotal %zu triangles, %zu materials", triangles.size(), materials.size());
 
     if(bounds)
-        printf("\tBounds: (%.2f,%.2f,%.2f) to (%.2f,%.2f,%.2f)\n",
+        printf("\n\tBounds: (%.2f,%.2f,%.2f) to (%.2f,%.2f,%.2f)\n",
              bounds->min_bound.x, bounds->min_bound.y, bounds->min_bound.z,
              bounds->max_bound.x, bounds->max_bound.y, bounds->max_bound.z);
 

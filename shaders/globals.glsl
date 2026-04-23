@@ -118,7 +118,6 @@ layout(std430, binding = 2) buffer TriangleBuffer {
     GPUTriangle triangles[];
 };
 
-
 layout(std430, binding = 3) buffer MaterialBuffer {
     GPUMaterial gpu_materials[];
 };
@@ -137,5 +136,26 @@ uniform vec3 mesh_aabb_max;
 ///Pre-calculated count to avoid unnecessary operations in the GPU runtime
 ///Used in intersects triangles loop
 uniform int triangle_count;
+
+///\}
+
+///\defgroup bvh BVH
+///\{
+struct BVHNode {
+    vec3 aabb_min;
+    float _pad0;
+    vec3 aabb_max;
+    float _pad1;
+    int left_child;
+    int right_child;
+    int first_tri;
+    int tri_count;
+};
+
+layout(std430, binding = 8) buffer BVHBuffer {
+    BVHNode bvh_nodes[];
+};
+
+uniform int bvh_root;
 
 ///\}

@@ -18,7 +18,7 @@ uniform sampler2D prev_frame;
 #include "globals.glsl"
 #include "sampling.glsl"
 #include "intersection.glsl"
-#include "cornell_scene.glsl"
+#include "scene.glsl"
 #include "path_trace_core.glsl"
 
 void main() {
