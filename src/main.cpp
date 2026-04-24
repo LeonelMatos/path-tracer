@@ -229,7 +229,7 @@ bool transferDataToGPU(void) {
     //transform = rotate(transform, radians(180.0f), vec3(0, 1, 0));
     //transform = rotate(transform, radians(180.0f), vec3(0, 0, 1));
 
-    loadMesh("../models/stanford_dragon_sss_test/scene.gltf", tris, mats, transform, &bounds);
+    loadMesh("../models/stanford_bunny_pbr_low/scene.obj", tris, mats, transform, &bounds);
     for (auto& mat : mats) { //temp test
         mat.albedo = vec4(0.8f, 0.3f, 0.1f, 1.0f);  // laranja
         mat.type = 0;

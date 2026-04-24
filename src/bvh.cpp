@@ -63,9 +63,16 @@ struct BVHBuilder {
             }
         );
         
-        int mid = start + count / 2;
-        int left_id = build(start, mid - start);
-        int right_id = build(mid, start + count - mid);
+        vector<GPUTriangle> sorted(count);
+        for (int i = 0; i < count; i++)
+            sorted[i] = tris[tri_info[start+i].original_index];
+        for (int i = 0; i < count; +i) {
+            tris[start + i] = sorted[i];
+            tri_info[start + i].original_index = start + i;
+        }
+
+        int left_id = build(start, mid_idx - start);
+        int right_id = build(mid_idx, start + count - mid_idx);
 
         //need to update node reference
         nodes[node_id].left_child = left_id;
@@ -73,28 +80,27 @@ struct BVHBuilder {
         nodes[node_id].first_tri = -1;
         nodes[node_id].tri_count = 0;
 
-        (void)right_id;
         return node_id;
     }
 };
-
 
 bool buildBVH(vector<GPUTriangle>& triangles, vector<BVHNode>& bvh_nodes) {
     if (triangles.empty()) {
         printf("\tBVH: No triangles to build\n");
         return false;
     }
+    printf("\tBVH: Building BVH\n");
     bvh_nodes.clear();
     bvh_nodes.reserve(triangles.size() * 2);
 
-    BVHBuilder builder(bvh_nodes, triangles);
-
-    //Pre-calculates triangles once
+    //Pre-calculates triangles center
     vector<TriInfo> tri_info(triangles.size());
-    for (int i = 0; i < (int)triangles.size(); i++) {
+    for(int i = 0; i < (int)triangles.size(); i++) {
         tri_info[i].center = triangle_center(triangles[i]);
         tri_info[i].original_index = i;
     }
+
+    BVHBuilder builder(bvh_nodes, triangles, tri_info);
 
     builder.build(0, triangles.size());
 
