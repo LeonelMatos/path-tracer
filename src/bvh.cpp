@@ -22,13 +22,20 @@ static void calculate_aabb(const vector<GPUTriangle>& tris, int start, int count
     }
 }
 
+///Pre-calculated triangle center stored for runtime
+struct TriInfo {
+    vec3 center;
+    int original_index;
+};
+
 //BVH Builder
 
 struct BVHBuilder {
     vector<BVHNode>& nodes;
     vector<GPUTriangle>& tris;
+    vector<TriInfo>& tri_info;
 
-    BVHBuilder(vector<BVHNode>& n, vector<GPUTriangle>& t) : nodes(n), tris(t) {}
+    BVHBuilder(vector<BVHNode>& n, vector<GPUTriangle>& t, vector<TriInfo>& ti) : nodes(n), tris(t), tri_info(ti) {}
     
     int build(int start, int count) {
         int node_id = nodes.size();
@@ -49,9 +56,12 @@ struct BVHBuilder {
         if(extent.y > extent.x) axis = 1;
         if(extent.z > extent[axis]) axis = 2;
 
-        sort(tris.begin() + start, tris.begin() + start + count, [axis](const GPUTriangle& a, const GPUTriangle& b) {
-            return triangle_center(a)[axis] < triangle_center(b)[axis];
-        });
+        auto mid_idx = start + count / 2;
+        nth_element(tri_info.begin() + start, tri_info.begin() + mid_idx, tri_info.begin() + start + count,
+            [axis](const TriInfo& a, const TriInfo& b) {
+                return a.center[axis] < b.center[axis];
+            }
+        );
         
         int mid = start + count / 2;
         int left_id = build(start, mid - start);
@@ -68,6 +78,7 @@ struct BVHBuilder {
     }
 };
 
+
 bool buildBVH(vector<GPUTriangle>& triangles, vector<BVHNode>& bvh_nodes) {
     if (triangles.empty()) {
         printf("\tBVH: No triangles to build\n");
@@ -77,6 +88,14 @@ bool buildBVH(vector<GPUTriangle>& triangles, vector<BVHNode>& bvh_nodes) {
     bvh_nodes.reserve(triangles.size() * 2);
 
     BVHBuilder builder(bvh_nodes, triangles);
+
+    //Pre-calculates triangles once
+    vector<TriInfo> tri_info(triangles.size());
+    for (int i = 0; i < (int)triangles.size(); i++) {
+        tri_info[i].center = triangle_center(triangles[i]);
+        tri_info[i].original_index = i;
+    }
+
     builder.build(0, triangles.size());
 
     printf("\tBVH: %zu nodes for %zu triangles\n", bvh_nodes.size(), triangles.size());

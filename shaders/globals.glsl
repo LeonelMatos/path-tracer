@@ -33,7 +33,7 @@ const int BG_WHITE = 1;
 const int BG_GRADIENT = 2;
 
 ///Color result if the ray doesn't reach the light
-const int BACKGROUND = BG_BLACK;
+const int BACKGROUND = BG_WHITE;
 ///\}
 
 ///\defgroup tone_map Tone Mapping
