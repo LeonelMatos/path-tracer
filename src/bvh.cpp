@@ -34,8 +34,11 @@ struct BVHBuilder {
     vector<BVHNode>& nodes;
     vector<GPUTriangle>& tris;
     vector<TriInfo>& tri_info;
+    vector<GPUTriangle> scratch;
 
-    BVHBuilder(vector<BVHNode>& n, vector<GPUTriangle>& t, vector<TriInfo>& ti) : nodes(n), tris(t), tri_info(ti) {}
+    BVHBuilder(vector<BVHNode>& n, vector<GPUTriangle>& t, vector<TriInfo>& ti) : nodes(n), tris(t), tri_info(ti) {
+        scratch.resize(t.size());
+    }
     
     int build(int start, int count) {
         int node_id = nodes.size();
@@ -45,6 +48,7 @@ struct BVHBuilder {
 
         if(count <= 4) {
             nodes[node_id].left_child = -1;
+            nodes[node_id].right_child = -1;
             nodes[node_id].first_tri = start;
             nodes[node_id].tri_count = count;
             return node_id;
@@ -63,16 +67,18 @@ struct BVHBuilder {
             }
         );
         
-        vector<GPUTriangle> sorted(count);
         for (int i = 0; i < count; i++)
-            sorted[i] = tris[tri_info[start+i].original_index];
-        for (int i = 0; i < count; +i) {
-            tris[start + i] = sorted[i];
+        scratch[i] = tris[tri_info[start+i].original_index];
+        for (int i = 0; i < count; i++) {
+            tris[start + i] = scratch[i];
             tri_info[start + i].original_index = start + i;
         }
 
         int left_id = build(start, mid_idx - start);
         int right_id = build(mid_idx, start + count - mid_idx);
+
+        nodes[node_id].aabb_min = min(nodes[left_id].aabb_min, nodes[right_id].aabb_min);
+        nodes[node_id].aabb_max = max(nodes[left_id].aabb_max, nodes[right_id].aabb_max);
 
         //need to update node reference
         nodes[node_id].left_child = left_id;
@@ -99,7 +105,6 @@ bool buildBVH(vector<GPUTriangle>& triangles, vector<BVHNode>& bvh_nodes) {
         tri_info[i].center = triangle_center(triangles[i]);
         tri_info[i].original_index = i;
     }
-
     BVHBuilder builder(bvh_nodes, triangles, tri_info);
 
     builder.build(0, triangles.size());
