@@ -46,7 +46,7 @@ add_executable(pathtracer
     src/bvh.cpp
     common/shader.cpp)
 
-target_include_directories(pathtracer PRIVATE .)
+target_include_directories(pathtracer PRIVATE . include)
 
 target_link_libraries(pathtracer
     GL

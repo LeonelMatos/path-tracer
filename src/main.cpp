@@ -34,6 +34,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 
 #include "common/shader.hpp"
 #include "mesh.hpp"
@@ -100,11 +102,26 @@ GLint loc_bvh_root;
 /*----------------------------------------------------------
   Function Declarations
 */
+void onKeyPress(GLFWwindow* window, int key, int scancode, int action, int mods);
 void formatTime(double seconds, char*buf, int buf_size);
 bool transferDataToGPU(void);
 void cleanDataFromGPU();
 void display(void);
 void draw(void);
+void saveScreenshot();
+
+/*----------------------------------------------------------
+  Input handle
+*/
+void onKeyPress(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    if (action != GLFW_PRESS) return;
+
+    switch (key) {
+        case GLFW_KEY_F12:
+        saveScreenshot();
+        break;
+    }
+}
 
 //----------------------------------------------------------
 int main(void) {
@@ -124,12 +141,14 @@ int main(void) {
     glewInit();
     
     glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
+
+    glfwSetKeyCallback(window, onKeyPress);
     
     if(!transferDataToGPU())
     return -1;
     
     printf("%s\n%s v%s\nResolution: %dx%d\n", txt_sep, WINDOW_TITLE, VERSION, WINDOW_WIDTH, WINDOW_HEIGHT);
-    printf("Shader: %s\nPress ESC to quit\n%s\n", USE_COMPUTE_SH ? "Compute" : "Fragment", txt_sep);
+    printf("Shader: %s\nPress \tESC to quit\n \tF12 to screenshot render\n%s\n", USE_COMPUTE_SH ? "Compute" : "Fragment", txt_sep);
 
     //Time init
     struct timespec ts;
@@ -340,4 +359,30 @@ void draw(void) {
             frame_id, fps, ms_frame, samples_per_s / 1e6, time_buf);
         fflush(stdout);
     }
+}
+
+/*----------------------------------------------------------
+  Render Extras
+*/
+void saveScreenshot() {
+    time_t now = time(nullptr);
+    struct tm* t = localtime(&now);
+
+    vector<unsigned char> pixels(WINDOW_WIDTH * WINDOW_HEIGHT * 3);
+    char filename[64];
+    snprintf(filename, sizeof(filename), "render_%4d%02d%02d_%02d%02d%02d_%d.png",
+        t->tm_year + 1900, t->tm_mon + 1, t->tm_mday,
+        t->tm_hour, t->tm_min, t->tm_sec, frame_id);
+    
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glReadPixels(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+
+    //flip y
+    for (int y = 0; y < WINDOW_HEIGHT / 2; y++) {
+        int y2 = WINDOW_HEIGHT - 1 - y;
+        for (int x = 0; x < WINDOW_WIDTH * 3; x++)
+            swap(pixels[y * WINDOW_WIDTH * 3 + x], pixels[y2 * WINDOW_WIDTH * 3 + x]);
+    }
+    stbi_write_png(filename, WINDOW_WIDTH, WINDOW_HEIGHT, 3, pixels.data(), WINDOW_WIDTH * 3);
+    printf("\nSaved screenshot %s\n", filename);
 }
