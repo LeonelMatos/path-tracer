@@ -14,13 +14,11 @@
     Capítulo 3.2 Path Tracing, Brute-Force Evaluation of the Rendering Equation (8/32)
     (https://www.uni-marburg.de/en/fb12/research-groups/grafikmultimedia/lectures/graphics2)
 
-    Cornell box, 1 esfera emissiva perto do topo, 2 esferas no chão, acumulação progressiva de frames
-
     Dependências
     shaders/
         common
         display
-        path_trace
+        path_trace - compute e fragment
 */
 
 #include <stdio.h>
@@ -37,6 +35,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
+#include "config.hpp"
 #include "common/shader.hpp"
 #include "mesh.hpp"
 #include "bvh.hpp"
@@ -49,10 +48,25 @@ using namespace glm;
 /*----------------------------------------------------------
   Global Variables
 */
-GLuint program_id;
-GLuint pathtr_frg_id;
-//used for compute shader
-GLuint pathtr_cpt_id;
+
+struct Renderer {
+    GLuint display_id, pathtr_frag_id, pathtr_comp_id;
+    GLuint active_id;
+    GLuint tex[2], fbo[2], vao;
+    GLint loc_res, loc_frame, loc_prev, loc_tex;
+    int frame_id = 0, cur_f = 0, prev_f = 1;
+};
+
+struct Metrics {
+    //Time metrics
+    uint total_frames = 0;
+    double start_time = 0.0;
+    double fps, samples_per_s;
+};
+
+Renderer renderer;
+Metrics metrics;
+
 GLFWwindow* window;
 
 static const int WINDOW_WIDTH = 1000, WINDOW_HEIGHT = 1000;
@@ -70,18 +84,6 @@ static const int COMPUTE_LOCAL_Y = 16;
 const int V_SYNC = 0;
 const uint MAX_SAMPLES = 1000;
 
-GLuint tex[2], fbo[2];
-GLuint vao;
-
-
-GLint loc_res, loc_frame, loc_prev, loc_tex;
-
-int frame_id = 0;
-int cur_f = 0, prev_f = 1;
-
-//Time metrics
-double start_time = 0.0;
-uint total_frames = 0;
 
 const char* txt_sep = "----------------------------";
 
@@ -143,7 +145,7 @@ int main(void) {
     glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
 
     glfwSetKeyCallback(window, onKeyPress);
-    
+
     if(!transferDataToGPU())
     return -1;
     
@@ -153,11 +155,11 @@ int main(void) {
     //Time init
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    start_time = ts.tv_sec + ts.tv_nsec * 1e-9;
+    metrics.start_time = ts.tv_sec + ts.tv_nsec * 1e-9;
 
     while (!glfwWindowShouldClose(window) && glfwGetKey(window, GLFW_KEY_ESCAPE) != GLFW_PRESS) {
         //Suspend the rendering after completion to avoid useless GPU processing
-        if (MAX_SAMPLES > 0 && frame_id >= MAX_SAMPLES) {
+        if (MAX_SAMPLES > 0 && renderer.display_id >= MAX_SAMPLES) {
             glfwWaitEvents(); //Gets input events and avoids program freezing
             continue;
         }
@@ -181,60 +183,23 @@ void formatTime(double seconds, char*buf, int buf_size) {
 
 //----------------------------------------------------------
 
-bool transferDataToGPU(void) {
-    program_id = LoadShaders({
+bool initShaders() {
+    renderer.display_id = LoadShaders({
         { GL_VERTEX_SHADER,   "shaders/common.vert"    },
         { GL_FRAGMENT_SHADER, "shaders/display.frag" },
     });
-    pathtr_frg_id = LoadShaders({
+    renderer.pathtr_frag_id = LoadShaders({
         { GL_VERTEX_SHADER,   "shaders/common.vert"       },
         { GL_FRAGMENT_SHADER, "shaders/path_trace.frag" },
     });
-    pathtr_cpt_id = LoadShaders({
+    renderer.pathtr_comp_id = LoadShaders({
         { GL_COMPUTE_SHADER, "shaders/path_trace.comp" }
     });
-    if(!program_id || !pathtr_frg_id || !pathtr_cpt_id)  { glfwTerminate(); return false; }
+    if(!renderer.display_id || !renderer.pathtr_frag_id || !renderer.pathtr_comp_id)  { glfwTerminate(); return false; }
+    return true;
+}
 
-    //Select shader
-    GLuint active_id = USE_COMPUTE_SH ? pathtr_cpt_id : pathtr_frg_id;
-
-    loc_res = glGetUniformLocation(active_id, "resolution");
-    loc_frame = glGetUniformLocation(active_id, "frame_id");
-    loc_tex = glGetUniformLocation(active_id, "tex");
-    loc_tri_count = glGetUniformLocation(active_id, "triangle_count");
-    loc_aabb_min = glGetUniformLocation(active_id, "mesh_aabb_min");
-    loc_aabb_max = glGetUniformLocation(active_id, "mesh_aabb_max");
-    loc_bvh_root = glGetUniformLocation(active_id, "bvh_root");
-
-    if(!USE_COMPUTE_SH) {
-        loc_prev = glGetUniformLocation(pathtr_frg_id, "prev_frame");\
-    }
-
-    //Textures DSA
-    glCreateTextures(GL_TEXTURE_2D, 2, tex);
-    for (int i = 0; i < 2; i++) {
-        glTextureStorage2D(tex[i], 1, GL_RGBA32F, WINDOW_WIDTH, WINDOW_HEIGHT);
-        glTextureParameteri(tex[i], GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTextureParameteri(tex[i], GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTextureParameteri(tex[i], GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTextureParameteri(tex[i], GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    }
-
-    //FBO DSA ping-pong
-    glCreateFramebuffers(2, fbo);
-    for (int i = 0; i < 2; i++) {
-        glNamedFramebufferTexture(fbo[i], GL_COLOR_ATTACHMENT0, tex[i], 0);
-        if (glCheckNamedFramebufferStatus(fbo[i], GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-            fprintf(stderr, "FBO %d incomplete. Check FBO DSA implementation.\n", i);
-            return false;
-        }
-    }
-
-    glCreateVertexArrays(1, &vao);
-    glBindVertexArray(vao);
-
-    //Mesh Loading//
-
+void loadScene() {
     auto test_triangles = makeTestMesh();
     vector<GPUMaterial> test_materials = {{{1.0f, 1.0f, 1.0f, 1}, {0,0,0,0}, 0, 0, {0,0}}};
 
@@ -260,23 +225,69 @@ bool transferDataToGPU(void) {
     uploadMesh(tris, mats, triangle_ssbo, material_ssbo);
     uploadBVH(bvh_nodes, bvh_ssbo);
 
-    glUseProgram(active_id);
+    glUseProgram(renderer.active_id);
     glUniform1i(loc_tri_count, (int)tris.size());
     glUniform1i(loc_bvh_root, 0);
     glUniform3f(loc_aabb_min, bounds.min_bound.x, bounds.min_bound.y, bounds.min_bound.z);
     glUniform3f(loc_aabb_max, bounds.max_bound.x, bounds.max_bound.y, bounds.max_bound.z);
+}
+
+bool transferDataToGPU(void) {
+    initShaders();
+
+    //Select shader
+    renderer.active_id = USE_COMPUTE_SH ? renderer.pathtr_comp_id : renderer.pathtr_frag_id;
+
+    renderer.loc_res = glGetUniformLocation(renderer.active_id, "resolution");
+    renderer.loc_frame = glGetUniformLocation(renderer.active_id, "frame_id");
+    renderer.loc_tex = glGetUniformLocation(renderer.active_id, "tex");
+    loc_tri_count = glGetUniformLocation(renderer.active_id, "triangle_count");
+    loc_aabb_min = glGetUniformLocation(renderer.active_id, "mesh_aabb_min");
+    loc_aabb_max = glGetUniformLocation(renderer.active_id, "mesh_aabb_max");
+    loc_bvh_root = glGetUniformLocation(renderer.active_id, "bvh_root");
+
+    if(!USE_COMPUTE_SH) {
+        renderer.loc_prev = glGetUniformLocation(renderer.pathtr_frag_id, "prev_frame");\
+    }
+
+    //Textures DSA
+    glCreateTextures(GL_TEXTURE_2D, 2, renderer.tex);
+    for (int i = 0; i < 2; i++) {
+        glTextureStorage2D(renderer.tex[i], 1, GL_RGBA32F, WINDOW_WIDTH, WINDOW_HEIGHT);
+        glTextureParameteri(renderer.tex[i], GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTextureParameteri(renderer.tex[i], GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTextureParameteri(renderer.tex[i], GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTextureParameteri(renderer.tex[i], GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    }
+
+    //FBO DSA ping-pong
+    glCreateFramebuffers(2, renderer.fbo);
+    for (int i = 0; i < 2; i++) {
+        glNamedFramebufferTexture(renderer.fbo[i], GL_COLOR_ATTACHMENT0, renderer.tex[i], 0);
+        if (glCheckNamedFramebufferStatus(renderer.fbo[i], GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+            fprintf(stderr, "FBO %d incomplete. Check FBO DSA implementation.\n", i);
+            return false;
+        }
+    }
+
+    glCreateVertexArrays(1, &renderer.vao);
+    glBindVertexArray(renderer.vao);
+
+    //Mesh Loading//
+    loadScene();
+    
 
     return true;
 }
 
 void cleanDataFromGPU() {
-    glDeleteVertexArrays(1, &vao);
-    glDeleteTextures(2, tex);
-    glDeleteFramebuffers(2, fbo);
+    glDeleteVertexArrays(1, &renderer.vao);
+    glDeleteTextures(2, renderer.tex);
+    glDeleteFramebuffers(2, renderer.fbo);
     
-    GLuint active_id = USE_COMPUTE_SH ? pathtr_cpt_id : pathtr_frg_id;
+    GLuint active_id = USE_COMPUTE_SH ? renderer.pathtr_comp_id : renderer.pathtr_frag_id;
     glDeleteProgram(active_id);
-    glDeleteProgram(program_id);
+    glDeleteProgram(renderer.display_id);
 
     glDeleteBuffers(1, &triangle_ssbo);
     glDeleteBuffers(1, &material_ssbo);
@@ -287,10 +298,10 @@ void cleanDataFromGPU() {
 void display(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
-    glUseProgram(program_id);
+    glUseProgram(renderer.display_id);
     
-    glBindTextureUnit(0, tex[cur_f]);
-    glUniform1i(loc_tex, 0);
+    glBindTextureUnit(0, renderer.tex[renderer.cur_f]);
+    glUniform1i(renderer.loc_tex, 0);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
     glfwSwapBuffers(window);
@@ -302,17 +313,17 @@ void display(void) {
 */
 void draw(void) {
     double time_now, time_elapsed;
-    GLuint active_id = USE_COMPUTE_SH ? pathtr_cpt_id : pathtr_frg_id;
+    GLuint active_id = USE_COMPUTE_SH ? renderer.pathtr_comp_id : renderer.pathtr_frag_id;
     
     //Step 1 Path Tracing
     if(USE_COMPUTE_SH) {
         //Compute pass, no fbo, no quad screen
         glUseProgram(active_id);
-        glUniform2f(loc_res, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT);
-        glUniform1i(loc_frame, frame_id);
+        glUniform2f(renderer.loc_res, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT);
+        glUniform1i(renderer.loc_frame, renderer.frame_id);
 
-        glBindImageTexture(0, tex[cur_f], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-        glBindImageTexture(1, tex[prev_f], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+        glBindImageTexture(0, renderer.tex[renderer.cur_f], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+        glBindImageTexture(1, renderer.tex[renderer.prev_f], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
 
         //Dispatch 16x16 work groups
         int groups_x = (WINDOW_WIDTH + COMPUTE_LOCAL_X - 1) / 16;
@@ -322,41 +333,41 @@ void draw(void) {
     }
     else {
         //Fragment pass
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo[cur_f]);
+        glBindFramebuffer(GL_FRAMEBUFFER, renderer.fbo[renderer.cur_f]);
         glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
         glUseProgram(active_id);
-        glUniform2f(loc_res, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT);
-        glUniform1i(loc_frame, frame_id);
-        glBindTextureUnit(0, tex[prev_f]);
-        glUniform1i(loc_prev, 0);
+        glUniform2f(renderer.loc_res, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT);
+        glUniform1i(renderer.loc_frame, renderer.display_id);
+        glBindTextureUnit(0, renderer.tex[renderer.prev_f]);
+        glUniform1i(renderer.loc_prev, 0);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     }
 
-    int tmp = cur_f; cur_f = prev_f; prev_f = tmp;
-    frame_id++;
+    int tmp = renderer.cur_f; renderer.cur_f = renderer.prev_f; renderer.prev_f = tmp;
+    renderer.frame_id++;
 
-    if(frame_id >= MAX_SAMPLES)
-        printf("\n%s\nRender complete - %d samples in %.1fs\n", txt_sep, frame_id, time_elapsed);
+    if(renderer.frame_id >= MAX_SAMPLES)
+        printf("\n%s\nRender complete - %d samples in %.1fs\n", txt_sep, renderer.frame_id, time_elapsed);
     
     //Step 2 Display : accumulated texture to screen
     display();
 
     // Metrics
-    if (frame_id % 10 == 0) {
+    if (renderer.frame_id % 10 == 0) {
         struct timespec ts;
         clock_gettime(CLOCK_MONOTONIC, &ts);
 
         time_now = ts.tv_sec + ts.tv_nsec * 1e-9;
-        time_elapsed = time_now - start_time;
+        time_elapsed = time_now - metrics.start_time;
         
-        double fps = frame_id / time_elapsed;
-        double samples_per_s = (double)frame_id * WINDOW_WIDTH * WINDOW_HEIGHT / time_elapsed;
-        double ms_frame = time_elapsed / frame_id * 1000.0;
+        metrics.fps = renderer.frame_id / time_elapsed;
+        metrics.samples_per_s = (double)renderer.frame_id * WINDOW_WIDTH * WINDOW_HEIGHT / time_elapsed;
+        double ms_frame = time_elapsed / renderer.frame_id * 1000.0;
         char time_buf[32];
         formatTime(time_elapsed, time_buf, sizeof(time_buf));
 
         printf("\rSamples/pixel: %d | FPS: %.1f | %.1fms/frame | %.1f | Time:%s",
-            frame_id, fps, ms_frame, samples_per_s / 1e6, time_buf);
+            renderer.frame_id, metrics.fps, ms_frame, metrics.samples_per_s / 1e6, time_buf);
         fflush(stdout);
     }
 }
@@ -372,7 +383,7 @@ void saveScreenshot() {
     char filename[64];
     snprintf(filename, sizeof(filename), "render_%4d%02d%02d_%02d%02d%02d_%d.png",
         t->tm_year + 1900, t->tm_mon + 1, t->tm_mday,
-        t->tm_hour, t->tm_min, t->tm_sec, frame_id);
+        t->tm_hour, t->tm_min, t->tm_sec, renderer.frame_id);
     
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glReadPixels(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
