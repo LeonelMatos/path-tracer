@@ -5,21 +5,22 @@ const float INV_PI = 1.0 / PI;
 const float INF = 1e30;
 const float EPS = 0.001;
 const float EPS_TRI = 0.0001;
-const int DEPTH = 5;
+
+uniform int DEPTH;
 
 ///\defgroup camera Camera Settings
 ///\{
 ///Lens aperture `0.0` = pinhole (no DOF), normal values up to `0.3`
-const float CAM_APERTURE = 0.00;
+uniform float CAM_APERTURE;
 
 ///Worldspace distance between camera and focal plane
-const float CAM_FOCAL_DISTANCE = 4.7;
+uniform float CAM_FOCAL_DISTANCE;
 
 ///Enables debug focal plane viewer
-const bool FOCAL_DEBUG = false;
+uniform bool FOCAL_DEBUG;
 
 ///Thickness of the focal plane line
-const float FOCAL_BAND_DEBUG = 0.05;
+uniform float FOCAL_BAND_DEBUG;
 
 ///Camera FOV converted to radians
 const float CAM_FOV_RAD = 30.0 * PI / 180.0;
@@ -33,7 +34,7 @@ const int BG_WHITE = 1;
 const int BG_GRADIENT = 2;
 
 ///Color result if the ray doesn't reach the light
-const int BACKGROUND = BG_WHITE;
+uniform int BACKGROUND;
 ///\}
 
 ///\defgroup tone_map Tone Mapping
@@ -42,7 +43,7 @@ const int TM_NONE = 0;
 const int TM_REINHARD = 1;
 const int TM_ACES = 2;
 
-const int TONE_MAPPING = TM_ACES;
+uniform int TONE_MAPPING;
 ///\}
 
 ///\defgroup path Path Tracer
@@ -60,7 +61,7 @@ struct Hit {
     float ior;
 };
 
-const int SAMPLES_PER_PIXEL = 1;
+uniform int SAMPLES_PER_PIXEL;
                                                                                                                     
 /**\brief Russian Roulette, minimum bounces before enabling.
 Changing to more or less gives minimal performance changes
@@ -69,13 +70,13 @@ Adds noise to the image if turned on.
 \note Turns off RR if `0`
 \note Default value `3`.
 */
-const int RR_MIN_BOUNCES = 3;
+uniform int RR_MIN_BOUNCES;
 
 /**Russian Roulette, maximum chance at surviving to avoid excessive throughput.
 The less the value, the more noise appears for cutted rays, but increases performance.
 \note Default value `0.95`. Safest number without noise is ~0.75.
 */
-const float RR_MAX_SURVIVAL = 0.75;
+uniform float RR_MAX_SURVIVAL;
 
 ///\}
 

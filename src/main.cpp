@@ -55,6 +55,9 @@ struct Renderer {
     GLuint tex[2], fbo[2], vao;
     GLint loc_res, loc_frame, loc_prev, loc_tex;
     int frame_id = 0, cur_f = 0, prev_f = 1;
+
+    GLint loc_depth, loc_spp, loc_rr_min, loc_rr_max, loc_aperture;
+    GLint loc_focal_dist, loc_focal_debug, loc_focal_band, loc_background, loc_tone_map;
 };
 
 struct Metrics {
@@ -64,10 +67,12 @@ struct Metrics {
     double fps, samples_per_s;
 };
 
+GLFWwindow* window;
+
 Renderer renderer;
 Metrics metrics;
 
-GLFWwindow* window;
+RenderConfig config;
 
 static const int WINDOW_WIDTH = 1000, WINDOW_HEIGHT = 1000;
 
@@ -106,9 +111,13 @@ GLint loc_bvh_root;
 */
 void onKeyPress(GLFWwindow* window, int key, int scancode, int action, int mods);
 void formatTime(double seconds, char*buf, int buf_size);
+bool initShaders();
+void loadScene();
+void uploadConfig();
 bool transferDataToGPU(void);
 void cleanDataFromGPU();
 void display(void);
+void resetAccumulation();
 void draw(void);
 void saveScreenshot();
 
@@ -120,7 +129,10 @@ void onKeyPress(GLFWwindow* window, int key, int scancode, int action, int mods)
 
     switch (key) {
         case GLFW_KEY_F12:
-        saveScreenshot();
+            saveScreenshot();
+        break;
+        case GLFW_KEY_R:
+            resetAccumulation();
         break;
     }
 }
@@ -159,7 +171,7 @@ int main(void) {
 
     while (!glfwWindowShouldClose(window) && glfwGetKey(window, GLFW_KEY_ESCAPE) != GLFW_PRESS) {
         //Suspend the rendering after completion to avoid useless GPU processing
-        if (MAX_SAMPLES > 0 && renderer.display_id >= MAX_SAMPLES) {
+        if (MAX_SAMPLES > 0 && renderer.frame_id >= MAX_SAMPLES) {
             glfwWaitEvents(); //Gets input events and avoids program freezing
             continue;
         }
@@ -199,6 +211,53 @@ bool initShaders() {
     return true;
 }
 
+void initUniforms() {
+    GLuint active = renderer.active_id;
+
+    renderer.loc_res = glGetUniformLocation(active, "resolution");
+    renderer.loc_frame = glGetUniformLocation(active, "frame_id");
+    renderer.loc_tex = glGetUniformLocation(active, "tex");
+    loc_tri_count = glGetUniformLocation(active, "triangle_count");
+    loc_aabb_min = glGetUniformLocation(active, "mesh_aabb_min");
+    loc_aabb_max = glGetUniformLocation(active, "mesh_aabb_max");
+    loc_bvh_root = glGetUniformLocation(active, "bvh_root");
+
+    if(!USE_COMPUTE_SH) {
+        renderer.loc_prev = glGetUniformLocation(renderer.pathtr_frag_id, "prev_frame");
+    }
+    renderer.loc_depth      = glGetUniformLocation(active, "DEPTH");
+    renderer.loc_spp        = glGetUniformLocation(active, "SAMPLES_PER_PIXEL");
+    renderer.loc_rr_min     = glGetUniformLocation(active, "RR_MIN_BOUNCES");
+    renderer.loc_rr_max     = glGetUniformLocation(active, "RR_MAX_SURVIVAL");
+    renderer.loc_aperture   = glGetUniformLocation(active, "CAM_APERTURE");
+    renderer.loc_focal_dist = glGetUniformLocation(active, "CAM_FOCAL_DISTANCE");
+    renderer.loc_focal_debug = glGetUniformLocation(active, "FOCAL_DEBUG");
+    renderer.loc_focal_band  = glGetUniformLocation(active, "FOCAL_BAND_DEBUG");
+    renderer.loc_background  = glGetUniformLocation(active, "BACKGROUND");
+    renderer.loc_tone_map  = glGetUniformLocation(active, "TONE_MAPPING");
+}
+
+void uploadConfig() {
+    GLuint active = renderer.active_id;
+    glUseProgram(active);
+    glUniform1i(renderer.loc_depth, config.depth);
+    glUniform1i(renderer.loc_spp, config.samples_per_pixel);
+    glUniform1i(renderer.loc_rr_min, config.rr_min_bounces);
+    glUniform1f(renderer.loc_rr_max, config.rr_max_survival);
+    glUniform1f(renderer.loc_aperture, config.cam_aperture);
+    glUniform1f(renderer.loc_focal_dist, config.cam_focal_distance);
+    glUniform1i(renderer.loc_focal_debug, config.focal_debug ? 1 : 0);
+    glUniform1f(renderer.loc_focal_band, config.focal_band_debug);
+    glUniform1i(renderer.loc_background, config.background);
+    glUniform1i(renderer.loc_tone_map, config.tone_mapping);
+}
+
+void applyConfig() {
+    uploadConfig();
+    resetAccumulation();
+    printf("\nConfig applied, accumulation reset\n");
+}
+
 void loadScene() {
     auto test_triangles = makeTestMesh();
     vector<GPUMaterial> test_materials = {{{1.0f, 1.0f, 1.0f, 1}, {0,0,0,0}, 0, 0, {0,0}}};
@@ -213,7 +272,7 @@ void loadScene() {
     //transform = rotate(transform, radians(180.0f), vec3(0, 1, 0));
     //transform = rotate(transform, radians(180.0f), vec3(0, 0, 1));
 
-    loadMesh("../models/stanford_bunny_pbr_low/scene.obj", tris, mats, transform, &bounds);
+    loadMesh("../models/stanford_bunny_pbr/scene.gltf", tris, mats, transform, &bounds);
     for (auto& mat : mats) { //temp test
         mat.albedo = vec4(0.8f, 0.3f, 0.1f, 1.0f);  // laranja
         mat.type = 0;
@@ -232,23 +291,14 @@ void loadScene() {
     glUniform3f(loc_aabb_max, bounds.max_bound.x, bounds.max_bound.y, bounds.max_bound.z);
 }
 
+
 bool transferDataToGPU(void) {
     initShaders();
 
     //Select shader
     renderer.active_id = USE_COMPUTE_SH ? renderer.pathtr_comp_id : renderer.pathtr_frag_id;
 
-    renderer.loc_res = glGetUniformLocation(renderer.active_id, "resolution");
-    renderer.loc_frame = glGetUniformLocation(renderer.active_id, "frame_id");
-    renderer.loc_tex = glGetUniformLocation(renderer.active_id, "tex");
-    loc_tri_count = glGetUniformLocation(renderer.active_id, "triangle_count");
-    loc_aabb_min = glGetUniformLocation(renderer.active_id, "mesh_aabb_min");
-    loc_aabb_max = glGetUniformLocation(renderer.active_id, "mesh_aabb_max");
-    loc_bvh_root = glGetUniformLocation(renderer.active_id, "bvh_root");
-
-    if(!USE_COMPUTE_SH) {
-        renderer.loc_prev = glGetUniformLocation(renderer.pathtr_frag_id, "prev_frame");\
-    }
+    initUniforms();
 
     //Textures DSA
     glCreateTextures(GL_TEXTURE_2D, 2, renderer.tex);
@@ -275,7 +325,8 @@ bool transferDataToGPU(void) {
 
     //Mesh Loading//
     loadScene();
-    
+
+    uploadConfig();
 
     return true;
 }
@@ -306,19 +357,23 @@ void display(void) {
 
     glfwSwapBuffers(window);
     glfwPollEvents();
+}
 
+void resetAccumulation() {
+    renderer.frame_id = 0;
+    renderer.cur_f = 0;
+    renderer.prev_f = 1;
 }
 /*----------------------------------------------------------
   Draw to GPU
 */
 void draw(void) {
     double time_now, time_elapsed;
-    GLuint active_id = USE_COMPUTE_SH ? renderer.pathtr_comp_id : renderer.pathtr_frag_id;
     
     //Step 1 Path Tracing
+    glUseProgram(renderer.active_id);
     if(USE_COMPUTE_SH) {
         //Compute pass, no fbo, no quad screen
-        glUseProgram(active_id);
         glUniform2f(renderer.loc_res, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT);
         glUniform1i(renderer.loc_frame, renderer.frame_id);
 
@@ -335,9 +390,8 @@ void draw(void) {
         //Fragment pass
         glBindFramebuffer(GL_FRAMEBUFFER, renderer.fbo[renderer.cur_f]);
         glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
-        glUseProgram(active_id);
         glUniform2f(renderer.loc_res, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT);
-        glUniform1i(renderer.loc_frame, renderer.display_id);
+        glUniform1i(renderer.loc_frame, renderer.frame_id);
         glBindTextureUnit(0, renderer.tex[renderer.prev_f]);
         glUniform1i(renderer.loc_prev, 0);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -346,7 +400,7 @@ void draw(void) {
     int tmp = renderer.cur_f; renderer.cur_f = renderer.prev_f; renderer.prev_f = tmp;
     renderer.frame_id++;
 
-    if(renderer.frame_id >= MAX_SAMPLES)
+    if(renderer.frame_id == MAX_SAMPLES)
         printf("\n%s\nRender complete - %d samples in %.1fs\n", txt_sep, renderer.frame_id, time_elapsed);
     
     //Step 2 Display : accumulated texture to screen

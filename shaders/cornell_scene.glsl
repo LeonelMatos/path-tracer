@@ -134,7 +134,6 @@ bool intersects_cornell(const Ray ray, out Hit h) {
             h.emission = vec3(0);
         }
     }
-/*
 
     // Left sphere
     const vec3 sphere_left_center = vec3(0.20, -0.3, -0.65);
@@ -192,7 +191,7 @@ bool intersects_cornell(const Ray ray, out Hit h) {
         h.ior = 1;
     }
 
-*/
+/*
     //AABB Early Rejection
     //Converts uniform min/max corners to center/half_size for boxT
     //Avoids O(triangle_count) tests for most rays
@@ -227,5 +226,6 @@ bool intersects_cornell(const Ray ray, out Hit h) {
             }
         }
     }
+*/
     return h.t < INF;
 }

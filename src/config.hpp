@@ -4,9 +4,13 @@ struct RenderConfig {
     int rr_min_bounces = 3;
     float rr_max_survival = 0.75;
 
-    float CAM_APERTURE = 0.00;
-    float CAM_FOCAL_DISTANCE = 4.7;
+    int background = 0;
 
-    bool FOCAL_DEBUG = false;
-    float FOCAL_BAND_DEBUG = 0.05;
+    int tone_mapping = 2;
+
+    float cam_aperture = 0.00;
+    float cam_focal_distance = 4.7;
+
+    bool focal_debug = false;
+    float focal_band_debug = 0.05;
 };
