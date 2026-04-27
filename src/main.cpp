@@ -114,6 +114,7 @@ void formatTime(double seconds, char*buf, int buf_size);
 bool initShaders();
 void loadScene();
 void uploadConfig();
+void applyConfig();
 bool transferDataToGPU(void);
 void cleanDataFromGPU();
 void display(void);
@@ -133,6 +134,10 @@ void onKeyPress(GLFWwindow* window, int key, int scancode, int action, int mods)
         break;
         case GLFW_KEY_R:
             resetAccumulation();
+        break;
+        case GLFW_KEY_E:
+            config.background = 1 - config.background;
+            applyConfig();
         break;
     }
 }

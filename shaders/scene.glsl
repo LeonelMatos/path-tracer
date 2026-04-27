@@ -80,7 +80,7 @@ bool intersects(const Ray ray, out Hit h) {
     h.ior      = 0.0;
 
     intersects_cornell(ray, h);
-    //intersects_mesh(ray, h);
+    intersects_mesh(ray, h);
 
     return h.t < INF;
 }
