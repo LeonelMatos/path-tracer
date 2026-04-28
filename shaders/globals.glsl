@@ -24,6 +24,16 @@ uniform float FOCAL_BAND_DEBUG;
 
 ///Camera FOV converted to radians
 const float CAM_FOV_RAD = 30.0 * PI / 180.0;
+
+///Camera position in world space
+uniform vec3 camera_position;
+
+///Camera direction
+uniform vec3 camera_lookat;
+
+///Camera's up vector
+uniform vec3 camera_up;
+
 ///\}
 
 ///\defgroup ambient Ambient Settings

@@ -49,17 +49,6 @@ using namespace glm;
   Global Variables
 */
 
-struct Renderer {
-    GLuint display_id, pathtr_frag_id, pathtr_comp_id;
-    GLuint active_id;
-    GLuint tex[2], fbo[2], vao;
-    GLint loc_res, loc_frame, loc_prev, loc_tex;
-    int frame_id = 0, cur_f = 0, prev_f = 1;
-
-    GLint loc_depth, loc_spp, loc_rr_min, loc_rr_max, loc_aperture;
-    GLint loc_focal_dist, loc_focal_debug, loc_focal_band, loc_background, loc_tone_map;
-};
-
 struct Metrics {
     //Time metrics
     uint total_frames = 0;
@@ -70,6 +59,12 @@ struct Metrics {
 GLFWwindow* window;
 
 Renderer renderer;
+CameraConfig camera;
+
+double mouse_last_x = 0.0, mouse_last_y = 0.0;
+bool mouse_first = true;
+bool mouse_captured = false;
+
 Metrics metrics;
 
 RenderConfig config;
@@ -87,7 +82,7 @@ static const int COMPUTE_LOCAL_X = 16;
 static const int COMPUTE_LOCAL_Y = 16;
 
 const int V_SYNC = 0;
-const uint MAX_SAMPLES = 1000;
+uint MAX_SAMPLES = 1000;
 
 
 const char* txt_sep = "----------------------------";
@@ -115,6 +110,8 @@ bool initShaders();
 void loadScene();
 void uploadConfig();
 void applyConfig();
+void uploadCamera();
+void moveCamera();
 bool transferDataToGPU(void);
 void cleanDataFromGPU();
 void display(void);
@@ -127,6 +124,9 @@ void saveScreenshot();
 */
 void onKeyPress(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if (action != GLFW_PRESS) return;
+    vec3 forward = normalize(camera.lookat - camera.position);
+    vec3 right = normalize(cross(forward, camera.up));
+    float speed = camera.move_speed;
 
     switch (key) {
         case GLFW_KEY_F12:
@@ -139,6 +139,78 @@ void onKeyPress(GLFWwindow* window, int key, int scancode, int action, int mods)
             config.background = 1 - config.background;
             applyConfig();
         break;
+    }
+}
+
+void onMouseMove(GLFWwindow* w, double x, double y) {
+    if (!mouse_captured) return;
+
+    if(mouse_first) {
+        mouse_last_x = x;
+        mouse_last_y = y;
+        mouse_first = false;
+        return;
+    }
+
+    double dx = x - mouse_last_x;
+    double dy = y  - mouse_last_y;
+    mouse_last_x = x;
+    mouse_last_y = y;
+
+    camera.yaw -= (float)dx * camera.mouse_sens;
+    camera.pitch -= (float)dy * camera.mouse_sens;
+
+    camera.pitch = clamp(camera.pitch, -1.5f, 1.5f);
+
+    camera.moving = true;
+}
+
+void onMouseButton(GLFWwindow* w, int button, int action, int mods) {
+    if (button == GLFW_MOUSE_BUTTON_LEFT) {
+        if (action == GLFW_PRESS) {
+            mouse_captured = true;
+            mouse_first = true;
+            glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        }
+        else if (action == GLFW_RELEASE) {
+            mouse_captured = false;
+            glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        }
+    }
+}
+
+vec3 cameraForward() {
+    return normalize(vec3(cos(camera.pitch) * cos(camera.yaw), cos(camera.pitch) * sin(camera.yaw), sin(camera.pitch)));
+}
+
+void processMovement() {
+    vec3 forward = cameraForward();
+    vec3 right = normalize(cross(forward, camera.up));
+    float speed = camera.move_speed;
+    bool moved = false;
+
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+        camera.position += forward * speed;
+        moved = true;
+    }
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+        camera.position -= forward * speed;
+        moved = true;
+    }
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+        camera.position -= right * speed;
+        moved = true;
+    }
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+        camera.position += right * speed;
+        moved = true;
+    }
+    if(moved || camera.moving) {
+        camera.lookat = camera.position + cameraForward();
+        camera.moving = false;
+        uploadCamera();
+        if(renderer.frame_id >= 2)
+            resetAccumulation();
     }
 }
 
@@ -160,6 +232,8 @@ int main(void) {
     glewInit();
     
     glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
+    glfwSetCursorPosCallback(window, onMouseMove);
+    glfwSetMouseButtonCallback(window, onMouseButton);
 
     glfwSetKeyCallback(window, onKeyPress);
 
@@ -240,6 +314,10 @@ void initUniforms() {
     renderer.loc_focal_band  = glGetUniformLocation(active, "FOCAL_BAND_DEBUG");
     renderer.loc_background  = glGetUniformLocation(active, "BACKGROUND");
     renderer.loc_tone_map  = glGetUniformLocation(active, "TONE_MAPPING");
+
+    renderer.loc_cam_pos = glGetUniformLocation(active, "camera_position");
+    renderer.loc_cam_lookat = glGetUniformLocation(active, "camera_lookat");
+    renderer.loc_cam_up = glGetUniformLocation(active, "camera_up");
 }
 
 void uploadConfig() {
@@ -261,6 +339,18 @@ void applyConfig() {
     uploadConfig();
     resetAccumulation();
     printf("\nConfig applied, accumulation reset\n");
+}
+
+void uploadCamera() {
+    glUseProgram(renderer.active_id);
+    glUniform3f(renderer.loc_cam_pos, camera.position.x, camera.position.y, camera.position.z);
+    glUniform3f(renderer.loc_cam_lookat, camera.lookat.x, camera.lookat.y, camera.lookat.z);
+    glUniform3f(renderer.loc_cam_up, camera.up.x, camera.up.y, camera.up.z);
+}
+
+void moveCamera() {
+    uploadCamera();
+    resetAccumulation();
 }
 
 void loadScene() {
@@ -332,6 +422,7 @@ bool transferDataToGPU(void) {
     loadScene();
 
     uploadConfig();
+    uploadCamera();
 
     return true;
 }
@@ -374,6 +465,8 @@ void resetAccumulation() {
 */
 void draw(void) {
     double time_now, time_elapsed;
+
+    processMovement();
     
     //Step 1 Path Tracing
     glUseProgram(renderer.active_id);
