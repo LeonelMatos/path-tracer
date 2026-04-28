@@ -2,12 +2,6 @@ const vec3 WHITE = vec3(0.90, 0.90, 0.90);
 const vec3 RED   = vec3(0.90, 0.05, 0.05);
 const vec3 GREEN = vec3(0.05, 0.90, 0.05);
 
-///Camera position in world space
-const vec3 camera_position = vec3(0.0, -5.0, 0.0);
-///Camera direction
-const vec3 camera_lookat   = vec3(0.0,  0.0, 0.0);
-///Camera's up vector
-const vec3 camera_up       = vec3(0.0,  0.0, 1.0);
 
 bool intersects_basic(const Ray ray, inout Hit h) {
     float ray_dist;
