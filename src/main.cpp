@@ -105,13 +105,17 @@ GLint loc_bvh_root;
   Function Declarations
 */
 void onKeyPress(GLFWwindow* window, int key, int scancode, int action, int mods);
+void onMouseMove(GLFWwindow* w, double x, double y);
+void onMouseButton(GLFWwindow* w, int button, int action, int mods);
+void onMouseScroll(GLFWwindow* w, double xoffset, double yoffset);
+vec3 cameraForward();
+void processMovement();
 void formatTime(double seconds, char*buf, int buf_size);
 bool initShaders();
 void loadScene();
 void uploadConfig();
 void applyConfig();
 void uploadCamera();
-void moveCamera();
 bool transferDataToGPU(void);
 void cleanDataFromGPU();
 void display(void);
@@ -179,6 +183,14 @@ void onMouseButton(GLFWwindow* w, int button, int action, int mods) {
     }
 }
 
+void onMouseScroll(GLFWwindow* w, double xoffset, double yoffset) {
+    //Simulate Unity's camera control speed multiplier
+    camera.move_speed *= (yoffset > 0) ? 1.2f : 0.8f;
+    camera.move_speed = clamp(camera.move_speed, 0.001f, 10.0f);
+
+    printf("\nMove speed: %.3f\n", camera.move_speed);
+}
+
 vec3 cameraForward() {
     return normalize(vec3(cos(camera.pitch) * cos(camera.yaw), cos(camera.pitch) * sin(camera.yaw), sin(camera.pitch)));
 }
@@ -189,6 +201,10 @@ void processMovement() {
     float speed = camera.move_speed;
     bool moved = false;
 
+    if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+        speed *= 2;
+    }
+    
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
         camera.position += forward * speed;
         moved = true;
@@ -234,6 +250,7 @@ int main(void) {
     glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
     glfwSetCursorPosCallback(window, onMouseMove);
     glfwSetMouseButtonCallback(window, onMouseButton);
+    glfwSetScrollCallback(window, onMouseScroll);
 
     glfwSetKeyCallback(window, onKeyPress);
 
@@ -252,6 +269,7 @@ int main(void) {
         //Suspend the rendering after completion to avoid useless GPU processing
         if (MAX_SAMPLES > 0 && renderer.frame_id >= MAX_SAMPLES) {
             glfwWaitEvents(); //Gets input events and avoids program freezing
+            processMovement();
             continue;
         }
         draw();
@@ -348,15 +366,7 @@ void uploadCamera() {
     glUniform3f(renderer.loc_cam_up, camera.up.x, camera.up.y, camera.up.z);
 }
 
-void moveCamera() {
-    uploadCamera();
-    resetAccumulation();
-}
-
 void loadScene() {
-    auto test_triangles = makeTestMesh();
-    vector<GPUMaterial> test_materials = {{{1.0f, 1.0f, 1.0f, 1}, {0,0,0,0}, 0, 0, {0,0}}};
-
     vector<GPUTriangle> tris; vector<GPUMaterial> mats;
 
     MeshBounds bounds;
@@ -432,8 +442,8 @@ void cleanDataFromGPU() {
     glDeleteTextures(2, renderer.tex);
     glDeleteFramebuffers(2, renderer.fbo);
     
-    GLuint active_id = USE_COMPUTE_SH ? renderer.pathtr_comp_id : renderer.pathtr_frag_id;
-    glDeleteProgram(active_id);
+    glDeleteProgram(renderer.pathtr_comp_id);
+    glDeleteProgram(renderer.pathtr_frag_id);
     glDeleteProgram(renderer.display_id);
 
     glDeleteBuffers(1, &triangle_ssbo);

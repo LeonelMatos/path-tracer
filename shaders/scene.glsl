@@ -79,7 +79,7 @@ bool intersects(const Ray ray, out Hit h) {
     h.material = MAT_DIFFUSE;
     h.ior      = 0.0;
 
-    intersects_cornell(ray, h);
+    intersects_basic(ray, h);
     intersects_mesh(ray, h);
 
     return h.t < INF;
