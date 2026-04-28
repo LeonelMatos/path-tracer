@@ -9,7 +9,7 @@ struct RenderConfig {
     int rr_min_bounces = 3;
     float rr_max_survival = 0.75;
 
-    int background = 0;
+    int background = 1;
 
     int tone_mapping = 2;
 
@@ -18,6 +18,12 @@ struct RenderConfig {
 
     bool focal_debug = false;
     float focal_band_debug = 0.05;
+
+    //Not part of the shader config
+    ///render resolution when moving the camera
+    int moving_resolution = 64;
+    ///controls the progressive resolution scaling up to the original
+    bool progressive_refine = true;
 };
 
 struct Renderer {
@@ -31,6 +37,9 @@ struct Renderer {
     GLint loc_focal_dist, loc_focal_debug, loc_focal_band, loc_background, loc_tone_map;
 
     GLint loc_cam_pos, loc_cam_lookat, loc_cam_up;
+
+    GLint loc_display_render_res;
+    GLint loc_display_res;
 };
 
 struct CameraConfig {

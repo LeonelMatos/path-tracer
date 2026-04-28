@@ -69,7 +69,8 @@ Metrics metrics;
 
 RenderConfig config;
 
-static const int WINDOW_WIDTH = 1000, WINDOW_HEIGHT = 1000;
+static const int WINDOW_WIDTH = 1920, WINDOW_HEIGHT = 1080;
+int render_w = WINDOW_WIDTH, render_h = WINDOW_HEIGHT;
 
 #define WINDOW_TITLE "Path Tracer"
 
@@ -119,6 +120,7 @@ void uploadCamera();
 bool transferDataToGPU(void);
 void cleanDataFromGPU();
 void display(void);
+void clearTextures();
 void resetAccumulation();
 void draw(void);
 void saveScreenshot();
@@ -128,9 +130,6 @@ void saveScreenshot();
 */
 void onKeyPress(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if (action != GLFW_PRESS) return;
-    vec3 forward = normalize(camera.lookat - camera.position);
-    vec3 right = normalize(cross(forward, camera.up));
-    float speed = camera.move_speed;
 
     switch (key) {
         case GLFW_KEY_F12:
@@ -195,6 +194,8 @@ vec3 cameraForward() {
     return normalize(vec3(cos(camera.pitch) * cos(camera.yaw), cos(camera.pitch) * sin(camera.yaw), sin(camera.pitch)));
 }
 
+int frames_since_moved = 9999;
+
 void processMovement() {
     vec3 forward = cameraForward();
     vec3 right = normalize(cross(forward, camera.up));
@@ -221,12 +222,43 @@ void processMovement() {
         camera.position += right * speed;
         moved = true;
     }
+
     if(moved || camera.moving) {
         camera.lookat = camera.position + cameraForward();
         camera.moving = false;
         uploadCamera();
-        if(renderer.frame_id >= 2)
+
+        if(render_w != config.moving_resolution) {
+            render_w = config.moving_resolution;
+            render_h = config.moving_resolution;
+            glUseProgram(renderer.active_id);
+            glUniform2f(renderer.loc_res, (float)render_w, (float)render_h);
+            if(!USE_COMPUTE_SH) {
+                glBindFramebuffer(GL_FRAMEBUFFER, renderer.fbo[renderer.cur_f]);
+                glViewport(0, 0, render_w, render_h);
+            }
+            clearTextures();
+            renderer.cur_f = 0;
+            renderer.prev_f = 1;
+        }
+        renderer.frame_id = 0;
+        frames_since_moved = 0;
+    }
+    else {
+        frames_since_moved++;
+
+        if (frames_since_moved == 5 && render_w != WINDOW_WIDTH) {
+            render_w = WINDOW_WIDTH;
+            render_h = WINDOW_HEIGHT;
+            glUseProgram(renderer.active_id);
+            glUniform2f(renderer.loc_res, (float)render_w, (float)render_h);
+            if(!USE_COMPUTE_SH) {
+                glBindFramebuffer(GL_FRAMEBUFFER, renderer.fbo[renderer.cur_f]);
+                glViewport(0, 0, render_w, render_h);
+            }
+            clearTextures();
             resetAccumulation();
+        }
     }
 }
 
@@ -266,8 +298,10 @@ int main(void) {
     metrics.start_time = ts.tv_sec + ts.tv_nsec * 1e-9;
 
     while (!glfwWindowShouldClose(window) && glfwGetKey(window, GLFW_KEY_ESCAPE) != GLFW_PRESS) {
+        //avoids render lock when in preview rendering and reaches max samples(moving camera)
+        bool is_moving = (render_w != WINDOW_WIDTH);
         //Suspend the rendering after completion to avoid useless GPU processing
-        if (MAX_SAMPLES > 0 && renderer.frame_id >= MAX_SAMPLES) {
+        if (MAX_SAMPLES > 0 && renderer.frame_id >= MAX_SAMPLES && !is_moving) {
             glfwWaitEvents(); //Gets input events and avoids program freezing
             processMovement();
             continue;
@@ -336,6 +370,9 @@ void initUniforms() {
     renderer.loc_cam_pos = glGetUniformLocation(active, "camera_position");
     renderer.loc_cam_lookat = glGetUniformLocation(active, "camera_lookat");
     renderer.loc_cam_up = glGetUniformLocation(active, "camera_up");
+
+    renderer.loc_display_render_res = glGetUniformLocation(renderer.display_id, "render_resolution");
+    renderer.loc_display_res = glGetUniformLocation(renderer.display_id, "display_resolution");
 }
 
 void uploadConfig() {
@@ -372,14 +409,14 @@ void loadScene() {
     MeshBounds bounds;
 
     mat4 transform = translate(mat4(1.0f), vec3(0, 0, -1));
-    transform = scale(transform, vec3(0.01f));
+    transform = scale(transform, vec3(1.0f));
     transform = rotate(transform, radians(90.0f), vec3(1, 0, 0));
     //transform = rotate(transform, radians(180.0f), vec3(0, 1, 0));
     //transform = rotate(transform, radians(180.0f), vec3(0, 0, 1));
 
-    loadMesh("../models/stanford_bunny_pbr/scene.gltf", tris, mats, transform, &bounds);
+    loadMesh("../models/NewYork-City-Manhattan.obj", tris, mats, transform, &bounds);
     for (auto& mat : mats) { //temp test
-        mat.albedo = vec4(0.8f, 0.3f, 0.1f, 1.0f);  // laranja
+        //mat.albedo = vec4(0.8f, 0.3f, 0.1f, 1.0f);  // laranja
         mat.type = 0;
     }
     
@@ -408,7 +445,7 @@ bool transferDataToGPU(void) {
     //Textures DSA
     glCreateTextures(GL_TEXTURE_2D, 2, renderer.tex);
     for (int i = 0; i < 2; i++) {
-        glTextureStorage2D(renderer.tex[i], 1, GL_RGBA32F, WINDOW_WIDTH, WINDOW_HEIGHT);
+        glTextureStorage2D(renderer.tex[i], 1, GL_RGBA32F, render_w, render_h);
         glTextureParameteri(renderer.tex[i], GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTextureParameteri(renderer.tex[i], GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTextureParameteri(renderer.tex[i], GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -456,6 +493,9 @@ void display(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
     glUseProgram(renderer.display_id);
+
+    glUniform2f(renderer.loc_display_render_res, (float)render_w, (float)render_h);
+    glUniform2f(renderer.loc_display_res, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT);
     
     glBindTextureUnit(0, renderer.tex[renderer.cur_f]);
     glUniform1i(renderer.loc_tex, 0);
@@ -465,10 +505,17 @@ void display(void) {
     glfwPollEvents();
 }
 
+void clearTextures() {
+    float zero[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    glClearTexImage(renderer.tex[0], 0, GL_RGBA, GL_FLOAT, zero);
+    glClearTexImage(renderer.tex[1], 0, GL_RGBA, GL_FLOAT, zero);
+}
+
 void resetAccumulation() {
     renderer.frame_id = 0;
     renderer.cur_f = 0;
     renderer.prev_f = 1;
+    clearTextures();
 }
 /*----------------------------------------------------------
   Draw to GPU
@@ -482,23 +529,23 @@ void draw(void) {
     glUseProgram(renderer.active_id);
     if(USE_COMPUTE_SH) {
         //Compute pass, no fbo, no quad screen
-        glUniform2f(renderer.loc_res, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT);
+        glUniform2f(renderer.loc_res, (float)render_w, (float)render_h);
         glUniform1i(renderer.loc_frame, renderer.frame_id);
 
         glBindImageTexture(0, renderer.tex[renderer.cur_f], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
         glBindImageTexture(1, renderer.tex[renderer.prev_f], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
 
         //Dispatch 16x16 work groups
-        int groups_x = (WINDOW_WIDTH + COMPUTE_LOCAL_X - 1) / 16;
-        int groups_y = (WINDOW_HEIGHT + COMPUTE_LOCAL_Y - 1) / 16;
+        int groups_x = (render_w + COMPUTE_LOCAL_X - 1) / 16;
+        int groups_y = (render_h + COMPUTE_LOCAL_Y - 1) / 16;
         glDispatchCompute(groups_x, groups_y, 1);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     }
     else {
         //Fragment pass
         glBindFramebuffer(GL_FRAMEBUFFER, renderer.fbo[renderer.cur_f]);
-        glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
-        glUniform2f(renderer.loc_res, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT);
+        glViewport(0, 0, render_w, render_h);
+        glUniform2f(renderer.loc_res, (float)render_w, (float)render_h);
         glUniform1i(renderer.loc_frame, renderer.frame_id);
         glBindTextureUnit(0, renderer.tex[renderer.prev_f]);
         glUniform1i(renderer.loc_prev, 0);
@@ -523,7 +570,7 @@ void draw(void) {
         time_elapsed = time_now - metrics.start_time;
         
         metrics.fps = renderer.frame_id / time_elapsed;
-        metrics.samples_per_s = (double)renderer.frame_id * WINDOW_WIDTH * WINDOW_HEIGHT / time_elapsed;
+        metrics.samples_per_s = (double)renderer.frame_id * render_w * render_h / time_elapsed;
         double ms_frame = time_elapsed / renderer.frame_id * 1000.0;
         char time_buf[32];
         formatTime(time_elapsed, time_buf, sizeof(time_buf));
@@ -541,7 +588,7 @@ void saveScreenshot() {
     time_t now = time(nullptr);
     struct tm* t = localtime(&now);
 
-    vector<unsigned char> pixels(WINDOW_WIDTH * WINDOW_HEIGHT * 3);
+    vector<unsigned char> pixels(render_w * render_h * 3);
     char filename[64];
     snprintf(filename, sizeof(filename), "render_%4d%02d%02d_%02d%02d%02d_%d.png",
         t->tm_year + 1900, t->tm_mon + 1, t->tm_mday,
@@ -551,11 +598,11 @@ void saveScreenshot() {
     glReadPixels(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
 
     //flip y
-    for (int y = 0; y < WINDOW_HEIGHT / 2; y++) {
-        int y2 = WINDOW_HEIGHT - 1 - y;
-        for (int x = 0; x < WINDOW_WIDTH * 3; x++)
-            swap(pixels[y * WINDOW_WIDTH * 3 + x], pixels[y2 * WINDOW_WIDTH * 3 + x]);
+    for (int y = 0; y < render_h / 2; y++) {
+        int y2 = render_h - 1 - y;
+        for (int x = 0; x < render_w * 3; x++)
+            swap(pixels[y * render_w * 3 + x], pixels[y2 * render_w * 3 + x]);
     }
-    stbi_write_png(filename, WINDOW_WIDTH, WINDOW_HEIGHT, 3, pixels.data(), WINDOW_WIDTH * 3);
+    stbi_write_png(filename, WINDOW_WIDTH, WINDOW_HEIGHT, 3, pixels.data(), render_w * 3);
     printf("\nSaved screenshot %s\n", filename);
 }

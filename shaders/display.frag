@@ -14,6 +14,9 @@ in vec2 vUV;
 out vec4 frag_color;
 uniform sampler2D tex;
 
+uniform vec2 render_resolution;
+uniform vec2 display_resolution;
+
 /**
 \note Aces adapted from https://github.com/TheRealMJP/BakingLab/blob/master/BakingLab/ACES.hlsl
 */
@@ -45,6 +48,7 @@ vec3 toneMap(vec3 color) {
 }
 
 void main() {
-    vec3 linear = texture(tex, vUV).rgb;
+    vec2 uv = vUV * (render_resolution / display_resolution);
+    vec3 linear = texture(tex, uv).rgb;
     frag_color = vec4(pow(toneMap(linear), vec3(1.0/2.2)), 1.0);
 }
