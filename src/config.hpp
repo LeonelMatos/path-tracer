@@ -53,3 +53,10 @@ struct CameraConfig {
     float yaw = 1.57f;
     bool moving = false;
 };
+
+///ACES tone map on the CPU side, an approximation of the shader ACES
+///\see saveScreenshot
+auto aces_approx = [](float x) -> float {
+    float a = 2.51f, b = 0.03f, c = 2.43f, d = 0.59f, e = 0.14f;
+    return glm::clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0f, 1.0f);
+};
