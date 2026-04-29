@@ -414,13 +414,13 @@ void loadScene() {
     //transform = rotate(transform, radians(180.0f), vec3(0, 1, 0));
     //transform = rotate(transform, radians(180.0f), vec3(0, 0, 1));
 
-    loadMesh("../models/NewYork-City-Manhattan.obj", tris, mats, transform, &bounds);
+    loadMesh("../models/stanford_dragon_sss_test/scene.gltf", tris, mats, transform, &bounds);
     /*
     for (auto& mat : mats) { //temp test
         mat.albedo = vec4(0.8f, 0.3f, 0.1f, 1.0f);  // laranja
-        mat.type = 0;
-    }*/
-    
+        mat.type = 2;
+    }
+    */
     vector<BVHNode> bvh_nodes;
     buildBVH(tris, bvh_nodes);
     
@@ -589,21 +589,24 @@ void saveScreenshot() {
     time_t now = time(nullptr);
     struct tm* t = localtime(&now);
 
-    vector<unsigned char> pixels(render_w * render_h * 3);
+    vector<unsigned char> pixels(WINDOW_WIDTH * WINDOW_HEIGHT * 3);
     char filename[64];
-    snprintf(filename, sizeof(filename), "render_%4d%02d%02d_%02d%02d%02d_%d.png",
+    snprintf(filename, sizeof(filename), "render_%04d%02d%02d_%02d%02d%02d_%ds.png",
         t->tm_year + 1900, t->tm_mon + 1, t->tm_mday,
         t->tm_hour, t->tm_min, t->tm_sec, renderer.frame_id);
     
+    display();
+
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glReadBuffer(GL_FRONT);
     glReadPixels(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
 
     //flip y
-    for (int y = 0; y < render_h / 2; y++) {
-        int y2 = render_h - 1 - y;
-        for (int x = 0; x < render_w * 3; x++)
-            swap(pixels[y * render_w * 3 + x], pixels[y2 * render_w * 3 + x]);
+    for (int y = 0; y < WINDOW_HEIGHT / 2; y++) {
+        int y2 = WINDOW_HEIGHT - 1 - y;
+        for (int x = 0; x < WINDOW_WIDTH * 3; x++)
+            swap(pixels[y * WINDOW_WIDTH * 3 + x], pixels[y2 * WINDOW_WIDTH * 3 + x]);
     }
-    stbi_write_png(filename, WINDOW_WIDTH, WINDOW_HEIGHT, 3, pixels.data(), render_w * 3);
+    stbi_write_png(filename, WINDOW_WIDTH, WINDOW_HEIGHT, 3, pixels.data(), WINDOW_WIDTH * 3);
     printf("\nSaved screenshot %s\n", filename);
 }
