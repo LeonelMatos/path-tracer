@@ -21,7 +21,7 @@ struct RenderConfig {
 
     //Not part of the shader config
     ///render resolution when moving the camera
-    int moving_resolution = 64;
+    int moving_resolution = 256;
     ///controls the progressive resolution scaling up to the original
     bool progressive_refine = true;
 };

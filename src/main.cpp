@@ -77,7 +77,7 @@ int render_w = WINDOW_WIDTH, render_h = WINDOW_HEIGHT;
 /**Switches between using fragment or compute shaders
 for the path tracer
 \note false = fragment; true = compute*/
-const bool USE_COMPUTE_SH = false;
+const bool USE_COMPUTE_SH = true;
 
 static const int COMPUTE_LOCAL_X = 16;
 static const int COMPUTE_LOCAL_Y = 16;
@@ -409,16 +409,17 @@ void loadScene() {
     MeshBounds bounds;
 
     mat4 transform = translate(mat4(1.0f), vec3(0, 0, -1));
-    transform = scale(transform, vec3(1.0f));
+    transform = scale(transform, vec3(10.0f));
     transform = rotate(transform, radians(90.0f), vec3(1, 0, 0));
     //transform = rotate(transform, radians(180.0f), vec3(0, 1, 0));
     //transform = rotate(transform, radians(180.0f), vec3(0, 0, 1));
 
     loadMesh("../models/NewYork-City-Manhattan.obj", tris, mats, transform, &bounds);
+    /*
     for (auto& mat : mats) { //temp test
-        //mat.albedo = vec4(0.8f, 0.3f, 0.1f, 1.0f);  // laranja
+        mat.albedo = vec4(0.8f, 0.3f, 0.1f, 1.0f);  // laranja
         mat.type = 0;
-    }
+    }*/
     
     vector<BVHNode> bvh_nodes;
     buildBVH(tris, bvh_nodes);

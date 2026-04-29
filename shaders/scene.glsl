@@ -11,7 +11,7 @@ void intersects_mesh(const Ray ray, inout Hit h) {
 
     if(aabb_t >= h.t) return;
 
-    int stack[32];
+    int stack[128];
     int stack_top = 0;
     stack[stack_top++] = 0;
 
@@ -42,9 +42,9 @@ void intersects_mesh(const Ray ray, inout Hit h) {
                     
                     h.t = t;
                     h.pos = ray.origin + t * ray.direction;
-                    h.normal = length(smooth_normal) > EPS ? normalize(smooth_normal) : tri_normal;
-                    if (dot(ray.direction, h.normal) > 0.0)
-                        h.normal = -h.normal;
+                    h.normal = length(smooth_normal) > EPS_TRI ? normalize(smooth_normal) : tri_normal;
+                    /*if (dot(ray.direction, h.normal) > 0.0)
+                        h.normal = -h.normal;*/
                     h.albedo = gpu_materials[m_id].albedo.rgb;
                     h.emission = gpu_materials[m_id].emission.rgb;
                     h.material = gpu_materials[m_id].type;
@@ -58,16 +58,28 @@ void intersects_mesh(const Ray ray, inout Hit h) {
         }
     }
     /*
-    if (nodes_visited > 0 && h.t >= INF) {
-        h.t        = aabb_t;
-        h.pos      = ray.origin + aabb_t * ray.direction;
-        h.normal   = aabb_normal;
-        // Verde = visitou nós mas não acertou triângulos
-        h.albedo   = vec3(0, float(nodes_visited) / 20.0, 0);
-        h.emission = vec3(0);
-        h.material = MAT_DIFFUSE;
-        h.ior      = 0.0;
-    }*/
+    if (nodes_visited > 0) {
+        float heat = clamp(float(nodes_visited) / 30.0, 0.0, 1.0);
+        vec3 cold = vec3(0.0, 0.0, 1.0);
+        vec3 warm = vec3(0.0, 1.0, 0.0);
+        vec3 hot = vec3(1.0, 0.0, 0.0);
+        vec3 heatmap_color = heat < 0.5 ? mix(cold, warm, heat * 2.0) : mix(warm, hot, (heat - 0.5) * 2.0);
+        
+        if (h.t < INF) {
+            h.albedo   = heatmap_color;
+        }
+        else {
+            // Sem hit mas BVH foi traversada — raio entrou no AABB mas não acertou triângulos
+            h.t        = aabb_t;
+            h.pos      = ray.origin + aabb_t * ray.direction;
+            h.normal   = aabb_normal;
+            h.albedo   = vec3(1.0, 1.0, 0.0);  // amarelo = buraco
+            h.emission = vec3(0);
+            h.material = MAT_DIFFUSE;
+            h.ior      = 0.0;
+        }
+    }
+    */
 }
 
 bool intersects(const Ray ray, out Hit h) {
