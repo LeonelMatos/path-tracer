@@ -3,6 +3,11 @@
 #include <GL/glew.h>
 #include <glm/gtc/matrix_transform.hpp>
 
+/**Switches between using fragment or compute shaders
+for the path tracer
+\note false = fragment; true = compute*/
+const bool USE_COMPUTE_SH = true;
+
 struct RenderConfig {
     int depth = 5;
     int samples_per_pixel = 1;

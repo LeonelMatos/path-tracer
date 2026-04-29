@@ -74,11 +74,6 @@ int render_w = WINDOW_WIDTH, render_h = WINDOW_HEIGHT;
 
 #define WINDOW_TITLE "Path Tracer"
 
-/**Switches between using fragment or compute shaders
-for the path tracer
-\note false = fragment; true = compute*/
-const bool USE_COMPUTE_SH = true;
-
 static const int COMPUTE_LOCAL_X = 16;
 static const int COMPUTE_LOCAL_Y = 16;
 
@@ -589,29 +584,20 @@ void saveScreenshot() {
     time_t now = time(nullptr);
     struct tm* t = localtime(&now);
 
-    vector<unsigned char> pixels(WINDOW_WIDTH * WINDOW_HEIGHT * 3);
     char filename[64];
     snprintf(filename, sizeof(filename), "render_%04d%02d%02d_%02d%02d%02d_%ds.png",
         t->tm_year + 1900, t->tm_mon + 1, t->tm_mday,
         t->tm_hour, t->tm_min, t->tm_sec, renderer.frame_id);
-    
-    if(USE_COMPUTE_SH) { //compute shader screenshot -> reads directly from texture
-        vector<float> pixels_float(WINDOW_WIDTH * WINDOW_HEIGHT * 4);
-        glGetTextureImage(renderer.tex[renderer.cur_f], 0, GL_RGBA, GL_FLOAT, pixels_float.size() * sizeof(float), pixels_float.data());
 
-        for (int i = 0; i < WINDOW_WIDTH * WINDOW_HEIGHT; i++) {
-            float r = pow(aces_approx(pixels_float[i*4+0]), 1.0f/2.2f);
-            float g = pow(aces_approx(pixels_float[i*4+1]), 1.0f/2.2f);
-            float b = pow(aces_approx(pixels_float[i*4+2]), 1.0f/2.2f);
-            pixels[i*3+0] = (unsigned char)(r * 255.0f);
-            pixels[i*3+1] = (unsigned char)(g * 255.0f);
-            pixels[i*3+2] = (unsigned char)(b * 255.0f);
-        }
-    }
-    else { //fragment shader -> reads framebuffer
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glReadPixels(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+    // Reads directly from texture (maybe avoids problems with Wayland or X11 windows)
+    vector<float> pixels_float(WINDOW_WIDTH * WINDOW_HEIGHT * 4);
+    glGetTextureImage(renderer.tex[renderer.cur_f], 0, GL_RGBA, GL_FLOAT, pixels_float.size() * sizeof(float), pixels_float.data());
 
+    vector<unsigned char> pixels(WINDOW_WIDTH * WINDOW_HEIGHT * 3);
+    for (int i = 0; i < WINDOW_WIDTH * WINDOW_HEIGHT; i++) {
+        pixels[i*3+0] = (unsigned char)(pow(aces_approx(pixels_float[i*4+0]), 1.0f/2.2f) * 255.0f);
+        pixels[i*3+1] = (unsigned char)(pow(aces_approx(pixels_float[i*4+1]), 1.0f/2.2f) * 255.0f);
+        pixels[i*3+2] = (unsigned char)(pow(aces_approx(pixels_float[i*4+2]), 1.0f/2.2f) * 255.0f);
     }
 
     //flip y
