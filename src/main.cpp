@@ -40,7 +40,7 @@
 #include "mesh.hpp"
 #include "bvh.hpp"
 
-#define VERSION "1.1.2"
+#define VERSION "1.1.3"
 
 using namespace std;
 using namespace glm;
@@ -51,7 +51,6 @@ using namespace glm;
 
 struct Metrics {
     //Time metrics
-    uint total_frames = 0;
     double start_time = 0.0;
     double fps, samples_per_s;
 };
@@ -91,7 +90,6 @@ GLuint material_ssbo;
 ///Triangle count fixed value passed pre-calculated
 GLint loc_tri_count;
 GLint loc_aabb_min, loc_aabb_max;
-
 
 //BVH
 GLuint bvh_ssbo;
