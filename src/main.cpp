@@ -34,13 +34,16 @@
 #include <glm/gtc/type_ptr.hpp>
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_glfw.h"
+#include "imgui/imgui_impl_opengl3.h"
 
 #include "config.hpp"
 #include "common/shader.hpp"
 #include "mesh.hpp"
 #include "bvh.hpp"
 
-#define VERSION "1.1.3"
+#define VERSION "1.2.0"
 
 using namespace std;
 using namespace glm;
@@ -53,6 +56,7 @@ struct Metrics {
     //Time metrics
     double start_time = 0.0;
     double fps, samples_per_s;
+    char time_buf[32];
 };
 
 GLFWwindow* window;
@@ -117,11 +121,13 @@ void clearTextures();
 void resetAccumulation();
 void draw(void);
 void saveScreenshot();
+void drawUI();
 
 /*----------------------------------------------------------
   Input handle
 */
 void onKeyPress(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    if (ImGui::GetIO().WantCaptureKeyboard) return;
     if (action != GLFW_PRESS) return;
 
     switch (key) {
@@ -139,6 +145,7 @@ void onKeyPress(GLFWwindow* window, int key, int scancode, int action, int mods)
 }
 
 void onMouseMove(GLFWwindow* w, double x, double y) {
+    if (ImGui::GetIO().WantCaptureMouse) return;
     if (!mouse_captured) return;
 
     if(mouse_first) {
@@ -162,6 +169,7 @@ void onMouseMove(GLFWwindow* w, double x, double y) {
 }
 
 void onMouseButton(GLFWwindow* w, int button, int action, int mods) {
+    if (ImGui::GetIO().WantCaptureMouse) return; 
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
         if (action == GLFW_PRESS) {
             mouse_captured = true;
@@ -271,6 +279,16 @@ int main(void) {
     
     glewExperimental = GL_TRUE;
     glewInit();
+
+    //Init ImGui
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+
+    ImGui::StyleColorsDark();
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 460");
     
     glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
     glfwSetCursorPosCallback(window, onMouseMove);
@@ -481,6 +499,9 @@ void cleanDataFromGPU() {
     glDeleteBuffers(1, &material_ssbo);
     glDeleteBuffers(1, &bvh_ssbo);
     
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
 }
 
 void display(void) {
@@ -495,8 +516,6 @@ void display(void) {
     glUniform1i(renderer.loc_tex, 0);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-    glfwSwapBuffers(window);
-    glfwPollEvents();
 }
 
 void clearTextures() {
@@ -555,6 +574,12 @@ void draw(void) {
     //Step 2 Display : accumulated texture to screen
     display();
 
+    //Step 3 UI
+    drawUI();
+
+    glfwSwapBuffers(window);
+    glfwPollEvents();
+
     // Metrics
     if (renderer.frame_id % 10 == 0) {
         struct timespec ts;
@@ -566,11 +591,11 @@ void draw(void) {
         metrics.fps = renderer.frame_id / time_elapsed;
         metrics.samples_per_s = (double)renderer.frame_id * render_w * render_h / time_elapsed;
         double ms_frame = time_elapsed / renderer.frame_id * 1000.0;
-        char time_buf[32];
-        formatTime(time_elapsed, time_buf, sizeof(time_buf));
+        
+        formatTime(time_elapsed, metrics.time_buf, sizeof(metrics.time_buf));
 
         printf("\rSamples/pixel: %d | FPS: %.1f | %.1fms/frame | %.1f | Time:%s",
-            renderer.frame_id, metrics.fps, ms_frame, metrics.samples_per_s / 1e6, time_buf);
+            renderer.frame_id, metrics.fps, ms_frame, metrics.samples_per_s / 1e6, metrics.time_buf);
         fflush(stdout);
     }
 }
@@ -606,4 +631,37 @@ void saveScreenshot() {
     }
     stbi_write_png(filename, WINDOW_WIDTH, WINDOW_HEIGHT, 3, pixels.data(), WINDOW_WIDTH * 3);
     printf("\nSaved screenshot %s\n", filename);
+}
+
+/*----------------------------------------------------------
+  UI Draw
+*/
+void drawUI() {
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(320, 600), ImGuiCond_FirstUseEver);
+    ImGui::Begin("Path Tracer");
+
+    //-- Metrics -------------
+    if (ImGui::CollapsingHeader("Metrics", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Text("SPP:     %d / %d", renderer.frame_id, MAX_SAMPLES);
+        ImGui::Text("FPS:\t%.1f", metrics.fps);
+        ImGui::Text("Time:\t%s", metrics.time_buf);
+        ImGui::Text("Shader:  %s", USE_COMPUTE_SH ? "Compute" : "Fragment");
+        ImGui::Text("Res:     %dx%d", render_w, render_h);
+
+        if (ImGui::Button("Reset Accumulation"))
+            resetAccumulation();
+        ImGui::SameLine();
+        if (ImGui::Button("Screenshot"))
+            saveScreenshot();
+    }
+
+    ImGui::End();
+
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }

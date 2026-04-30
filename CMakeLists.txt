@@ -44,9 +44,15 @@ add_executable(pathtracer
     src/main.cpp
     src/mesh.cpp
     src/bvh.cpp
-    common/shader.cpp)
+    common/shader.cpp
+    include/imgui/imgui.cpp
+    include/imgui/imgui_draw.cpp
+    include/imgui/imgui_tables.cpp
+    include/imgui/imgui_widgets.cpp
+    include/imgui/imgui_impl_glfw.cpp
+    include/imgui/imgui_impl_opengl3.cpp)
 
-target_include_directories(pathtracer PRIVATE . include)
+target_include_directories(pathtracer PRIVATE . include imgui)
 
 target_link_libraries(pathtracer
     GL
