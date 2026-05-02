@@ -73,7 +73,7 @@ Metrics metrics;
 
 RenderConfig config;
 
-static const int WINDOW_WIDTH = 1000, WINDOW_HEIGHT = 1000;
+static const int WINDOW_WIDTH = 1280, WINDOW_HEIGHT = 720;
 int render_w = WINDOW_WIDTH, render_h = WINDOW_HEIGHT;
 
 #define WINDOW_TITLE "Path Tracer"
@@ -82,7 +82,7 @@ static const int COMPUTE_LOCAL_X = 16;
 static const int COMPUTE_LOCAL_Y = 16;
 
 const int V_SYNC = 0;
-uint MAX_SAMPLES = 3;
+uint MAX_SAMPLES = 100;
 
 
 const char* txt_sep = "----------------------------";
@@ -231,7 +231,9 @@ void processMovement() {
     uploadCamera();
 
     int target_w = config.moving_resolution;
-    int target_h = config.moving_resolution;
+    int target_h = glm::max(16, (int)(config.moving_resolution * (float)WINDOW_HEIGHT / (float)WINDOW_WIDTH));
+    target_w = glm::max(16, (target_w / 16) * 16);
+    target_h = glm::max(16, (target_h / 16) * 16);
 
     if (render_w != target_w || render_h != target_h) {
         render_w = target_w;
@@ -320,6 +322,11 @@ int main(void) {
         if (MAX_SAMPLES > 0 && renderer.frame_id >= MAX_SAMPLES && !is_moving) {
             glfwWaitEvents(); //Gets input events and avoids program freezing
             processMovement();
+
+            display();
+            drawUI();
+            glfwSwapBuffers(window);
+            glfwPollEvents();
             continue;
         }
         draw();
