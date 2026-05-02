@@ -72,7 +72,7 @@ Metrics metrics;
 
 RenderConfig config;
 
-static const int WINDOW_WIDTH = 1920, WINDOW_HEIGHT = 1080;
+static const int WINDOW_WIDTH = 1000, WINDOW_HEIGHT = 1000;
 int render_w = WINDOW_WIDTH, render_h = WINDOW_HEIGHT;
 
 #define WINDOW_TITLE "Path Tracer"
@@ -280,6 +280,13 @@ int main(void) {
     glewExperimental = GL_TRUE;
     glewInit();
 
+    
+    glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
+    glfwSetKeyCallback(window, onKeyPress);
+    glfwSetCursorPosCallback(window, onMouseMove);
+    glfwSetMouseButtonCallback(window, onMouseButton);
+    glfwSetScrollCallback(window, onMouseScroll);
+    
     //Init ImGui
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -289,13 +296,6 @@ int main(void) {
     ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 460");
-    
-    glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
-    glfwSetCursorPosCallback(window, onMouseMove);
-    glfwSetMouseButtonCallback(window, onMouseButton);
-    glfwSetScrollCallback(window, onMouseScroll);
-
-    glfwSetKeyCallback(window, onKeyPress);
 
     if(!transferDataToGPU())
     return -1;
