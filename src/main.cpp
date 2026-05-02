@@ -56,6 +56,7 @@ struct Metrics {
     //Time metrics
     double start_time = 0.0;
     double fps, samples_per_s;
+    double last_frame_time = 0.0;
     char time_buf[32];
 };
 
@@ -81,7 +82,7 @@ static const int COMPUTE_LOCAL_X = 16;
 static const int COMPUTE_LOCAL_Y = 16;
 
 const int V_SYNC = 0;
-uint MAX_SAMPLES = 1000;
+uint MAX_SAMPLES = 3;
 
 
 const char* txt_sep = "----------------------------";
@@ -224,30 +225,34 @@ void processMovement() {
         moved = true;
     }
 
-    if(moved || camera.moving) {
-        camera.lookat = camera.position + cameraForward();
-        camera.moving = false;
-        uploadCamera();
+    if (moved || camera.moving) {
+    camera.lookat  = camera.position + cameraForward();
+    camera.moving  = false;
+    uploadCamera();
 
-        if(render_w != config.moving_resolution) {
-            render_w = config.moving_resolution;
-            render_h = config.moving_resolution;
-            glUseProgram(renderer.active_id);
-            glUniform2f(renderer.loc_res, (float)render_w, (float)render_h);
-            if(!USE_COMPUTE_SH) {
-                glBindFramebuffer(GL_FRAMEBUFFER, renderer.fbo[renderer.cur_f]);
-                glViewport(0, 0, render_w, render_h);
-            }
-            clearTextures();
-            renderer.cur_f = 0;
-            renderer.prev_f = 1;
+    int target_w = config.moving_resolution;
+    int target_h = config.moving_resolution;
+
+    if (render_w != target_w || render_h != target_h) {
+        render_w = target_w;
+        render_h = target_h;
+        glUseProgram(renderer.active_id);
+        glUniform2f(renderer.loc_res, (float)render_w, (float)render_h);
+        if (!USE_COMPUTE_SH) {
+            glBindFramebuffer(GL_FRAMEBUFFER, renderer.fbo[renderer.cur_f]);
+            glViewport(0, 0, render_w, render_h);
         }
-        renderer.frame_id = 0;
-        frames_since_moved = 0;
+        clearTextures();
+        renderer.cur_f  = 0;
+        renderer.prev_f = 1;
     }
+
+    renderer.frame_id  = 0;
+    frames_since_moved = 0;
+}
     else {
         frames_since_moved++;
-
+        
         if (frames_since_moved == 5 && render_w != WINDOW_WIDTH) {
             render_w = WINDOW_WIDTH;
             render_h = WINDOW_HEIGHT;
@@ -534,6 +539,7 @@ void resetAccumulation() {
   Draw to GPU
 */
 void draw(void) {
+    struct timespec ts_now;
     double time_now, time_elapsed;
 
     processMovement();
@@ -582,10 +588,8 @@ void draw(void) {
 
     // Metrics
     if (renderer.frame_id % 10 == 0) {
-        struct timespec ts;
-        clock_gettime(CLOCK_MONOTONIC, &ts);
-
-        time_now = ts.tv_sec + ts.tv_nsec * 1e-9;
+        clock_gettime(CLOCK_MONOTONIC, &ts_now);
+        time_now = ts_now.tv_sec + ts_now.tv_nsec * 1e-9;
         time_elapsed = time_now - metrics.start_time;
         
         metrics.fps = renderer.frame_id / time_elapsed;
@@ -658,6 +662,14 @@ void drawUI() {
         ImGui::SameLine();
         if (ImGui::Button("Screenshot"))
             saveScreenshot();
+    }
+    if(ImGui::CollapsingHeader("Preview")) {
+        int res = config.moving_resolution;
+        if(ImGui::SliderInt("Preview Resolution", &res, 32, 512)) {
+            res = (res / 16) * 16;
+            res = glm::max(32, res);
+            config.moving_resolution = res;
+        }
     }
 
     ImGui::End();
