@@ -82,7 +82,7 @@ static const int COMPUTE_LOCAL_X = 16;
 static const int COMPUTE_LOCAL_Y = 16;
 
 const int V_SYNC = 0;
-uint MAX_SAMPLES = 100;
+uint MAX_SAMPLES = 10;
 
 
 const char* txt_sep = "----------------------------";
@@ -437,7 +437,7 @@ void loadScene() {
     //transform = rotate(transform, radians(180.0f), vec3(0, 1, 0));
     //transform = rotate(transform, radians(180.0f), vec3(0, 0, 1));
 
-    loadMesh("../models/stanford_dragon_sss_test/scene.gltf", tris, mats, transform, &bounds);
+    loadMesh("../models/utah_teapot_pbr/scene.gltf", tris, mats, transform, &bounds);
     /*
     for (auto& mat : mats) { //temp test
         mat.albedo = vec4(0.8f, 0.3f, 0.1f, 1.0f);  // laranja
@@ -541,6 +541,13 @@ void resetAccumulation() {
     renderer.cur_f = 0;
     renderer.prev_f = 1;
     clearTextures();
+
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    metrics.start_time = ts.tv_sec + ts.tv_nsec * 1e-9;
+    metrics.fps = 0.0;
+    metrics.samples_per_s = 0.0;
+    snprintf(metrics.time_buf, sizeof(metrics.time_buf), "0.0s");
 }
 /*----------------------------------------------------------
   Draw to GPU
@@ -581,7 +588,7 @@ void draw(void) {
     int tmp = renderer.cur_f; renderer.cur_f = renderer.prev_f; renderer.prev_f = tmp;
     renderer.frame_id++;
 
-    if(renderer.frame_id == MAX_SAMPLES)
+    if(renderer.frame_id == (int)MAX_SAMPLES)
         printf("\n%s\nRender complete - %d samples in %.1fs\n", txt_sep, renderer.frame_id, time_elapsed);
     
     //Step 2 Display : accumulated texture to screen
@@ -670,13 +677,67 @@ void drawUI() {
         if (ImGui::Button("Screenshot"))
             saveScreenshot();
     }
+    //-- Preview Config -------------
     if(ImGui::CollapsingHeader("Preview")) {
         int res = config.moving_resolution;
-        if(ImGui::SliderInt("Preview Resolution", &res, 32, 512)) {
+        if(ImGui::SliderInt("Preview Res", &res, 32, 512)) {
             res = (res / 16) * 16;
             res = glm::max(32, res);
             config.moving_resolution = res;
         }
+    }
+    //-- Render Settings -------------
+    if(ImGui::CollapsingHeader("Render", ImGuiTreeNodeFlags_DefaultOpen)) {
+        bool changed = false;
+        RenderConfig defaults;
+
+        auto resetBtn = [&](const char* id, auto& field, auto default_val) -> bool {
+            ImGui::SameLine();
+            ImGui::PushItemWidth(-1);
+            bool r = ImGui::SmallButton(id);
+            ImGui::SetItemTooltip("Reset to default");
+            if(r && field != default_val) { field = default_val; return true; }
+            ImGui::PopItemWidth();
+            return false;
+        };
+        
+        int samples = (int)MAX_SAMPLES;
+        if(ImGui::InputInt("Max Samples", &samples, 1, 5000)) {
+            samples = glm::max(1, samples);
+            MAX_SAMPLES = (uint)samples;
+        }
+        ImGui::SetItemTooltip("Max progressive samples per pixel");
+        changed |= ImGui::SliderInt("Depth", &config.depth, 1, 50);
+        changed |= resetBtn("*##depth", config.depth, defaults.depth);
+
+        changed |= ImGui::SliderInt("Rays/Pixel", &config.samples_per_pixel, 1, 16);
+        changed |= resetBtn("*##spp", config.samples_per_pixel, defaults.samples_per_pixel);
+
+        ImGui::SeparatorText("Russian Roulette");
+
+        bool rr_enabled = (config.rr_min_bounces > 0);
+        if(ImGui::Checkbox("Enable RR", &rr_enabled)) {
+            config.rr_min_bounces = rr_enabled ? defaults.rr_min_bounces : 0;
+            changed = true;
+        }
+        
+        changed |= ImGui::SliderInt("Min Bounces", &config.rr_min_bounces, 0, 10);
+        ImGui::SetItemTooltip("Minimum bounces before enabling Russian Roulette\n0 = off");
+        changed |= resetBtn("*##rrmin", config.rr_min_bounces, defaults.rr_min_bounces);
+
+        changed |= ImGui::SliderFloat("Survival Chance", &config.rr_max_survival, 0.1f, 1.0f, "%.2f");
+        ImGui::SetItemTooltip("Probability of ray survival after each bounce");
+        changed |= resetBtn("*##rrsur", config.rr_max_survival, defaults.rr_max_survival);
+
+        ImGui::SeparatorText("Environment");
+
+        const char* bg_names[] = {"Black", "White"};
+        changed |= ImGui::Combo("Background", &config.background, bg_names, 2);
+
+        const char* tm_names[] = {"None", "Reinhard", "ACES"};
+        changed |= ImGui::Combo("Tone Map", &config.tone_mapping, tm_names, 3);
+
+        if(changed) applyConfig();
     }
 
     ImGui::End();
