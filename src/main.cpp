@@ -56,6 +56,7 @@ struct Metrics {
     //Time metrics
     double start_time = 0.0;
     double fps, samples_per_s;
+    double ms_frame;
     double last_frame_time = 0.0;
     char time_buf[32];
 };
@@ -608,12 +609,12 @@ void draw(void) {
         
         metrics.fps = renderer.frame_id / time_elapsed;
         metrics.samples_per_s = (double)renderer.frame_id * render_w * render_h / time_elapsed;
-        double ms_frame = time_elapsed / renderer.frame_id * 1000.0;
+        metrics.ms_frame = time_elapsed / renderer.frame_id * 1000.0;
         
         formatTime(time_elapsed, metrics.time_buf, sizeof(metrics.time_buf));
 
         printf("\rSamples/pixel: %d | FPS: %.1f | %.1fms/frame | %.1f | Time:%s",
-            renderer.frame_id, metrics.fps, ms_frame, metrics.samples_per_s / 1e6, metrics.time_buf);
+            renderer.frame_id, metrics.fps, metrics.ms_frame, metrics.samples_per_s / 1e6, metrics.time_buf);
         fflush(stdout);
     }
 }
@@ -660,13 +661,12 @@ void drawUI() {
     ImGui::NewFrame();
 
     ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(ImVec2(320, 600), ImGuiCond_FirstUseEver);
-    ImGui::Begin("Path Tracer");
-
+    ImGui::SetNextWindowSize(ImVec2(280, 180), ImGuiCond_FirstUseEver);
+    
     //-- Metrics -------------
-    if (ImGui::CollapsingHeader("Metrics", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if(ImGui::Begin("Metrics")) {
         ImGui::Text("SPP:     %d / %d", renderer.frame_id, MAX_SAMPLES);
-        ImGui::Text("FPS:\t%.1f", metrics.fps);
+        ImGui::Text("FPS:\t%.1f (%.1fms)", metrics.fps, metrics.ms_frame);
         ImGui::Text("Time:\t%s", metrics.time_buf);
         ImGui::Text("Shader:  %s", USE_COMPUTE_SH ? "Compute" : "Fragment");
         ImGui::Text("Res:     %dx%d", render_w, render_h);
@@ -677,67 +677,75 @@ void drawUI() {
         if (ImGui::Button("Screenshot"))
             saveScreenshot();
     }
-    //-- Preview Config -------------
-    if(ImGui::CollapsingHeader("Preview")) {
-        int res = config.moving_resolution;
-        if(ImGui::SliderInt("Preview Res", &res, 32, 512)) {
-            res = (res / 16) * 16;
-            res = glm::max(32, res);
-            config.moving_resolution = res;
-        }
-    }
+
+    ImGui::End();
+
     //-- Render Settings -------------
-    if(ImGui::CollapsingHeader("Render", ImGuiTreeNodeFlags_DefaultOpen)) {
-        bool changed = false;
-        RenderConfig defaults;
-
-        auto resetBtn = [&](const char* id, auto& field, auto default_val) -> bool {
-            ImGui::SameLine();
-            ImGui::PushItemWidth(-1);
-            bool r = ImGui::SmallButton(id);
-            ImGui::SetItemTooltip("Reset to default");
-            if(r && field != default_val) { field = default_val; return true; }
-            ImGui::PopItemWidth();
-            return false;
-        };
-        
-        int samples = (int)MAX_SAMPLES;
-        if(ImGui::InputInt("Max Samples", &samples, 1, 5000)) {
-            samples = glm::max(1, samples);
-            MAX_SAMPLES = (uint)samples;
+    ImGui::SetNextWindowPos(ImVec2(WINDOW_WIDTH - 310, 10), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(300, 400), ImGuiCond_FirstUseEver);
+    if(ImGui::Begin("Render")) {
+        //-- Preview Config -------------
+        if(ImGui::CollapsingHeader("Preview")) {
+            int res = config.moving_resolution;
+            if(ImGui::SliderInt("Preview Res", &res, 32, 512)) {
+                res = (res / 16) * 16;
+                res = glm::max(32, res);
+                config.moving_resolution = res;
+            }
         }
-        ImGui::SetItemTooltip("Max progressive samples per pixel");
-        changed |= ImGui::SliderInt("Depth", &config.depth, 1, 50);
-        changed |= resetBtn("*##depth", config.depth, defaults.depth);
 
-        changed |= ImGui::SliderInt("Rays/Pixel", &config.samples_per_pixel, 1, 16);
-        changed |= resetBtn("*##spp", config.samples_per_pixel, defaults.samples_per_pixel);
-
-        ImGui::SeparatorText("Russian Roulette");
-
-        bool rr_enabled = (config.rr_min_bounces > 0);
-        if(ImGui::Checkbox("Enable RR", &rr_enabled)) {
-            config.rr_min_bounces = rr_enabled ? defaults.rr_min_bounces : 0;
-            changed = true;
+        if(ImGui::CollapsingHeader("Render", ImGuiTreeNodeFlags_DefaultOpen)) {
+            bool changed = false;
+            RenderConfig defaults;
+    
+            auto resetBtn = [&](const char* id, auto& field, auto default_val) -> bool {
+                ImGui::SameLine();
+                ImGui::PushItemWidth(-1);
+                bool r = ImGui::SmallButton(id);
+                ImGui::SetItemTooltip("Reset to default");
+                if(r && field != default_val) { field = default_val; return true; }
+                ImGui::PopItemWidth();
+                return false;
+            };
+            
+            int samples = (int)MAX_SAMPLES;
+            if(ImGui::InputInt("Max Samples", &samples, 1, 5000)) {
+                samples = glm::max(1, samples);
+                MAX_SAMPLES = (uint)samples;
+            }
+            ImGui::SetItemTooltip("Max progressive samples per pixel");
+            changed |= ImGui::SliderInt("Depth", &config.depth, 1, 50);
+            changed |= resetBtn("*##depth", config.depth, defaults.depth);
+    
+            changed |= ImGui::SliderInt("Rays/Pixel", &config.samples_per_pixel, 1, 16);
+            changed |= resetBtn("*##spp", config.samples_per_pixel, defaults.samples_per_pixel);
+    
+            ImGui::SeparatorText("Russian Roulette");
+    
+            bool rr_enabled = (config.rr_min_bounces > 0);
+            if(ImGui::Checkbox("Enable RR", &rr_enabled)) {
+                config.rr_min_bounces = rr_enabled ? defaults.rr_min_bounces : 0;
+                changed = true;
+            }
+            
+            changed |= ImGui::SliderInt("Min Bounces", &config.rr_min_bounces, 0, 10);
+            ImGui::SetItemTooltip("Minimum bounces before enabling Russian Roulette\n0 = off");
+            changed |= resetBtn("*##rrmin", config.rr_min_bounces, defaults.rr_min_bounces);
+    
+            changed |= ImGui::SliderFloat("Survival Chance", &config.rr_max_survival, 0.1f, 1.0f, "%.2f");
+            ImGui::SetItemTooltip("Probability of ray survival after each bounce");
+            changed |= resetBtn("*##rrsur", config.rr_max_survival, defaults.rr_max_survival);
+    
+            ImGui::SeparatorText("Environment");
+    
+            const char* bg_names[] = {"Black", "White"};
+            changed |= ImGui::Combo("Background", &config.background, bg_names, 2);
+    
+            const char* tm_names[] = {"None", "Reinhard", "ACES"};
+            changed |= ImGui::Combo("Tone Map", &config.tone_mapping, tm_names, 3);
+    
+            if(changed) applyConfig();
         }
-        
-        changed |= ImGui::SliderInt("Min Bounces", &config.rr_min_bounces, 0, 10);
-        ImGui::SetItemTooltip("Minimum bounces before enabling Russian Roulette\n0 = off");
-        changed |= resetBtn("*##rrmin", config.rr_min_bounces, defaults.rr_min_bounces);
-
-        changed |= ImGui::SliderFloat("Survival Chance", &config.rr_max_survival, 0.1f, 1.0f, "%.2f");
-        ImGui::SetItemTooltip("Probability of ray survival after each bounce");
-        changed |= resetBtn("*##rrsur", config.rr_max_survival, defaults.rr_max_survival);
-
-        ImGui::SeparatorText("Environment");
-
-        const char* bg_names[] = {"Black", "White"};
-        changed |= ImGui::Combo("Background", &config.background, bg_names, 2);
-
-        const char* tm_names[] = {"None", "Reinhard", "ACES"};
-        changed |= ImGui::Combo("Tone Map", &config.tone_mapping, tm_names, 3);
-
-        if(changed) applyConfig();
     }
 
     ImGui::End();
