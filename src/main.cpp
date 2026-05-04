@@ -660,6 +660,20 @@ void drawUI() {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
+    RenderConfig render_defaults;
+    CameraConfig camera_defaults;
+    bool changed = false;
+
+    auto resetBtn = [&](const char* id, auto& field, auto default_val) -> bool {
+                ImGui::SameLine();
+                ImGui::PushItemWidth(-1);
+                bool r = ImGui::SmallButton(id);
+                ImGui::SetItemTooltip("Reset to default");
+                if(r && field != default_val) { field = default_val; return true; }
+                ImGui::PopItemWidth();
+                return false;
+            };
+
     ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(280, 180), ImGuiCond_FirstUseEver);
     
@@ -683,6 +697,7 @@ void drawUI() {
     //-- Render Settings -------------
     ImGui::SetNextWindowPos(ImVec2(WINDOW_WIDTH - 310, 10), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(300, 400), ImGuiCond_FirstUseEver);
+    changed = false;
     if(ImGui::Begin("Render")) {
         //-- Preview Config -------------
         if(ImGui::CollapsingHeader("Preview")) {
@@ -695,18 +710,6 @@ void drawUI() {
         }
 
         if(ImGui::CollapsingHeader("Render", ImGuiTreeNodeFlags_DefaultOpen)) {
-            bool changed = false;
-            RenderConfig defaults;
-    
-            auto resetBtn = [&](const char* id, auto& field, auto default_val) -> bool {
-                ImGui::SameLine();
-                ImGui::PushItemWidth(-1);
-                bool r = ImGui::SmallButton(id);
-                ImGui::SetItemTooltip("Reset to default");
-                if(r && field != default_val) { field = default_val; return true; }
-                ImGui::PopItemWidth();
-                return false;
-            };
             
             int samples = (int)MAX_SAMPLES;
             if(ImGui::InputInt("Max Samples", &samples, 1, 5000)) {
@@ -715,26 +718,26 @@ void drawUI() {
             }
             ImGui::SetItemTooltip("Max progressive samples per pixel");
             changed |= ImGui::SliderInt("Depth", &config.depth, 1, 50);
-            changed |= resetBtn("*##depth", config.depth, defaults.depth);
+            changed |= resetBtn("*##depth", config.depth, render_defaults.depth);
     
             changed |= ImGui::SliderInt("Rays/Pixel", &config.samples_per_pixel, 1, 16);
-            changed |= resetBtn("*##spp", config.samples_per_pixel, defaults.samples_per_pixel);
+            changed |= resetBtn("*##spp", config.samples_per_pixel, render_defaults.samples_per_pixel);
     
             ImGui::SeparatorText("Russian Roulette");
     
             bool rr_enabled = (config.rr_min_bounces > 0);
             if(ImGui::Checkbox("Enable RR", &rr_enabled)) {
-                config.rr_min_bounces = rr_enabled ? defaults.rr_min_bounces : 0;
+                config.rr_min_bounces = rr_enabled ? render_defaults.rr_min_bounces : 0;
                 changed = true;
             }
             
             changed |= ImGui::SliderInt("Min Bounces", &config.rr_min_bounces, 0, 10);
             ImGui::SetItemTooltip("Minimum bounces before enabling Russian Roulette\n0 = off");
-            changed |= resetBtn("*##rrmin", config.rr_min_bounces, defaults.rr_min_bounces);
+            changed |= resetBtn("*##rrmin", config.rr_min_bounces, render_defaults.rr_min_bounces);
     
             changed |= ImGui::SliderFloat("Survival Chance", &config.rr_max_survival, 0.1f, 1.0f, "%.2f");
             ImGui::SetItemTooltip("Probability of ray survival after each bounce");
-            changed |= resetBtn("*##rrsur", config.rr_max_survival, defaults.rr_max_survival);
+            changed |= resetBtn("*##rrsur", config.rr_max_survival, render_defaults.rr_max_survival);
     
             ImGui::SeparatorText("Environment");
     
@@ -747,7 +750,48 @@ void drawUI() {
             if(changed) applyConfig();
         }
     }
+    ImGui::End();
 
+    ImGui::SetNextWindowPos(ImVec2(WINDOW_WIDTH - 310, 420), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(300, 280), ImGuiCond_FirstUseEver);
+    changed = false;
+    if(ImGui::Begin("Camera")) {
+        ImGui::Text("x = %.2f, y = %.2f, z = %.2f", camera.position.x, camera.position.y, camera.position.z);
+
+        ImGui::SeparatorText("Controls");
+        ImGui::SliderFloat("Speed", &camera.move_speed, 0.001f, 1.0f, "%.3f");
+        resetBtn("*##speed", camera.move_speed, camera_defaults.move_speed);
+
+        ImGui::SliderFloat("Sensitivity", &camera.mouse_sens, 0.0001f, 0.1f, "%.4f");
+        resetBtn("*##sens", camera.mouse_sens, camera_defaults.mouse_sens);
+
+        ImGui::SeparatorText("Depth of Field");
+
+        bool dof_enabled = (config.cam_aperture > 0.0f);
+        if(ImGui::Checkbox("Enable DoF", &dof_enabled)) {
+            config.cam_aperture = dof_enabled ? 0.05f : 0.0f;
+            changed = true;
+        }
+
+        if(dof_enabled) {
+            changed |= ImGui::SliderFloat("Aperture", &config.cam_aperture, 0.001f, 0.5f, "%.3f");
+            resetBtn("*##aperture", config.cam_aperture, 0.05f);
+            ImGui::SetItemTooltip("Size of the lens aperture\nHigher = more blur");
+
+            changed |= ImGui::SliderFloat("Focal Dist", &config.cam_focal_distance, 0.1f, 50.0f, "%.2f");
+            resetBtn("*##focal", config.cam_focal_distance, render_defaults.cam_focal_distance);
+            ImGui::SetItemTooltip("Distance to focal plane");
+
+            ImGui::Checkbox("Draw Focus", &config.focal_debug);
+            ImGui::SetItemTooltip("View the focal plane");
+
+            if(config.focal_debug) {
+                changed |= ImGui::SliderFloat("Draw Size", &config.focal_band_debug, 0.01f, 0.5f, "%.2f");
+                resetBtn("*##fband", config.focal_band_debug, render_defaults.focal_band_debug);
+            }
+        }
+        if(changed) applyConfig();
+    }
     ImGui::End();
 
     ImGui::Render();
