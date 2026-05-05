@@ -14,11 +14,22 @@ vec4 grid(vec3 pos, float scale) {
     float line = min(grid_uv.x, grid_uv.y);
     float alpha = 1.0 - min(line, 1.0);
 
-    vec4 color = vec4(0.4, 0.4, 0.4, alpha * 0.6);
+    vec4 color = vec4(0.4, 0.4, 0.4, alpha * 0.5);
+
+    //10-step marks
+    vec2 coord10 = pos.xy * 0.1;
+    vec2 deriv10 = fwidth(coord10);
+    vec2 grid10_uv = abs(fract(coord10 - 0.5) - 0.5) / deriv10;
+    float line10 = min(grid10_uv.x, grid10_uv.y);
+    float alpha10 = 1.0 - min(line10, 1.0);
+    if(alpha10 > 0.05)
+        color = mix(color, vec4(0.6, 0.6, 0.6, alpha10 * 0.8), alpha10);
     
-    float axis_thickness = 2.0;
-    if (abs(pos.x) < deriv.y * axis_thickness || abs(pos.y) < deriv.x * axis_thickness)
-        color = vec4(0.6, 0.6, 0.6, alpha);
+    //axis subtle color
+    if(abs(pos.y) < deriv.x * 2.5)
+        color = vec4(0.6, 0.25, 0.25, alpha * 0.9);
+    if(abs(pos.x) < deriv.y * 2.5)
+        color = vec4(0.25, 0.6, 0.25, alpha * 0.9);
 
     return color;
 }
@@ -35,7 +46,6 @@ void main() {
 
     vec4 g = grid(pos, 1.0);
 
-//0.4 hardcoded to be more transparent, avoids overlay on the path tracer meshes
-    frag_color = g * fade * 0.4;
+    frag_color = g * fade;
     if (frag_color.a < 0.01) discard;
 }
