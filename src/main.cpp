@@ -43,7 +43,7 @@
 #include "mesh.hpp"
 #include "bvh.hpp"
 
-#define VERSION "1.2.2"
+#define VERSION "1.2.3"
 
 using namespace std;
 using namespace glm;
@@ -125,6 +125,7 @@ void clearTextures();
 void resetAccumulation();
 void draw(void);
 void saveScreenshot();
+void drawGrid();
 void drawUI();
 
 /*----------------------------------------------------------
@@ -408,6 +409,7 @@ int main(void) {
             processMovement();
 
             display();
+            drawGrid();
             drawUI();
             glfwSwapBuffers(window);
             glfwPollEvents();
@@ -448,7 +450,13 @@ bool initShaders() {
     renderer.pathtr_comp_id = LoadShaders({
         { GL_COMPUTE_SHADER, "shaders/path_trace.comp" }
     });
-    if(!renderer.display_id || !renderer.pathtr_frag_id || !renderer.pathtr_comp_id)  { glfwTerminate(); return false; }
+    renderer.grid_id = LoadShaders({
+        { GL_VERTEX_SHADER, "shaders/grid.vert" },
+        { GL_FRAGMENT_SHADER, "shaders/grid.frag" }
+    });
+    if(!renderer.display_id || !renderer.pathtr_frag_id || !renderer.pathtr_comp_id || !renderer.grid_id) {
+        glfwTerminate(); return false;
+    }
     return true;
 }
 
@@ -483,6 +491,11 @@ void initUniforms() {
 
     renderer.loc_display_render_res = glGetUniformLocation(renderer.display_id, "render_resolution");
     renderer.loc_display_res = glGetUniformLocation(renderer.display_id, "display_resolution");
+
+    renderer.grid_loc_view = glGetUniformLocation(renderer.grid_id, "view");
+    renderer.grid_loc_proj = glGetUniformLocation(renderer.grid_id, "projection");
+    renderer.grid_loc_near = glGetUniformLocation(renderer.grid_id, "near_plane");
+    renderer.grid_loc_far = glGetUniformLocation(renderer.grid_id, "far_plane");
 }
 
 void uploadConfig() {
@@ -543,7 +556,6 @@ void loadScene() {
     glUniform3f(loc_aabb_min, bounds.min_bound.x, bounds.min_bound.y, bounds.min_bound.z);
     glUniform3f(loc_aabb_max, bounds.max_bound.x, bounds.max_bound.y, bounds.max_bound.z);
 }
-
 
 bool transferDataToGPU(void) {
     initShaders();
@@ -678,10 +690,13 @@ void draw(void) {
     if(renderer.frame_id == (int)MAX_SAMPLES)
         printf("\n%s\nRender complete - %d samples in %.1fs\n", txt_sep, renderer.frame_id, time_elapsed);
     
-    //Step 2 Display : accumulated texture to screen
+    //Step 2 Display: accumulated texture to screen
     display();
 
-    //Step 3 UI
+    //Step 3 Grid : World view grid
+    drawGrid();
+
+    //Step 4 UI: Dear ImGui
     drawUI();
 
     glfwSwapBuffers(window);
@@ -708,6 +723,8 @@ void draw(void) {
 /*----------------------------------------------------------
   Render Extras
 */
+
+/// @brief Takes a screenshot of the render
 void saveScreenshot() {
     time_t now = time(nullptr);
     struct tm* t = localtime(&now);
@@ -736,6 +753,29 @@ void saveScreenshot() {
     }
     stbi_write_png(filename, WINDOW_WIDTH, WINDOW_HEIGHT, 3, pixels.data(), WINDOW_WIDTH * 3);
     printf("\nSaved screenshot %s\n", filename);
+}
+
+/// @brief Renders the world view grid
+void drawGrid() {
+    if (!renderer.show_grid) return;
+
+    mat4 view = lookAt(camera.position, camera.lookat, camera.up);
+    //check if the fov is equal to the fov in the globals shader
+    mat4 proj = perspective(radians(30.0f), (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT, 0.01f, 100.0f);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_DEPTH_TEST);
+
+    glUseProgram(renderer.grid_id);
+    glUniformMatrix4fv(renderer.grid_loc_view, 1, GL_FALSE, value_ptr(view));
+    glUniformMatrix4fv(renderer.grid_loc_proj, 1, GL_FALSE, value_ptr(proj));
+    glUniform1f(renderer.grid_loc_near, 0.01f);
+    glUniform1f(renderer.grid_loc_far, 100.0f);
+
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glDisable(GL_BLEND);
+    //glEnable(GL_DEPTH_TEST);
 }
 
 /*----------------------------------------------------------
@@ -771,11 +811,13 @@ void drawUI() {
         ImGui::Text("Shader:  %s", USE_COMPUTE_SH ? "Compute" : "Fragment");
         ImGui::Text("Res:     %dx%d", renderer.render_w, renderer.render_h);
 
-        if (ImGui::Button("Reset Accumulation"))
+        if (ImGui::Button("Reset Accumulation[R]"))
             resetAccumulation();
         ImGui::SameLine();
-        if (ImGui::Button("Screenshot"))
+        if (ImGui::Button("Screenshot[F12]"))
             saveScreenshot();
+        if(ImGui::Button("Reset Camera[H]"))
+            camera.returning_home = true;
     }
 
     ImGui::End();
@@ -793,6 +835,8 @@ void drawUI() {
                 res = glm::max(32, res);
                 config.moving_resolution = res;
             }
+            ImGui::Checkbox("Show Grid", &renderer.show_grid);
+            ImGui::SetItemTooltip("Grid not visible on screenshots");
         }
 
         if(ImGui::CollapsingHeader("Render", ImGuiTreeNodeFlags_DefaultOpen)) {
