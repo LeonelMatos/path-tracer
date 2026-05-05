@@ -62,6 +62,8 @@ struct CameraConfig {
     float pitch = 0.0f;
     float yaw = 1.57f;
     bool moving = false;
+    bool returning_home = false;
+    float return_speed = 3.0f;
 };
 
 ///ACES tone map on the CPU side, an approximation of the shader ACES

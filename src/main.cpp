@@ -54,9 +54,10 @@ using namespace glm;
 
 struct Metrics {
     //Time metrics
-    double start_time = 0.0;
+    double render_start_time = 0.0;
     double fps, samples_per_s;
     double ms_frame;
+    /// \note also known as delta time
     double last_frame_time = 0.0;
     char time_buf[32];
 };
@@ -107,6 +108,9 @@ void onMouseButton(GLFWwindow* w, int button, int action, int mods);
 void onMouseScroll(GLFWwindow* w, double xoffset, double yoffset);
 void onWindowResize(GLFWwindow* w, int width, int height);
 vec3 cameraForward();
+void setPreviewResolution();
+void setFullResolution();
+void startMoving();
 void processMovement();
 void formatTime(double seconds, char*buf, int buf_size);
 bool initShaders();
@@ -140,6 +144,10 @@ void onKeyPress(GLFWwindow* window, int key, int scancode, int action, int mods)
         case GLFW_KEY_E:
             config.background = 1 - config.background;
             applyConfig();
+        break;
+        case GLFW_KEY_H:
+        case GLFW_KEY_0:
+            camera.returning_home = true;
         break;
     }
 }
@@ -197,76 +205,119 @@ vec3 cameraForward() {
 
 int frames_since_moved = 9999;
 
-void processMovement() {
-    vec3 forward = cameraForward();
-    vec3 right = normalize(cross(forward, camera.up));
-    float speed = camera.move_speed;
-    bool moved = false;
-
-    if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
-        speed *= 2;
-    }
-    
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-        camera.position += forward * speed;
-        moved = true;
-    }
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-        camera.position -= forward * speed;
-        moved = true;
-    }
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-        camera.position -= right * speed;
-        moved = true;
-    }
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-        camera.position += right * speed;
-        moved = true;
-    }
-
-    if (moved || camera.moving) {
-    camera.lookat  = camera.position + cameraForward();
-    camera.moving  = false;
-    uploadCamera();
-
+/// Changes the render resolution to preview mode, aux function
+void setPreviewResolution() {
     int target_w = config.moving_resolution;
     int target_h = glm::max(16, (int)(config.moving_resolution * (float)WINDOW_HEIGHT / (float)WINDOW_WIDTH));
     target_w = glm::max(16, (target_w / 16) * 16);
     target_h = glm::max(16, (target_h / 16) * 16);
 
-    if (renderer.render_w != target_w || renderer.render_h != target_h) {
-        renderer.render_w = target_w;
-        renderer.render_h = target_h;
-        glUseProgram(renderer.active_id);
-        glUniform2f(renderer.loc_res, (float)renderer.render_w, (float)renderer.render_h);
-        if (!USE_COMPUTE_SH) {
-            glBindFramebuffer(GL_FRAMEBUFFER, renderer.fbo[renderer.cur_f]);
-            glViewport(0, 0, renderer.render_w, renderer.render_h);
-        }
-        clearTextures();
-        renderer.cur_f  = 0;
-        renderer.prev_f = 1;
-    }
+    if (renderer.render_w == target_w || renderer.render_h == target_h) return;
 
-    renderer.frame_id  = 0;
+    renderer.render_w = target_w;
+    renderer.render_h = target_h;
+    glUseProgram(renderer.active_id);
+    glUniform2f(renderer.loc_res, (float)renderer.render_w, (float)renderer.render_h);
+    if (!USE_COMPUTE_SH) {
+        glBindFramebuffer(GL_FRAMEBUFFER, renderer.fbo[renderer.cur_f]);
+        glViewport(0, 0, renderer.render_w, renderer.render_h);
+    }
+    clearTextures();
+    renderer.cur_f  = 0;
+    renderer.prev_f = 1;
+}
+
+/// Changes the render resolution to full mode
+void setFullResolution() {
+    if (renderer.render_w == WINDOW_WIDTH && renderer.render_h == WINDOW_HEIGHT) return;
+
+    renderer.render_w = WINDOW_WIDTH;
+    renderer.render_h = WINDOW_HEIGHT;
+    glUseProgram(renderer.active_id);
+    glUniform2f(renderer.loc_res, (float)renderer.render_w, (float)renderer.render_h);
+    if(!USE_COMPUTE_SH) {
+        glBindFramebuffer(GL_FRAMEBUFFER, renderer.fbo[renderer.cur_f]);
+        glViewport(0, 0, renderer.render_w, renderer.render_h);
+    }
+    clearTextures();
+    resetAccumulation();
+}
+
+void startMoving() {
+    setPreviewResolution();
+    renderer.frame_id = 0;
     frames_since_moved = 0;
 }
-    else {
-        frames_since_moved++;
-        
-        if (frames_since_moved == 5 && renderer.render_w != WINDOW_WIDTH) {
-            renderer.render_w = WINDOW_WIDTH;
-            renderer.render_h = WINDOW_HEIGHT;
-            glUseProgram(renderer.active_id);
-            glUniform2f(renderer.loc_res, (float)renderer.render_w, (float)renderer.render_h);
-            if(!USE_COMPUTE_SH) {
-                glBindFramebuffer(GL_FRAMEBUFFER, renderer.fbo[renderer.cur_f]);
-                glViewport(0, 0, renderer.render_w, renderer.render_h);
+
+/// \brief Checks if the user pressed the WASD keys
+/// \return true if any WASD key pressed
+bool useMoveKeys() {
+    return (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS ||
+            glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS ||
+            glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS ||
+            glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS);
+}
+
+void processMovement() {
+    //Reset camera position to start
+    if(camera.returning_home) {
+        if(useMoveKeys() || camera.moving) {
+            camera.returning_home = false;
+        }
+        else {
+            CameraConfig camera_default;
+            float t = glm::clamp((float)(metrics.last_frame_time * camera.return_speed), 0.0f, 0.15f);
+
+            camera.position = mix(camera.position, camera_default.position, t);
+            camera.pitch = glm::mix(camera.pitch, camera_default.pitch, t);
+            camera.yaw = glm::mix(camera.yaw, camera_default.yaw, t);
+            camera.lookat = camera.position + cameraForward();
+            uploadCamera();
+            startMoving();
+            
+            //Reached position
+            if(length(camera.position - camera_default.position) < 0.001f && abs(camera.yaw - camera_default.yaw) < 0.001f &&
+            abs(camera.pitch - camera_default.pitch) < 0.001f) {
+                camera.position = camera_default.position;
+                camera.pitch = camera_default.pitch;
+                camera.yaw = camera_default.yaw;
+                camera.returning_home = false;
+                uploadCamera();
+                resetAccumulation();
             }
-            clearTextures();
-            resetAccumulation();
+            return;
         }
     }
+        
+    vec3 forward = cameraForward();
+    vec3 right = normalize(cross(forward, camera.up));
+    float speed = camera.move_speed;
+    bool moved = false;
+
+    if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) speed *= 2;
+
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+        camera.position += forward * speed; moved = true;
+    }
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+        camera.position -= forward * speed; moved = true;
+    }
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+        camera.position -= right * speed; moved = true;
+    }
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+        camera.position += right * speed; moved = true;
+    }
+
+    if (moved || camera.moving) {
+        camera.lookat  = camera.position + cameraForward();
+        camera.moving  = false;
+        uploadCamera();
+        startMoving();
+        return;
+    }
+    frames_since_moved++;
+    if (frames_since_moved == 5) setFullResolution();
 }
 
 void onWindowResize(GLFWwindow* window, int width, int height) {
@@ -318,7 +369,6 @@ int main(void) {
     glewExperimental = GL_TRUE;
     glewInit();
 
-    
     glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
     glfwSetKeyCallback(window, onKeyPress);
     glfwSetCursorPosCallback(window, onMouseMove);
@@ -340,18 +390,20 @@ int main(void) {
     return -1;
     
     printf("%s\n%s v%s\nResolution: %dx%d\n", txt_sep, WINDOW_TITLE, VERSION, WINDOW_WIDTH, WINDOW_HEIGHT);
-    printf("Shader: %s\nPress \tESC to quit\n \tF12 to screenshot render\n%s\n", USE_COMPUTE_SH ? "Compute" : "Fragment", txt_sep);
+    printf("Shader: %s\nPress \tESC to quit\n \tF12 to screenshot render\n \t0 or H to center camera\n%s\n", USE_COMPUTE_SH ? "Compute" : "Fragment", txt_sep);
 
     //Time init
-    struct timespec ts;
+    struct timespec ts, ts_start, ts_end;
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    metrics.start_time = ts.tv_sec + ts.tv_nsec * 1e-9;
+    metrics.render_start_time = ts.tv_sec + ts.tv_nsec * 1e-9;
 
     while (!glfwWindowShouldClose(window) && glfwGetKey(window, GLFW_KEY_ESCAPE) != GLFW_PRESS) {
         //avoids render lock when in preview rendering and reaches max samples(moving camera)
         bool is_moving = (renderer.render_w != WINDOW_WIDTH);
         //Suspend the rendering after completion to avoid useless GPU processing
         if (MAX_SAMPLES > 0 && renderer.frame_id >= MAX_SAMPLES && !is_moving) {
+            clock_gettime(CLOCK_MONOTONIC, &ts_start);
+
             glfwWaitEvents(); //Gets input events and avoids program freezing
             processMovement();
 
@@ -359,6 +411,9 @@ int main(void) {
             drawUI();
             glfwSwapBuffers(window);
             glfwPollEvents();
+
+            clock_gettime(CLOCK_MONOTONIC, &ts_end);
+            metrics.last_frame_time = (ts_end.tv_sec - ts_start.tv_sec) + (ts_end.tv_nsec - ts_start.tv_nsec) * 1e-9;
             continue;
         }
         draw();
@@ -576,7 +631,7 @@ void resetAccumulation() {
 
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    metrics.start_time = ts.tv_sec + ts.tv_nsec * 1e-9;
+    metrics.render_start_time = ts.tv_sec + ts.tv_nsec * 1e-9;
     metrics.fps = 0.0;
     metrics.samples_per_s = 0.0;
     snprintf(metrics.time_buf, sizeof(metrics.time_buf), "0.0s");
@@ -636,7 +691,7 @@ void draw(void) {
     if (renderer.frame_id % 10 == 0) {
         clock_gettime(CLOCK_MONOTONIC, &ts_now);
         time_now = ts_now.tv_sec + ts_now.tv_nsec * 1e-9;
-        time_elapsed = time_now - metrics.start_time;
+        time_elapsed = time_now - metrics.render_start_time;
         
         metrics.fps = renderer.frame_id / time_elapsed;
         metrics.samples_per_s = (double)renderer.frame_id * renderer.render_w * renderer.render_h / time_elapsed;
