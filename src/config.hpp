@@ -3,6 +3,9 @@
 #include <GL/glew.h>
 #include <glm/gtc/matrix_transform.hpp>
 
+/// @brief Program window resolution
+int WINDOW_WIDTH = 1280, WINDOW_HEIGHT = 720;
+
 /**Switches between using fragment or compute shaders
 for the path tracer
 \note false = fragment; true = compute*/
@@ -32,6 +35,8 @@ struct RenderConfig {
 };
 
 struct Renderer {
+    int render_w = WINDOW_WIDTH, render_h = WINDOW_HEIGHT;
+
     GLuint display_id, pathtr_frag_id, pathtr_comp_id;
     GLuint active_id;
     GLuint tex[2], fbo[2], vao;

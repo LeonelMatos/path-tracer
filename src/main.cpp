@@ -43,7 +43,7 @@
 #include "mesh.hpp"
 #include "bvh.hpp"
 
-#define VERSION "1.2.1"
+#define VERSION "1.2.2"
 
 using namespace std;
 using namespace glm;
@@ -73,9 +73,6 @@ bool mouse_captured = false;
 Metrics metrics;
 
 RenderConfig config;
-
-static const int WINDOW_WIDTH = 1280, WINDOW_HEIGHT = 720;
-int render_w = WINDOW_WIDTH, render_h = WINDOW_HEIGHT;
 
 #define WINDOW_TITLE "Path Tracer"
 
@@ -108,6 +105,7 @@ void onKeyPress(GLFWwindow* window, int key, int scancode, int action, int mods)
 void onMouseMove(GLFWwindow* w, double x, double y);
 void onMouseButton(GLFWwindow* w, int button, int action, int mods);
 void onMouseScroll(GLFWwindow* w, double xoffset, double yoffset);
+void onWindowResize(GLFWwindow* w, int width, int height);
 vec3 cameraForward();
 void processMovement();
 void formatTime(double seconds, char*buf, int buf_size);
@@ -236,14 +234,14 @@ void processMovement() {
     target_w = glm::max(16, (target_w / 16) * 16);
     target_h = glm::max(16, (target_h / 16) * 16);
 
-    if (render_w != target_w || render_h != target_h) {
-        render_w = target_w;
-        render_h = target_h;
+    if (renderer.render_w != target_w || renderer.render_h != target_h) {
+        renderer.render_w = target_w;
+        renderer.render_h = target_h;
         glUseProgram(renderer.active_id);
-        glUniform2f(renderer.loc_res, (float)render_w, (float)render_h);
+        glUniform2f(renderer.loc_res, (float)renderer.render_w, (float)renderer.render_h);
         if (!USE_COMPUTE_SH) {
             glBindFramebuffer(GL_FRAMEBUFFER, renderer.fbo[renderer.cur_f]);
-            glViewport(0, 0, render_w, render_h);
+            glViewport(0, 0, renderer.render_w, renderer.render_h);
         }
         clearTextures();
         renderer.cur_f  = 0;
@@ -256,19 +254,51 @@ void processMovement() {
     else {
         frames_since_moved++;
         
-        if (frames_since_moved == 5 && render_w != WINDOW_WIDTH) {
-            render_w = WINDOW_WIDTH;
-            render_h = WINDOW_HEIGHT;
+        if (frames_since_moved == 5 && renderer.render_w != WINDOW_WIDTH) {
+            renderer.render_w = WINDOW_WIDTH;
+            renderer.render_h = WINDOW_HEIGHT;
             glUseProgram(renderer.active_id);
-            glUniform2f(renderer.loc_res, (float)render_w, (float)render_h);
+            glUniform2f(renderer.loc_res, (float)renderer.render_w, (float)renderer.render_h);
             if(!USE_COMPUTE_SH) {
                 glBindFramebuffer(GL_FRAMEBUFFER, renderer.fbo[renderer.cur_f]);
-                glViewport(0, 0, render_w, render_h);
+                glViewport(0, 0, renderer.render_w, renderer.render_h);
             }
             clearTextures();
             resetAccumulation();
         }
     }
+}
+
+void onWindowResize(GLFWwindow* window, int width, int height) {
+    //minimized
+    if (width == 0 || height == 0) return;
+
+    WINDOW_WIDTH = width;
+    WINDOW_HEIGHT = height;
+
+    glDeleteTextures(2, renderer.tex);
+    glDeleteFramebuffers(2, renderer.fbo);
+
+    glCreateTextures(GL_TEXTURE_2D, 2, renderer.tex);
+    for (int i = 0; i < 2; i++) {
+        glTextureStorage2D(renderer.tex[i], 1, GL_RGBA32F, width, height);
+        glTextureParameteri(renderer.tex[i], GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTextureParameteri(renderer.tex[i], GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTextureParameteri(renderer.tex[i], GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTextureParameteri(renderer.tex[i], GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    }
+
+    glCreateFramebuffers(2, renderer.fbo);
+    for(int i = 0; i < 2; i++)
+        glNamedFramebufferTexture(renderer.fbo[i], GL_COLOR_ATTACHMENT0, renderer.tex[i], 0);
+
+    renderer.render_w = width;
+    renderer.render_h = height;
+
+    glUseProgram(renderer.active_id);
+    glUniform2f(renderer.loc_res, (float)width, (float)height);
+
+    resetAccumulation();
 }
 
 //----------------------------------------------------------
@@ -294,6 +324,7 @@ int main(void) {
     glfwSetCursorPosCallback(window, onMouseMove);
     glfwSetMouseButtonCallback(window, onMouseButton);
     glfwSetScrollCallback(window, onMouseScroll);
+    glfwSetFramebufferSizeCallback(window, onWindowResize);
     
     //Init ImGui
     IMGUI_CHECKVERSION();
@@ -318,7 +349,7 @@ int main(void) {
 
     while (!glfwWindowShouldClose(window) && glfwGetKey(window, GLFW_KEY_ESCAPE) != GLFW_PRESS) {
         //avoids render lock when in preview rendering and reaches max samples(moving camera)
-        bool is_moving = (render_w != WINDOW_WIDTH);
+        bool is_moving = (renderer.render_w != WINDOW_WIDTH);
         //Suspend the rendering after completion to avoid useless GPU processing
         if (MAX_SAMPLES > 0 && renderer.frame_id >= MAX_SAMPLES && !is_moving) {
             glfwWaitEvents(); //Gets input events and avoids program freezing
@@ -438,7 +469,7 @@ void loadScene() {
     //transform = rotate(transform, radians(180.0f), vec3(0, 1, 0));
     //transform = rotate(transform, radians(180.0f), vec3(0, 0, 1));
 
-    loadMesh("../models/utah_teapot_pbr/scene.gltf", tris, mats, transform, &bounds);
+    loadMesh("../models/stanford_dragon_sss_test/scene.gltf", tris, mats, transform, &bounds);
     /*
     for (auto& mat : mats) { //temp test
         mat.albedo = vec4(0.8f, 0.3f, 0.1f, 1.0f);  // laranja
@@ -470,7 +501,7 @@ bool transferDataToGPU(void) {
     //Textures DSA
     glCreateTextures(GL_TEXTURE_2D, 2, renderer.tex);
     for (int i = 0; i < 2; i++) {
-        glTextureStorage2D(renderer.tex[i], 1, GL_RGBA32F, render_w, render_h);
+        glTextureStorage2D(renderer.tex[i], 1, GL_RGBA32F, renderer.render_w, renderer.render_h);
         glTextureParameteri(renderer.tex[i], GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTextureParameteri(renderer.tex[i], GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTextureParameteri(renderer.tex[i], GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -522,7 +553,7 @@ void display(void) {
     glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
     glUseProgram(renderer.display_id);
 
-    glUniform2f(renderer.loc_display_render_res, (float)render_w, (float)render_h);
+    glUniform2f(renderer.loc_display_render_res, (float)renderer.render_w, (float)renderer.render_h);
     glUniform2f(renderer.loc_display_res, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT);
     
     glBindTextureUnit(0, renderer.tex[renderer.cur_f]);
@@ -563,23 +594,23 @@ void draw(void) {
     glUseProgram(renderer.active_id);
     if(USE_COMPUTE_SH) {
         //Compute pass, no fbo, no quad screen
-        glUniform2f(renderer.loc_res, (float)render_w, (float)render_h);
+        glUniform2f(renderer.loc_res, (float)renderer.render_w, (float)renderer.render_h);
         glUniform1i(renderer.loc_frame, renderer.frame_id);
 
         glBindImageTexture(0, renderer.tex[renderer.cur_f], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
         glBindImageTexture(1, renderer.tex[renderer.prev_f], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
 
         //Dispatch 16x16 work groups
-        int groups_x = (render_w + COMPUTE_LOCAL_X - 1) / 16;
-        int groups_y = (render_h + COMPUTE_LOCAL_Y - 1) / 16;
+        int groups_x = (renderer.render_w + COMPUTE_LOCAL_X - 1) / 16;
+        int groups_y = (renderer.render_h + COMPUTE_LOCAL_Y - 1) / 16;
         glDispatchCompute(groups_x, groups_y, 1);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     }
     else {
         //Fragment pass
         glBindFramebuffer(GL_FRAMEBUFFER, renderer.fbo[renderer.cur_f]);
-        glViewport(0, 0, render_w, render_h);
-        glUniform2f(renderer.loc_res, (float)render_w, (float)render_h);
+        glViewport(0, 0, renderer.render_w, renderer.render_h);
+        glUniform2f(renderer.loc_res, (float)renderer.render_w, (float)renderer.render_h);
         glUniform1i(renderer.loc_frame, renderer.frame_id);
         glBindTextureUnit(0, renderer.tex[renderer.prev_f]);
         glUniform1i(renderer.loc_prev, 0);
@@ -608,7 +639,7 @@ void draw(void) {
         time_elapsed = time_now - metrics.start_time;
         
         metrics.fps = renderer.frame_id / time_elapsed;
-        metrics.samples_per_s = (double)renderer.frame_id * render_w * render_h / time_elapsed;
+        metrics.samples_per_s = (double)renderer.frame_id * renderer.render_w * renderer.render_h / time_elapsed;
         metrics.ms_frame = time_elapsed / renderer.frame_id * 1000.0;
         
         formatTime(time_elapsed, metrics.time_buf, sizeof(metrics.time_buf));
@@ -683,7 +714,7 @@ void drawUI() {
         ImGui::Text("FPS:\t%.1f (%.1fms)", metrics.fps, metrics.ms_frame);
         ImGui::Text("Time:\t%s", metrics.time_buf);
         ImGui::Text("Shader:  %s", USE_COMPUTE_SH ? "Compute" : "Fragment");
-        ImGui::Text("Res:     %dx%d", render_w, render_h);
+        ImGui::Text("Res:     %dx%d", renderer.render_w, renderer.render_h);
 
         if (ImGui::Button("Reset Accumulation"))
             resetAccumulation();
@@ -782,7 +813,7 @@ void drawUI() {
             resetBtn("*##focal", config.cam_focal_distance, render_defaults.cam_focal_distance);
             ImGui::SetItemTooltip("Distance to focal plane");
 
-            ImGui::Checkbox("Draw Focus", &config.focal_debug);
+            if(ImGui::Checkbox("Draw Focus", &config.focal_debug)) changed = true;
             ImGui::SetItemTooltip("View the focal plane");
 
             if(config.focal_debug) {
