@@ -496,6 +496,7 @@ void initUniforms() {
     renderer.grid_loc_proj = glGetUniformLocation(renderer.grid_id, "projection");
     renderer.grid_loc_near = glGetUniformLocation(renderer.grid_id, "near_plane");
     renderer.grid_loc_far = glGetUniformLocation(renderer.grid_id, "far_plane");
+    renderer.grid_loc_cam_pos = glGetUniformLocation(renderer.grid_id, "camera_pos");
 }
 
 void uploadConfig() {
@@ -772,6 +773,7 @@ void drawGrid() {
     glUniformMatrix4fv(renderer.grid_loc_proj, 1, GL_FALSE, value_ptr(proj));
     glUniform1f(renderer.grid_loc_near, 0.01f);
     glUniform1f(renderer.grid_loc_far, 100.0f);
+    glUniform3f(renderer.grid_loc_cam_pos, camera.position.x, camera.position.y, camera.position.z);
 
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glDisable(GL_BLEND);

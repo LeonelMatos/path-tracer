@@ -53,7 +53,7 @@ struct Renderer {
     
     bool show_grid = true;
     GLuint grid_id = 0;
-    GLint grid_loc_view, grid_loc_proj, grid_loc_near, grid_loc_far;
+    GLint grid_loc_view, grid_loc_proj, grid_loc_near, grid_loc_far, grid_loc_cam_pos;
 };
 
 struct CameraConfig {
