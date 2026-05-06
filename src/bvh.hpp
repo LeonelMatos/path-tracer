@@ -5,6 +5,8 @@
 #include <glm/glm.hpp>
 #include "mesh.hpp"
 
+const float AABB_EPS = 1e-4f;
+
 struct BVHNode {
     vec3 aabb_min;
     float _pad0;

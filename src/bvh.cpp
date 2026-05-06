@@ -20,6 +20,9 @@ static void calculate_aabb(const vector<GPUTriangle>& tris, int start, int count
             out_max = max(out_max, v->position);
         }
     }
+    //padding
+    out_min -= vec3(AABB_EPS);
+    out_max += vec3(AABB_EPS);
 }
 
 ///Pre-calculated triangle center stored for runtime
