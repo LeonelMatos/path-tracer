@@ -141,6 +141,7 @@ float boxT(Ray ray, vec3 center, vec3 half_size, float pitch, float yaw, out vec
 float triangleT(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec3 out_normal, out vec3 out_bary) {
    vec3 edge1 = v1 - v0;
    vec3 edge2 = v2 - v0;
+   vec3 flat_normal = cross(edge1, edge2);
    vec3 h = cross(ray.direction, edge2);
    float a = dot(edge1, h);
 
@@ -156,11 +157,17 @@ float triangleT(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec3 out_normal, out vec
    if (v < 0.0 || u + v > 1.0) return INF;
 
    float t = f * dot(edge2, q);
-   if (t < EPS_TRI) return INF;
 
-   out_normal = normalize(cross(edge1, edge2));
+   //relative EPS with the triangle size
+   float tri_size = length(flat_normal);
+   float eps = max(EPS_TRI, tri_size * 0.0001);
+
+   if (t < eps) return INF;
+
+   out_normal = normalize(flat_normal);
    if (dot(ray.direction, out_normal) > 0.0)
       out_normal = -out_normal;
+   
    out_bary = vec3(u, v, 1.0 - u - v);
    return t;
 }

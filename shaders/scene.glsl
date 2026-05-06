@@ -43,8 +43,8 @@ void intersects_mesh(const Ray ray, inout Hit h) {
                     h.t = t;
                     h.pos = ray.origin + t * ray.direction;
                     h.normal = length(smooth_normal) > EPS_TRI ? normalize(smooth_normal) : tri_normal;
-                    /*if (dot(ray.direction, h.normal) > 0.0)
-                        h.normal = -h.normal;*/
+                    if (dot(ray.direction, h.normal) > 0.0)
+                        h.normal = -h.normal;
                     h.albedo = gpu_materials[m_id].albedo.rgb;
                     h.emission = gpu_materials[m_id].emission.rgb;
                     h.material = gpu_materials[m_id].type;

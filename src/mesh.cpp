@@ -66,8 +66,13 @@ bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMate
 
                 verts[v]->position = vec3(transform * vec4(mesh->mVertices[idx].x, mesh->mVertices[idx].y, mesh->mVertices[idx].z, 1.0f));
 
-                if(mesh->HasNormals())
-                    verts[v]->normal = normalize(normal_mat * vec3(mesh->mNormals[idx].x, mesh->mNormals[idx].y, mesh->mNormals[idx].z));
+                //normal validation
+                if(mesh->HasNormals()) {
+                    vec3 n = normal_mat * vec3(mesh->mNormals[idx].x, mesh->mNormals[idx].y, mesh->mNormals[idx].z);
+
+                    float len = length(n);
+                    verts[v]->normal = (len > 1e-6f && !isnan(len)) ? n / len : vec3(0, 0, 1);
+                }
                 
                 if(mesh->HasTextureCoords(0))
                     verts[v]->texcoord = vec2(mesh->mTextureCoords[0][idx].x, mesh->mTextureCoords[0][idx].y);
@@ -77,6 +82,11 @@ bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMate
                     bounds->max_bound = max(bounds->max_bound, verts[v]->position);
                 }
             }
+            vec3 edge1 = tri.v1.position - tri.v0.position;
+            vec3 edge2 = tri.v2.position - tri.v0.position;
+            float area = length(cross(edge1, edge2));
+            if (area < 1e-10f) continue;
+
             tri.material_id = mesh->mMaterialIndex;
             triangles.push_back(tri);
         }
