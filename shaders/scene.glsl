@@ -53,8 +53,38 @@ void intersects_mesh(const Ray ray, inout Hit h) {
             }
         }
         else {
-            stack[stack_top++] = node.left_child;
-            stack[stack_top++] = node.right_child;
+            BVHNode left_node = bvh_nodes[node.left_child];
+            BVHNode right_node = bvh_nodes[node.right_child];
+
+            vec3 lc = (left_node.aabb_min + left_node.aabb_max) * 0.5;
+            vec3 lh = (left_node.aabb_max - left_node.aabb_min) * 0.5;
+            vec3 rc = (right_node.aabb_min + right_node.aabb_max) * 0.5;
+            vec3 rh = (right_node.aabb_max - right_node.aabb_min) * 0.5;
+            vec3 nn;
+
+            float t_left = boxT(ray, lc, lh, 0.0, 0.0, nn);
+            float t_right = boxT(ray, rc, rh, 0.0, 0.0, nn);
+
+            bool hit_left = t_left < h.t;
+            bool hit_right = t_right < h.t;
+
+            if(hit_left && hit_right) {
+                //Push the most distant first; the closest is passed first
+                if (t_left < t_right) {
+                    stack[stack_top++] = node.right_child;
+                    stack[stack_top++] = node.left_child;
+                }
+                else {
+                    stack[stack_top++] = node.left_child;
+                    stack[stack_top++] = node.right_child;
+                }
+            }
+            else if (hit_left) {
+                stack[stack_top++] = node.left_child;
+            }
+            else if (hit_right) {
+                stack[stack_top++] = node.right_child;
+            }
         }
     }
     /*

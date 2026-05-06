@@ -77,6 +77,8 @@ RenderConfig config;
 
 #define WINDOW_TITLE "Path Tracer"
 
+#define WINDOW_TITLE_VERSION WINDOW_TITLE " v" VERSION
+
 static const int COMPUTE_LOCAL_X = 16;
 static const int COMPUTE_LOCAL_Y = 16;
 
@@ -361,7 +363,7 @@ int main(void) {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE, NULL, NULL);
+    window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE_VERSION, NULL, NULL);
     if (!window) { glfwTerminate(); return -1; }
     glfwMakeContextCurrent(window);
     glfwSwapInterval(V_SYNC);
@@ -541,7 +543,7 @@ void loadScene() {
     //transform = rotate(transform, radians(180.0f), vec3(0, 1, 0));
     //transform = rotate(transform, radians(180.0f), vec3(0, 0, 1));
 
-    loadMesh("../models/Bedroom.obj", tris, mats, transform, &bounds);
+    loadMesh("../models/stanford_dragon_sss_test/scene.gltf", tris, mats, transform, &bounds);
     /*
     for (auto& mat : mats) { //temp test
         mat.albedo = vec4(0.8f, 0.3f, 0.1f, 1.0f);  // laranja
@@ -822,6 +824,7 @@ void drawUI() {
             ImGui::Text("Time:\t%s", metrics.time_buf);
             ImGui::Text("Shader:  %s", USE_COMPUTE_SH ? "Compute" : "Fragment");
             ImGui::Text("Res:     %dx%d", renderer.render_w, renderer.render_h);
+            ImGui::TextDisabled("v%s", VERSION);
 
             if (ImGui::Button("Reset Accumulation[R]"))
                 resetAccumulation();

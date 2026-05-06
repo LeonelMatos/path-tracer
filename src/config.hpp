@@ -38,7 +38,7 @@ struct RenderConfig {
 struct Renderer {
     int render_w = WINDOW_WIDTH, render_h = WINDOW_HEIGHT;
 
-    uint MAX_SAMPLES = 100;
+    uint MAX_SAMPLES = 200;
     
     GLuint display_id, pathtr_frag_id, pathtr_comp_id;
     GLuint active_id;
