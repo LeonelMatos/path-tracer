@@ -36,13 +36,13 @@ void main() {
     }
     linear /= float(SAMPLES_PER_PIXEL);
 
-    vec3 accumulated;
+    vec3 result;
     if (frame_id == 0) {
-        accumulated = linear;
+        result = linear;
     } else {
         vec3 prev = imageLoad(prev_image, pixel).rgb;
-        accumulated = mix(prev, linear, 1.0 / float(frame_id + 1));
+        result = mix(prev, linear, 1.0 / float(frame_id + 1));
     }
 
-    imageStore(output_image, pixel, vec4(accumulated, 1.0));
+    imageStore(output_image, pixel, vec4(result, 1.0));
 }
