@@ -22,8 +22,7 @@ uniform bool FOCAL_DEBUG;
 ///Thickness of the focal plane line
 uniform float FOCAL_BAND_DEBUG;
 
-///Camera FOV converted to radians
-const float CAM_FOV_RAD = 30.0 * PI / 180.0;
+uniform float CAM_FOV;
 
 ///Camera position in world space
 uniform vec3 camera_position;

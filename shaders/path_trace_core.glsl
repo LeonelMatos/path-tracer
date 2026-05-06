@@ -21,7 +21,7 @@ void camera_axes(out vec3 cam_x, out vec3 cam_y, out vec3 cam_z) {
 */
 vec3 cameraRay(vec2 uv, vec3 cam_x, vec3 cam_y, vec3 cam_z) {
     float aspect = resolution.x / resolution.y;
-    float f_len = 1.0 / tan(0.5 * CAM_FOV_RAD);
+    float f_len = 1.0 / tan(0.5 * CAM_FOV);
     vec2 p = 2.0 * uv - 1.0;
     vec3 ray_cam = vec3(p.x * aspect, p.y, -f_len);
     return normalize(cam_x * ray_cam.x + cam_y * ray_cam.y + cam_z * ray_cam.z);

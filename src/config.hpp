@@ -23,6 +23,7 @@ struct RenderConfig {
     
     float cam_aperture = 0.00;
     float cam_focal_distance = 4.7;
+    float cam_fov = 30.0f;
     
     bool focal_debug = false;
     float focal_band_debug = 0.05;
@@ -36,6 +37,8 @@ struct RenderConfig {
 
 struct Renderer {
     int render_w = WINDOW_WIDTH, render_h = WINDOW_HEIGHT;
+
+    uint MAX_SAMPLES = 100;
     
     GLuint display_id, pathtr_frag_id, pathtr_comp_id;
     GLuint active_id;
@@ -43,7 +46,7 @@ struct Renderer {
     GLint loc_res, loc_frame, loc_prev, loc_tex;
     int frame_id = 0, cur_f = 0, prev_f = 1;
     
-    GLint loc_depth, loc_spp, loc_rr_min, loc_rr_max, loc_aperture;
+    GLint loc_depth, loc_spp, loc_rr_min, loc_rr_max, loc_aperture, loc_cam_fov;
     GLint loc_focal_dist, loc_focal_debug, loc_focal_band, loc_background, loc_tone_map;
     
     GLint loc_cam_pos, loc_cam_lookat, loc_cam_up;

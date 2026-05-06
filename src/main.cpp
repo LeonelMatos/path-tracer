@@ -81,7 +81,6 @@ static const int COMPUTE_LOCAL_X = 16;
 static const int COMPUTE_LOCAL_Y = 16;
 
 const int V_SYNC = 0;
-uint MAX_SAMPLES = 10;
 
 
 const char* txt_sep = "----------------------------";
@@ -382,13 +381,15 @@ int main(void) {
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    io.ConfigWindowsMoveFromTitleBarOnly = true;
+    io.ConfigWindowsResizeFromEdges = true;
 
     ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 460");
 
     if(!transferDataToGPU())
-    return -1;
+        return -1;
     
     printf("%s\n%s v%s\nResolution: %dx%d\n", txt_sep, WINDOW_TITLE, VERSION, WINDOW_WIDTH, WINDOW_HEIGHT);
     printf("Shader: %s\nPress \tESC to quit\n \tF12 to screenshot render\n \t0 or H to center camera\n%s\n", USE_COMPUTE_SH ? "Compute" : "Fragment", txt_sep);
@@ -402,7 +403,7 @@ int main(void) {
         //avoids render lock when in preview rendering and reaches max samples(moving camera)
         bool is_moving = (renderer.render_w != WINDOW_WIDTH);
         //Suspend the rendering after completion to avoid useless GPU processing
-        if (MAX_SAMPLES > 0 && renderer.frame_id >= MAX_SAMPLES && !is_moving) {
+        if (renderer.MAX_SAMPLES > 0 && renderer.frame_id >= renderer.MAX_SAMPLES && !is_moving) {
             clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
             glfwWaitEvents(); //Gets input events and avoids program freezing
@@ -474,18 +475,19 @@ void initUniforms() {
     if(!USE_COMPUTE_SH) {
         renderer.loc_prev = glGetUniformLocation(renderer.pathtr_frag_id, "prev_frame");
     }
-    renderer.loc_depth      = glGetUniformLocation(active, "DEPTH");
-    renderer.loc_spp        = glGetUniformLocation(active, "SAMPLES_PER_PIXEL");
-    renderer.loc_rr_min     = glGetUniformLocation(active, "RR_MIN_BOUNCES");
-    renderer.loc_rr_max     = glGetUniformLocation(active, "RR_MAX_SURVIVAL");
+    renderer.loc_depth  = glGetUniformLocation(active, "DEPTH");
+    renderer.loc_spp    = glGetUniformLocation(active, "SAMPLES_PER_PIXEL");
+    renderer.loc_rr_min = glGetUniformLocation(active, "RR_MIN_BOUNCES");
+    renderer.loc_rr_max = glGetUniformLocation(active, "RR_MAX_SURVIVAL");
+    renderer.loc_cam_fov    = glGetUniformLocation(active, "CAM_FOV");
     renderer.loc_aperture   = glGetUniformLocation(active, "CAM_APERTURE");
     renderer.loc_focal_dist = glGetUniformLocation(active, "CAM_FOCAL_DISTANCE");
     renderer.loc_focal_debug = glGetUniformLocation(active, "FOCAL_DEBUG");
-    renderer.loc_focal_band  = glGetUniformLocation(active, "FOCAL_BAND_DEBUG");
-    renderer.loc_background  = glGetUniformLocation(active, "BACKGROUND");
-    renderer.loc_tone_map  = glGetUniformLocation(active, "TONE_MAPPING");
+    renderer.loc_focal_band = glGetUniformLocation(active, "FOCAL_BAND_DEBUG");
+    renderer.loc_background = glGetUniformLocation(active, "BACKGROUND");
+    renderer.loc_tone_map   = glGetUniformLocation(active, "TONE_MAPPING");
 
-    renderer.loc_cam_pos = glGetUniformLocation(active, "camera_position");
+    renderer.loc_cam_pos    = glGetUniformLocation(active, "camera_position");
     renderer.loc_cam_lookat = glGetUniformLocation(active, "camera_lookat");
     renderer.loc_cam_up = glGetUniformLocation(active, "camera_up");
 
@@ -506,6 +508,7 @@ void uploadConfig() {
     glUniform1i(renderer.loc_spp, config.samples_per_pixel);
     glUniform1i(renderer.loc_rr_min, config.rr_min_bounces);
     glUniform1f(renderer.loc_rr_max, config.rr_max_survival);
+    glUniform1f(renderer.loc_cam_fov, glm::radians(config.cam_fov));
     glUniform1f(renderer.loc_aperture, config.cam_aperture);
     glUniform1f(renderer.loc_focal_dist, config.cam_focal_distance);
     glUniform1i(renderer.loc_focal_debug, config.focal_debug ? 1 : 0);
@@ -538,7 +541,7 @@ void loadScene() {
     //transform = rotate(transform, radians(180.0f), vec3(0, 1, 0));
     //transform = rotate(transform, radians(180.0f), vec3(0, 0, 1));
 
-    loadMesh("../models/stanford_dragon_sss_test/scene.gltf", tris, mats, transform, &bounds);
+    loadMesh("../models/Bedroom.obj", tris, mats, transform, &bounds);
     /*
     for (auto& mat : mats) { //temp test
         mat.albedo = vec4(0.8f, 0.3f, 0.1f, 1.0f);  // laranja
@@ -688,7 +691,7 @@ void draw(void) {
     int tmp = renderer.cur_f; renderer.cur_f = renderer.prev_f; renderer.prev_f = tmp;
     renderer.frame_id++;
 
-    if(renderer.frame_id == (int)MAX_SAMPLES)
+    if(renderer.frame_id == (int)renderer.MAX_SAMPLES)
         printf("\n%s\nRender complete - %d samples in %.1fs\n", txt_sep, renderer.frame_id, time_elapsed);
     
     //Step 2 Display: accumulated texture to screen
@@ -762,7 +765,7 @@ void drawGrid() {
 
     mat4 view = lookAt(camera.position, camera.lookat, camera.up);
     //check if the fov is equal to the fov in the globals shader
-    mat4 proj = perspective(radians(30.0f), (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT, 0.01f, 100.0f);
+    mat4 proj = perspective(radians(config.cam_fov), (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT, 0.01f, 100.0f);
 
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -788,6 +791,9 @@ void drawUI() {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigWindowsMoveFromTitleBarOnly = true;
+
     RenderConfig render_defaults;
     CameraConfig camera_defaults;
     bool changed = false;
@@ -802,35 +808,81 @@ void drawUI() {
                 return false;
             };
 
-    ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(ImVec2(280, 180), ImGuiCond_FirstUseEver);
+    //-- Left Window -------------
+    ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_Always, ImVec2(0, 0));
+    ImGui::SetNextWindowSize(ImVec2(WINDOW_WIDTH * 0.22f, WINDOW_HEIGHT - 20.0f), ImGuiCond_Always);
     
-    //-- Metrics -------------
-    if(ImGui::Begin("Metrics")) {
-        ImGui::Text("SPP:     %d / %d", renderer.frame_id, MAX_SAMPLES);
-        ImGui::Text("FPS:\t%.1f (%.1fms)", metrics.fps, metrics.ms_frame);
-        ImGui::Text("Time:\t%s", metrics.time_buf);
-        ImGui::Text("Shader:  %s", USE_COMPUTE_SH ? "Compute" : "Fragment");
-        ImGui::Text("Res:     %dx%d", renderer.render_w, renderer.render_h);
+    //----- Metrics -------------
+    ImGui::SetNextWindowSizeConstraints(ImVec2(200, 100), ImVec2(FLT_MAX, FLT_MAX));
+    
+    if(ImGui::Begin("Scene Editor")) {
+        if(ImGui::CollapsingHeader("Metrics", ImGuiTreeNodeFlags_DefaultOpen)) {
+            ImGui::Text("SPP:     %d / %d", renderer.frame_id, renderer.MAX_SAMPLES);
+            ImGui::Text("FPS:\t%.1f (%.1fms)", metrics.fps, metrics.ms_frame);
+            ImGui::Text("Time:\t%s", metrics.time_buf);
+            ImGui::Text("Shader:  %s", USE_COMPUTE_SH ? "Compute" : "Fragment");
+            ImGui::Text("Res:     %dx%d", renderer.render_w, renderer.render_h);
 
-        if (ImGui::Button("Reset Accumulation[R]"))
-            resetAccumulation();
-        ImGui::SameLine();
-        if (ImGui::Button("Screenshot[F12]"))
-            saveScreenshot();
-        if(ImGui::Button("Reset Camera[H]"))
-            camera.returning_home = true;
+            if (ImGui::Button("Reset Accumulation[R]"))
+                resetAccumulation();
+            ImGui::SameLine();
+            if (ImGui::Button("Screenshot[F12]"))
+                saveScreenshot();
+            if(ImGui::Button("Reset Camera[H]"))
+                camera.returning_home = true;
+        }
+        if(ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
+            ImGui::Text("x = %.2f, y = %.2f, z = %.2f", camera.position.x, camera.position.y, camera.position.z);
+
+            changed |= ImGui::SliderFloat("FOV", &config.cam_fov, 10.0f, 100.0f, "%.1f°");
+            resetBtn("*##fov", config.cam_fov, render_defaults.cam_fov);
+            ImGui::SetItemTooltip("Field of view (degrees)");
+
+            ImGui::SeparatorText("Mouse");
+            ImGui::SliderFloat("Speed", &camera.move_speed, 0.001f, 1.0f, "%.3f");
+            resetBtn("*##speed", camera.move_speed, camera_defaults.move_speed);
+
+            ImGui::SliderFloat("Sensitivity", &camera.mouse_sens, 0.0001f, 0.1f, "%.4f");
+            resetBtn("*##sens", camera.mouse_sens, camera_defaults.mouse_sens);
+
+            ImGui::SeparatorText("Depth of Field");
+
+            bool dof_enabled = (config.cam_aperture > 0.0f);
+            if(ImGui::Checkbox("Enable DoF", &dof_enabled)) {
+                config.cam_aperture = dof_enabled ? 0.05f : 0.0f;
+                changed = true;
+            }
+
+            if(dof_enabled) {
+                changed |= ImGui::SliderFloat("Aperture", &config.cam_aperture, 0.001f, 0.5f, "%.3f");
+                resetBtn("*##aperture", config.cam_aperture, 0.05f);
+                ImGui::SetItemTooltip("Size of the lens aperture\nHigher = more blur");
+
+                changed |= ImGui::SliderFloat("Focal Dist", &config.cam_focal_distance, 0.1f, 50.0f, "%.2f");
+                resetBtn("*##focal", config.cam_focal_distance, render_defaults.cam_focal_distance);
+                ImGui::SetItemTooltip("Distance to focal plane");
+
+                if(ImGui::Checkbox("Draw Focus", &config.focal_debug)) changed = true;
+                ImGui::SetItemTooltip("View the focal plane");
+
+                if(config.focal_debug) {
+                    changed |= ImGui::SliderFloat("Draw Size", &config.focal_band_debug, 0.01f, 0.5f, "%.2f");
+                    resetBtn("*##fband", config.focal_band_debug, render_defaults.focal_band_debug);
+                }
+            }
+            if(changed) applyConfig();
+        }
     }
-
     ImGui::End();
 
-    //-- Render Settings -------------
-    ImGui::SetNextWindowPos(ImVec2(WINDOW_WIDTH - 310, 10), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(ImVec2(300, 400), ImGuiCond_FirstUseEver);
+    //-- Right Window -------------
+    ImGui::SetNextWindowPos(ImVec2(WINDOW_WIDTH - WINDOW_WIDTH * 0.22f - 10, 10), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(WINDOW_WIDTH * 0.22f, WINDOW_HEIGHT - 20.0f), ImGuiCond_Always);
     changed = false;
-    if(ImGui::Begin("Render")) {
-        //-- Preview Config -------------
-        if(ImGui::CollapsingHeader("Preview")) {
+    //----- Render Settings -------------
+    if(ImGui::Begin("Render Inspector")) {
+        //----- Preview Config -------------
+        if(ImGui::CollapsingHeader("Preview", ImGuiTreeNodeFlags_DefaultOpen)) {
             int res = config.moving_resolution;
             if(ImGui::SliderInt("Preview Res", &res, 32, 512)) {
                 res = (res / 16) * 16;
@@ -843,10 +895,10 @@ void drawUI() {
 
         if(ImGui::CollapsingHeader("Render", ImGuiTreeNodeFlags_DefaultOpen)) {
             
-            int samples = (int)MAX_SAMPLES;
+            int samples = (int)renderer.MAX_SAMPLES;
             if(ImGui::InputInt("Max Samples", &samples, 1, 5000)) {
                 samples = glm::max(1, samples);
-                MAX_SAMPLES = (uint)samples;
+                renderer.MAX_SAMPLES = (uint)samples;
             }
             ImGui::SetItemTooltip("Max progressive samples per pixel");
             changed |= ImGui::SliderInt("Depth", &config.depth, 1, 50);
@@ -882,48 +934,7 @@ void drawUI() {
             if(changed) applyConfig();
         }
     }
-    ImGui::End();
-
-    ImGui::SetNextWindowPos(ImVec2(WINDOW_WIDTH - 310, 420), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(ImVec2(300, 280), ImGuiCond_FirstUseEver);
-    changed = false;
-    if(ImGui::Begin("Camera")) {
-        ImGui::Text("x = %.2f, y = %.2f, z = %.2f", camera.position.x, camera.position.y, camera.position.z);
-
-        ImGui::SeparatorText("Controls");
-        ImGui::SliderFloat("Speed", &camera.move_speed, 0.001f, 1.0f, "%.3f");
-        resetBtn("*##speed", camera.move_speed, camera_defaults.move_speed);
-
-        ImGui::SliderFloat("Sensitivity", &camera.mouse_sens, 0.0001f, 0.1f, "%.4f");
-        resetBtn("*##sens", camera.mouse_sens, camera_defaults.mouse_sens);
-
-        ImGui::SeparatorText("Depth of Field");
-
-        bool dof_enabled = (config.cam_aperture > 0.0f);
-        if(ImGui::Checkbox("Enable DoF", &dof_enabled)) {
-            config.cam_aperture = dof_enabled ? 0.05f : 0.0f;
-            changed = true;
-        }
-
-        if(dof_enabled) {
-            changed |= ImGui::SliderFloat("Aperture", &config.cam_aperture, 0.001f, 0.5f, "%.3f");
-            resetBtn("*##aperture", config.cam_aperture, 0.05f);
-            ImGui::SetItemTooltip("Size of the lens aperture\nHigher = more blur");
-
-            changed |= ImGui::SliderFloat("Focal Dist", &config.cam_focal_distance, 0.1f, 50.0f, "%.2f");
-            resetBtn("*##focal", config.cam_focal_distance, render_defaults.cam_focal_distance);
-            ImGui::SetItemTooltip("Distance to focal plane");
-
-            if(ImGui::Checkbox("Draw Focus", &config.focal_debug)) changed = true;
-            ImGui::SetItemTooltip("View the focal plane");
-
-            if(config.focal_debug) {
-                changed |= ImGui::SliderFloat("Draw Size", &config.focal_band_debug, 0.01f, 0.5f, "%.2f");
-                resetBtn("*##fband", config.focal_band_debug, render_defaults.focal_band_debug);
-            }
-        }
-        if(changed) applyConfig();
-    }
+    
     ImGui::End();
 
     ImGui::Render();
