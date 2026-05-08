@@ -124,13 +124,21 @@ struct GPUMaterial {
 
 ///Shader Storage Buffer Objects SSBO (GL 4.3+)
 ///See https://ktstephano.github.io/rendering/opengl/ssbos
+///Triangle Buffer
 layout(std430, binding = 2) buffer TriangleBuffer {
     GPUTriangle triangles[];
 };
 
+///Material Buffer
 layout(std430, binding = 3) buffer MaterialBuffer {
     GPUMaterial gpu_materials[];
 };
+
+///Light Buffer
+layout(std430, binding = 9) readonly buffer LightBuffer {
+    int light_indices[];
+};
+uniform int light_count;
 
 ///\}
 

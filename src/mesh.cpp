@@ -8,6 +8,31 @@
 using namespace std;
 using namespace glm;
 
+int uploadLights(const vector<GPUTriangle>& triangles, const vector<GPUMaterial>& materials, GLuint& out_light_ssbo) {
+    vector<int> light_indices;
+
+    for(int i = 0; i < (int)triangles.size(); i++) {
+        int m_id = triangles[i].material_id;
+        vec3 emission = vec3(materials[m_id].emission);
+
+        if(dot(emission, emission) > 0.0f)
+            light_indices.push_back(i);
+    }
+    printf("\tLights: %zu emissive triangles\n", light_indices.size());
+
+    //real light count, before checking if empty and avoiding empty buffer
+    int real_count = (int)light_indices.size();
+
+    if(light_indices.empty())
+        light_indices.push_back(0);
+
+    glCreateBuffers(1, &out_light_ssbo);
+    glNamedBufferData(out_light_ssbo, light_indices.size() * sizeof(int), light_indices.data(), GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, out_light_ssbo);
+
+    return real_count;
+}
+
 bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMaterial>& materials, mat4 transform, MeshBounds* bounds) {\
     //Initialize bounds
     if (bounds) {

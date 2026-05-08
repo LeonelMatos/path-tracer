@@ -43,7 +43,7 @@
 #include "mesh.hpp"
 #include "bvh.hpp"
 
-#define VERSION "1.2.3"
+#define VERSION "1.2.4"
 
 using namespace std;
 using namespace glm;
@@ -99,6 +99,10 @@ GLint loc_aabb_min, loc_aabb_max;
 //BVH
 GLuint bvh_ssbo;
 GLint loc_bvh_root;
+
+//Light
+GLuint light_ssbo;
+GLint loc_light_count;
 
 /*----------------------------------------------------------
   Function Declarations
@@ -473,6 +477,7 @@ void initUniforms() {
     loc_aabb_min = glGetUniformLocation(active, "mesh_aabb_min");
     loc_aabb_max = glGetUniformLocation(active, "mesh_aabb_max");
     loc_bvh_root = glGetUniformLocation(active, "bvh_root");
+    loc_light_count = glGetUniformLocation(active, "light_count");
 
     if(!USE_COMPUTE_SH) {
         renderer.loc_prev = glGetUniformLocation(renderer.pathtr_frag_id, "prev_frame");
@@ -543,7 +548,7 @@ void loadScene() {
     //transform = rotate(transform, radians(180.0f), vec3(0, 1, 0));
     //transform = rotate(transform, radians(180.0f), vec3(0, 0, 1));
 
-    loadMesh("../models/stanford_dragon_sss_test/scene.gltf", tris, mats, transform, &bounds);
+    loadMesh("../models/NewYork-City-Manhattan.obj", tris, mats, transform, &bounds);
     /*
     for (auto& mat : mats) { //temp test
         mat.albedo = vec4(0.8f, 0.3f, 0.1f, 1.0f);  // laranja
@@ -555,12 +560,15 @@ void loadScene() {
     
     uploadMesh(tris, mats, triangle_ssbo, material_ssbo);
     uploadBVH(bvh_nodes, bvh_ssbo);
+    int light_count = uploadLights(tris, mats, light_ssbo);
 
     glUseProgram(renderer.active_id);
     glUniform1i(loc_tri_count, (int)tris.size());
+    glUniform1i(loc_light_count, light_count);
     glUniform1i(loc_bvh_root, 0);
     glUniform3f(loc_aabb_min, bounds.min_bound.x, bounds.min_bound.y, bounds.min_bound.z);
     glUniform3f(loc_aabb_max, bounds.max_bound.x, bounds.max_bound.y, bounds.max_bound.z);
+
 }
 
 bool transferDataToGPU(void) {
@@ -613,6 +621,7 @@ void cleanDataFromGPU() {
     glDeleteProgram(renderer.display_id);
 
     glDeleteBuffers(1, &triangle_ssbo);
+    glDeleteBuffers(1, &light_ssbo);
     glDeleteBuffers(1, &material_ssbo);
     glDeleteBuffers(1, &bvh_ssbo);
     

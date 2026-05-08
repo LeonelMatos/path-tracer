@@ -32,6 +32,10 @@ struct GPUMaterial {
     float _pad[2];
 };
 
+///\brief Mesh light storage to pass emissive triangles
+extern GLuint light_ssbo;
+extern GLint loc_light_count;
+
 /**\brief Loaded mesh bounding box, axis-aligned, used for AABB early rejection
 Calculated during loadMesh. Used for AABB early rejection for rays that miss the bouding box
 \see loadMesh, intersects
@@ -42,6 +46,8 @@ struct MeshBounds {
     ///Maximum corner in world position
     vec3 max_bound;
 };
+
+int uploadLights(const vector<GPUTriangle>& triangles, const vector<GPUMaterial>& materials, GLuint& light_ssbo);
 
 /**\brief Loads a mesh and calculates its bounding box
 \param path Path to the mesh file (any file format supported by ASSIMP)

@@ -6,6 +6,9 @@
  * \copyright Copyright (c) 2026
  */
 
+//----------------------------------------------------------
+//Camera Functions
+
 ///\brief Calculates the base of the camera in world-space
 ///\param vec3 All camera axes
 void camera_axes(out vec3 cam_x, out vec3 cam_y, out vec3 cam_z) {
@@ -56,6 +59,60 @@ Ray cameraRayDOF(vec2 uv, int spp_index, uvec2 px) {
     return Ray(origin, normalize(focal_point - origin));
 }
 
+//----------------------------------------------------------
+//Next Event Estimation
+
+vec3 estimateDirectLight(Hit h, int bounce, int spp_index, uvec2 px) {
+    if(light_count == 0) return vec3(0);
+
+    vec3 rnd = rand3(bounce + 100, spp_index, px);
+    int light_idx = light_indices[int(rnd.x * float(light_count))];
+
+    GPUTriangle light_tri = triangles[light_idx];
+    int m_id = light_tri.material_id;
+    vec3 emission = gpu_materials[m_id].emission.rgb;
+
+    if (dot(emission, emission) == 0.0) return vec3(0);
+
+    //Point sample on light surface
+    vec3 light_pos = sampleTriangle(light_tri.v0.position, light_tri.v1.position, light_tri.v2.position, rnd.yz);
+
+    //Shadow rays
+    vec3 to_light = light_pos - h.pos;
+    float dist = length(to_light);
+    vec3 dir_light = to_light / dist;
+
+    //Check if light is in the correct surface side
+    float cos_surface = dot(h.normal, dir_light);
+    if (cos_surface <= 0.0) return vec3(0);
+
+    //Light normal
+    vec3 light_normal = normalize(cross(light_tri.v1.position - light_tri.v0.position, light_tri.v2.position - light_tri.v0.position));
+    float cos_light = dot(-dir_light, light_normal);
+    if(cos_light <= 0.0) return vec3(0);
+
+    //check occlusion of shadow rays
+    Ray shadow_ray;
+    shadow_ray.origin = h.pos + h.normal * EPS;
+    shadow_ray.direction = dir_light;
+
+    Hit shadow_hit;
+    
+    bool occluded = intersects(shadow_ray, shadow_hit) && shadow_hit.t < dist - EPS;
+
+    if (occluded) return vec3(0);
+
+    //PDF sampling
+    float area = triangleArea(light_tri.v0.position, light_tri.v1.position, light_tri.v2.position);
+    float pdf = (dist * dist) / (cos_light * area * float(light_count));
+
+    //Direct contribution
+    return h.albedo * emission * cos_surface / (PI * pdf);
+}
+
+//----------------------------------------------------------
+//Path Tracer
+
 /**
 Traces a path for each pixel and returns the radiance
 \param uv pixel coordinates [0,1]
@@ -89,14 +146,21 @@ vec3 pathTrace(vec2 uv, int spp_index, uvec2 px) {
             break;
         }
 
-        if (FOCAL_DEBUG && b == 0) {
-            float dist_to_focal = abs(h.t - CAM_FOCAL_DISTANCE);
-            if(dist_to_focal < FOCAL_BAND_DEBUG)
-                color += vec3(0.0, 1.0, 0.0) * 0.5;
+        if(b == 0) {
+            if(FOCAL_DEBUG) {
+                float dist_to_focal = abs(h.t - CAM_FOCAL_DISTANCE);
+                if(dist_to_focal < FOCAL_BAND_DEBUG)
+                    color += vec3(0.0, 1.0, 0.0) * 0.5;
+            }
+
+            color += throughput * h.emission;
+            if (dot(h.emission, h.emission) > 0.0) break;
         }
 
-        color += throughput * h.emission;
-        if (dot(h.emission, h.emission) > 0.0) break;
+        //NEE
+        if (h.material == MAT_DIFFUSE) {
+            color += throughput * estimateDirectLight(h, b, spp_index, px);
+        }
 
         vec3 r = rand3(b, spp_index, px);
 
