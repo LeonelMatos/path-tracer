@@ -43,7 +43,7 @@
 #include "mesh.hpp"
 #include "bvh.hpp"
 
-#define VERSION "1.2.6"
+#define VERSION "1.2.8"
 
 using namespace std;
 using namespace glm;
@@ -81,8 +81,6 @@ RenderConfig config;
 
 static const int COMPUTE_LOCAL_X = 16;
 static const int COMPUTE_LOCAL_Y = 16;
-
-const int V_SYNC = 1;
 
 const char* txt_sep = "----------------------------";
 
@@ -356,7 +354,7 @@ int main(void) {
     window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE_VERSION, NULL, NULL);
     if (!window) { glfwTerminate(); return -1; }
     glfwMakeContextCurrent(window);
-    glfwSwapInterval(V_SYNC);
+    glfwSwapInterval(renderer.v_sync);
     
     glewExperimental = GL_TRUE;
     glewInit();
@@ -487,6 +485,8 @@ void initUniforms() {
 
     renderer.loc_display_render_res = glGetUniformLocation(renderer.display_id, "render_resolution");
     renderer.loc_display_res = glGetUniformLocation(renderer.display_id, "display_resolution");
+    
+    renderer.loc_use_nee = glGetUniformLocation(active, "USE_NEE");
 
     renderer.grid_loc_view = glGetUniformLocation(renderer.grid_id, "view");
     renderer.grid_loc_proj = glGetUniformLocation(renderer.grid_id, "projection");
@@ -509,6 +509,7 @@ void uploadConfig() {
     glUniform1f(renderer.loc_focal_band, config.focal_band_debug);
     glUniform1i(renderer.loc_background, config.background);
     glUniform1i(renderer.loc_tone_map, config.tone_mapping);
+    glUniform1i(renderer.loc_use_nee, config.use_nee ? 1 : 0);
 }
 
 void applyConfig() {
@@ -919,6 +920,13 @@ void drawUI() {
                 res = glm::max(32, res);
                 config.moving_resolution = res;
             }
+            bool vsync = renderer.v_sync == 1;
+            if(ImGui::Checkbox("Enable V-Sync", &vsync)) {
+                renderer.v_sync = vsync ? 1 : 0;
+                glfwSwapInterval(renderer.v_sync);
+            }
+            ImGui::SetItemTooltip("Vertical sync\nLocks framerate at 60FPS");
+
             ImGui::Checkbox("Show Grid", &renderer.show_grid);
             ImGui::SetItemTooltip("Grid not visible on screenshots");
         }
@@ -937,6 +945,9 @@ void drawUI() {
             changed |= ImGui::SliderInt("Rays/Pixel", &config.samples_per_pixel, 1, 16);
             changed |= resetBtn("*##spp", config.samples_per_pixel, render_defaults.samples_per_pixel);
     
+            changed |= ImGui::Checkbox("NEE", &config.use_nee);
+            ImGui::SetItemTooltip("Next Event Estimation\nDisable to compare with brute force");
+
             ImGui::SeparatorText("Russian Roulette");
     
             bool rr_enabled = (config.rr_min_bounces > 0);

@@ -91,6 +91,8 @@ The less the value, the more noise appears for cutted rays, but increases perfor
 */
 uniform float RR_MAX_SURVIVAL;
 
+uniform int USE_NEE;
+
 ///\}
 
 

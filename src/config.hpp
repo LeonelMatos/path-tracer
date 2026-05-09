@@ -9,7 +9,7 @@ int WINDOW_WIDTH = 1280, WINDOW_HEIGHT = 720;
 /**Switches between using fragment or compute shaders
 for the path tracer
 \note false = fragment; true = compute*/
-const bool USE_COMPUTE_SH = false;
+const bool USE_COMPUTE_SH = true;
 
 struct RenderConfig {
     int depth = 5;
@@ -34,6 +34,9 @@ struct RenderConfig {
     ///controls the progressive resolution scaling up to the original
     bool progressive_refine = true;
 
+    ///Enables Next Event Estimation
+    bool use_nee = true;
+
     //Sun
     bool sun_enabled = true;
     float sun_elevation = 45.0f;
@@ -50,6 +53,8 @@ struct RenderConfig {
 
 struct Renderer {
     int render_w = WINDOW_WIDTH, render_h = WINDOW_HEIGHT;
+
+    int v_sync = 0;
 
     uint MAX_SAMPLES = 200;
     
@@ -80,6 +85,9 @@ struct Renderer {
     //BVH
     GLuint bvh_ssbo;
     GLint loc_bvh_root;
+
+    //NEE
+    GLint loc_use_nee;
 
     //Light
     //memory buffers

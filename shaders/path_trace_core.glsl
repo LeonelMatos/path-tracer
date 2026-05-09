@@ -237,7 +237,7 @@ vec3 pathTrace(vec2 uv, int spp_index, uvec2 px) {
         }
 
         //NEE
-        if (h.material == MAT_DIFFUSE) {
+        if (USE_NEE == 1 && h.material == MAT_DIFFUSE) {
             color += throughput * estimateDirectLight(h, b, spp_index, px);
         }
 
