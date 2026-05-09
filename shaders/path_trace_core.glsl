@@ -62,7 +62,74 @@ Ray cameraRayDOF(vec2 uv, int spp_index, uvec2 px) {
 //----------------------------------------------------------
 //Next Event Estimation
 
-vec3 estimateDirectLight(Hit h, int bounce, int spp_index, uvec2 px) {
+vec3 sampleAnalyticLight(Hit h, int bounce, int spp_index, uvec2 px) {
+    if (analytic_light_count == 0) return vec3(0);
+
+    //pick random light from buffer
+    vec3 rnd = rand3(bounce + 200, spp_index, px);
+    int light_idx = int(rnd.x * float(analytic_light_count));
+    GPULight light = analytic_lights[light_idx];
+
+    //calculates the distance and direction
+    vec3 to_light;
+    float dist;
+    float attenuation = 1.0;
+
+    switch (light.type) {
+        case LIGHT_POINT: {
+            vec3 offset = vec3(0);
+            if(light.radius > 0.0) {
+                float r = light.radius * cbrt(rnd.y);
+                float phi = TWO_PI * rnd.z;
+                float cos_t = 2.0 * rnd.x - 1.0;
+                float sin_t = sqrt(1.0 - cos_t * cos_t);
+                offset = r * vec3(sin_t * cos(phi), sin_t * sin(phi), cos_t);
+            }
+            to_light = light.position.xyz + offset - h.pos;
+            dist = length(to_light);
+            attenuation = 1.0 / (dist * dist);
+            break;
+        }
+        case LIGHT_DIRECTIONAL: {
+            to_light = -light.direction.xyz;
+            dist = 1e10;
+            attenuation = 1.0;
+            break;
+        }
+        case LIGHT_SPOT: {
+            to_light = light.position.xyz - h.pos;
+            dist = length(to_light);
+            attenuation = 1.0 / (dist * dist);
+            vec3 dir_to_dir = -normalize(to_light);
+            float cos_angle = dot(dir_to_dir, light.direction.xyz);
+            float t = smoothstep(light.spot_outer, light.spot_inner, cos_angle);
+            attenuation *= t;
+            if (attenuation <= 0) return vec3(0);
+            break;
+        }
+        default:
+            return vec3(0);
+    }
+
+    vec3 dir_light = normalize(to_light);
+    float cos_surface = dot(h.normal, dir_light);
+    if (cos_surface <= 0.0) return vec3(0);
+
+    Ray shadow_ray;
+    shadow_ray.origin = h.pos + h.normal * EPS;
+    shadow_ray.direction = dir_light;
+
+    Hit shadow_hit;
+    bool occluded = intersects(shadow_ray, shadow_hit) && shadow_hit.t < dist - EPS;
+
+    if (occluded) return vec3(0);
+
+    float pdf = 1.0 / float(analytic_light_count);
+    //Direct contribution
+    return h.albedo * light.emission.rgb * cos_surface * attenuation / (PI * pdf);
+}
+
+vec3 sampleEmissiveTriangles(Hit h, int bounce, int spp_index, uvec2 px) {
     if(light_count == 0) return vec3(0);
 
     vec3 rnd = rand3(bounce + 100, spp_index, px);
@@ -108,6 +175,18 @@ vec3 estimateDirectLight(Hit h, int bounce, int spp_index, uvec2 px) {
 
     //Direct contribution
     return h.albedo * emission * cos_surface / (PI * pdf);
+}
+
+vec3 estimateDirectLight(Hit h, int bounce, int spp_index, uvec2 px) {
+    vec3 result = vec3(0);
+
+    if(light_count > 0)
+        result += sampleEmissiveTriangles(h, bounce, spp_index, px);
+
+    if(analytic_light_count > 0)
+        result += sampleAnalyticLight(h, bounce, spp_index, px);
+
+    return result;
 }
 
 //----------------------------------------------------------

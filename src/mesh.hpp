@@ -47,7 +47,26 @@ struct MeshBounds {
     vec3 max_bound;
 };
 
+/**
+\note vec4 used for padding on the ssbo (w-value not used)
+ */
+struct GPULight {
+    vec4 position;
+    vec4 emission;
+    vec4 direction;
+    int type;
+    float radius;
+    float spot_inner;
+    float spot_outer;
+};
+
+#define LIGHT_POINT 0
+#define LIGHT_DIRECTIONAL 1
+#define LIGHT_SPOT  2
+
 int uploadLights(const vector<GPUTriangle>& triangles, const vector<GPUMaterial>& materials, GLuint& light_ssbo);
+
+void uploadAnalyticLights(const vector<GPULight>& lights, GLuint& light_ssbo);
 
 /**\brief Loads a mesh and calculates its bounding box
 \param path Path to the mesh file (any file format supported by ASSIMP)

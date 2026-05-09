@@ -43,7 +43,7 @@
 #include "mesh.hpp"
 #include "bvh.hpp"
 
-#define VERSION "1.2.4"
+#define VERSION "1.2.5"
 
 using namespace std;
 using namespace glm;

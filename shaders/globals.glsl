@@ -8,6 +8,7 @@ const float EPS_TRI = 0.0000001;
 
 uniform int DEPTH;
 
+
 ///\defgroup camera Camera Settings
 ///\{
 ///Lens aperture `0.0` = pinhole (no DOF), normal values up to `0.3`
@@ -35,6 +36,7 @@ uniform vec3 camera_up;
 
 ///\}
 
+
 ///\defgroup ambient Ambient Settings
 ///\{
 //Background types
@@ -46,6 +48,7 @@ const int BG_GRADIENT = 2;
 uniform int BACKGROUND;
 ///\}
 
+
 ///\defgroup tone_map Tone Mapping
 ///\{
 const int TM_NONE = 0;
@@ -54,6 +57,7 @@ const int TM_ACES = 2;
 
 uniform int TONE_MAPPING;
 ///\}
+
 
 ///\defgroup path Path Tracer
 ///\{
@@ -89,6 +93,7 @@ uniform float RR_MAX_SURVIVAL;
 
 ///\}
 
+
 ///\defgroup materials Materials
 ///\{
 const int MAT_DIFFUSE = 0;
@@ -96,6 +101,16 @@ const int MAT_MIRROR = 1;
 const int MAT_GLASS = 2;
 const int MAT_TINTED_GLASS = 3;
 ///\}
+
+
+//\defgroup light Light Types
+///\{
+///\note values need to sync in mesh.hpp
+const int LIGHT_POINT =  0;
+const int LIGHT_DIRECTIONAL = 1;
+const int LIGHT_SPOT = 2;
+///\}
+
 
 ///\defgroup mesh Mesh
 ///\{
@@ -122,6 +137,16 @@ struct GPUMaterial {
     float _pad[2];
 };
 
+struct GPULight {
+    vec4 position;
+    vec4 emission;
+    vec4 direction;
+    int type;
+    float radius;
+    float spot_inner;
+    float spot_outer;
+};
+
 ///Shader Storage Buffer Objects SSBO (GL 4.3+)
 ///See https://ktstephano.github.io/rendering/opengl/ssbos
 ///Triangle Buffer
@@ -140,7 +165,13 @@ layout(std430, binding = 9) readonly buffer LightBuffer {
 };
 uniform int light_count;
 
+layout(std430, binding = 10) readonly buffer AnalytticLightBuffer {
+    GPULight analytic_lights[];
+};
+uniform int analytic_light_count;
+
 ///\}
+
 
 ///\defgroup mesh_aabb AABB Early rejection
 ///\brief Bounding box of the loaded mesh to skip the triangle loop for
@@ -156,6 +187,7 @@ uniform vec3 mesh_aabb_max;
 uniform int triangle_count;
 
 ///\}
+
 
 ///\defgroup bvh BVH
 ///\{
