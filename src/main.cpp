@@ -43,7 +43,7 @@
 #include "mesh.hpp"
 #include "bvh.hpp"
 
-#define VERSION "1.2.5"
+#define VERSION "1.2.6"
 
 using namespace std;
 using namespace glm;
@@ -103,6 +103,8 @@ GLint loc_bvh_root;
 //Light
 GLuint light_ssbo;
 GLint loc_light_count;
+GLuint analytic_light_ssbo;
+GLint loc_analytic_light_count;
 
 /*----------------------------------------------------------
   Function Declarations
@@ -478,6 +480,7 @@ void initUniforms() {
     loc_aabb_max = glGetUniformLocation(active, "mesh_aabb_max");
     loc_bvh_root = glGetUniformLocation(active, "bvh_root");
     loc_light_count = glGetUniformLocation(active, "light_count");
+    loc_analytic_light_count = glGetUniformLocation(active, "analytic_light_count");
 
     if(!USE_COMPUTE_SH) {
         renderer.loc_prev = glGetUniformLocation(renderer.pathtr_frag_id, "prev_frame");
@@ -562,9 +565,23 @@ void loadScene() {
     uploadBVH(bvh_nodes, bvh_ssbo);
     int light_count = uploadLights(tris, mats, light_ssbo);
 
+    //Sun directional light
+    vector<GPULight> lights = {
+        {
+            vec4(0.0f),
+            vec4(5.0f, 4.5f, 4.0f, 0.0f),
+            vec4(normalize(vec3(-0.5f, -1.0f, -0.3f)), 0.0f),
+            LIGHT_DIRECTIONAL,
+            0.0f, 0.0f, 0.0f
+        }
+    };
+
+    int analytics_light_count = uploadAnalyticLights(lights, analytic_light_ssbo);
+
     glUseProgram(renderer.active_id);
     glUniform1i(loc_tri_count, (int)tris.size());
     glUniform1i(loc_light_count, light_count);
+    glUniform1i(loc_analytic_light_count, (int)lights.size());
     glUniform1i(loc_bvh_root, 0);
     glUniform3f(loc_aabb_min, bounds.min_bound.x, bounds.min_bound.y, bounds.min_bound.z);
     glUniform3f(loc_aabb_max, bounds.max_bound.x, bounds.max_bound.y, bounds.max_bound.z);
@@ -622,6 +639,7 @@ void cleanDataFromGPU() {
 
     glDeleteBuffers(1, &triangle_ssbo);
     glDeleteBuffers(1, &light_ssbo);
+    glDeleteBuffers(1, &analytic_light_ssbo);
     glDeleteBuffers(1, &material_ssbo);
     glDeleteBuffers(1, &bvh_ssbo);
     
@@ -883,6 +901,25 @@ void drawUI() {
                 }
             }
             if(changed) applyConfig();
+        }
+        if(ImGui::CollapsingHeader("Sun", ImGuiTreeNodeFlags_DefaultOpen)) {
+            bool sun_changed = false;
+            sun_changed |= ImGui::SliderFloat("Elevation", &config.sun_elevation, 0.0f, 90.0f, "%.1f°");
+            sun_changed |= ImGui::SliderFloat("Horizontal", &config.sun_azimuth, 0.0f, 360.0f, "%.1f°");
+            sun_changed |= ImGui::SliderFloat("Intensity", &config.sun_intensity, 0.0f, 20.0f, "%.1f");
+
+            if(sun_changed) {
+                vector<GPULight> lights = {{
+                    vec4(0.0f),
+                    vec4(config.sun_intensity, config.sun_intensity * 0.9f, config.sun_intensity * 0.8f, 0.0f),
+                    vec4(-config.sunDirection(), 0.0f),
+                    LIGHT_DIRECTIONAL,
+                    0.0f, 0.0f, 0.0f
+                }};
+
+                glNamedBufferData(analytic_light_ssbo, lights.size() * sizeof(GPULight), lights.data(), GL_DYNAMIC_DRAW);
+                resetAccumulation();
+            }
         }
     }
     ImGui::End();

@@ -66,7 +66,7 @@ struct GPULight {
 
 int uploadLights(const vector<GPUTriangle>& triangles, const vector<GPUMaterial>& materials, GLuint& light_ssbo);
 
-void uploadAnalyticLights(const vector<GPULight>& lights, GLuint& light_ssbo);
+int uploadAnalyticLights(const vector<GPULight>& lights, GLuint& light_ssbo);
 
 /**\brief Loads a mesh and calculates its bounding box
 \param path Path to the mesh file (any file format supported by ASSIMP)

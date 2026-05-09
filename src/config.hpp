@@ -33,6 +33,17 @@ struct RenderConfig {
     int moving_resolution = 128;
     ///controls the progressive resolution scaling up to the original
     bool progressive_refine = true;
+
+    //Sun
+    float sun_elevation = 45.0f;
+    float sun_azimuth = 180.0f;
+    float sun_intensity = 5.0f;
+
+    glm::vec3 sunDirection() {
+        float el = glm::radians(sun_elevation);
+        float az = glm::radians(sun_azimuth);
+        return normalize(glm::vec3(cos(el) * sin(az), cos(el) * cos(az), sin(el)));
+    }
 };
 
 struct Renderer {

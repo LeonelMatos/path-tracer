@@ -33,6 +33,13 @@ int uploadLights(const vector<GPUTriangle>& triangles, const vector<GPUMaterial>
     return real_count;
 }
 
+int uploadAnalyticLights(const vector<GPULight>& lights, GLuint& out_ssbo) {
+    glCreateBuffers(1, &out_ssbo);
+    glNamedBufferData(out_ssbo, lights.size() * sizeof(GPULight), lights.data(), GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, out_ssbo);
+    return (int)lights.size();
+}
+
 bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMaterial>& materials, mat4 transform, MeshBounds* bounds) {\
     //Initialize bounds
     if (bounds) {

@@ -79,7 +79,7 @@ vec3 sampleAnalyticLight(Hit h, int bounce, int spp_index, uvec2 px) {
         case LIGHT_POINT: {
             vec3 offset = vec3(0);
             if(light.radius > 0.0) {
-                float r = light.radius * cbrt(rnd.y);
+                float r = light.radius * pow(rnd.y, 1.0 / 3.0);
                 float phi = TWO_PI * rnd.z;
                 float cos_t = 2.0 * rnd.x - 1.0;
                 float sin_t = sqrt(1.0 - cos_t * cos_t);
