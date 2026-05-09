@@ -9,7 +9,7 @@ int WINDOW_WIDTH = 1280, WINDOW_HEIGHT = 720;
 /**Switches between using fragment or compute shaders
 for the path tracer
 \note false = fragment; true = compute*/
-const bool USE_COMPUTE_SH = true;
+const bool USE_COMPUTE_SH = false;
 
 struct RenderConfig {
     int depth = 5;
@@ -35,9 +35,11 @@ struct RenderConfig {
     bool progressive_refine = true;
 
     //Sun
+    bool sun_enabled = true;
     float sun_elevation = 45.0f;
     float sun_azimuth = 180.0f;
     float sun_intensity = 5.0f;
+    glm::vec3 sun_color = glm::vec3(1.0f, 0.95f, 0.8f);
 
     glm::vec3 sunDirection() {
         float el = glm::radians(sun_elevation);
@@ -68,6 +70,23 @@ struct Renderer {
     bool show_grid = true;
     GLuint grid_id = 0;
     GLint grid_loc_view, grid_loc_proj, grid_loc_near, grid_loc_far, grid_loc_cam_pos;
+
+    GLuint triangle_ssbo;
+    GLuint material_ssbo;
+    ///Triangle count fixed value passed pre-calculated
+    GLint loc_tri_count;
+    GLint loc_aabb_min, loc_aabb_max;
+
+    //BVH
+    GLuint bvh_ssbo;
+    GLint loc_bvh_root;
+
+    //Light
+    //memory buffers
+    GLuint light_ssbo;
+    GLint loc_light_count;
+    GLuint analytic_light_ssbo;
+    GLint loc_analytic_light_count;
 };
 
 struct CameraConfig {

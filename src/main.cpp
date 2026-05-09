@@ -82,29 +82,13 @@ RenderConfig config;
 static const int COMPUTE_LOCAL_X = 16;
 static const int COMPUTE_LOCAL_Y = 16;
 
-const int V_SYNC = 0;
-
+const int V_SYNC = 1;
 
 const char* txt_sep = "----------------------------";
 
-/*----------------------------------------------------------
-GPU Mesh Render
-*/
-GLuint triangle_ssbo;
-GLuint material_ssbo;
-///Triangle count fixed value passed pre-calculated
-GLint loc_tri_count;
-GLint loc_aabb_min, loc_aabb_max;
 
-//BVH
-GLuint bvh_ssbo;
-GLint loc_bvh_root;
-
-//Light
-GLuint light_ssbo;
-GLint loc_light_count;
-GLuint analytic_light_ssbo;
-GLint loc_analytic_light_count;
+vector<GPULight> analytic_lights;
+int sun_light_index = -1;
 
 /*----------------------------------------------------------
   Function Declarations
@@ -475,12 +459,12 @@ void initUniforms() {
     renderer.loc_res = glGetUniformLocation(active, "resolution");
     renderer.loc_frame = glGetUniformLocation(active, "frame_id");
     renderer.loc_tex = glGetUniformLocation(active, "tex");
-    loc_tri_count = glGetUniformLocation(active, "triangle_count");
-    loc_aabb_min = glGetUniformLocation(active, "mesh_aabb_min");
-    loc_aabb_max = glGetUniformLocation(active, "mesh_aabb_max");
-    loc_bvh_root = glGetUniformLocation(active, "bvh_root");
-    loc_light_count = glGetUniformLocation(active, "light_count");
-    loc_analytic_light_count = glGetUniformLocation(active, "analytic_light_count");
+    renderer.loc_tri_count = glGetUniformLocation(active, "triangle_count");
+    renderer.loc_aabb_min = glGetUniformLocation(active, "mesh_aabb_min");
+    renderer.loc_aabb_max = glGetUniformLocation(active, "mesh_aabb_max");
+    renderer.loc_bvh_root = glGetUniformLocation(active, "bvh_root");
+    renderer.loc_light_count = glGetUniformLocation(active, "light_count");
+    renderer.loc_analytic_light_count = glGetUniformLocation(active, "analytic_light_count");
 
     if(!USE_COMPUTE_SH) {
         renderer.loc_prev = glGetUniformLocation(renderer.pathtr_frag_id, "prev_frame");
@@ -540,6 +524,25 @@ void uploadCamera() {
     glUniform3f(renderer.loc_cam_up, camera.up.x, camera.up.y, camera.up.z);
 }
 
+void uploadSun() {
+    if(sun_light_index >= 0 && sun_light_index < (int)analytic_lights.size())
+        analytic_lights.erase(analytic_lights.begin() + sun_light_index);
+    
+    sun_light_index = -1;
+
+    if(config.sun_enabled) {
+        GPULight sun{};
+        sun.emission = vec4(config.sun_color * config.sun_intensity, 0.0f);
+        sun.direction = vec4(-config.sunDirection(), 0.0f);
+        sun.type = LIGHT_DIRECTIONAL;
+
+        sun_light_index = (int)analytic_lights.size();
+        analytic_lights.push_back(sun);
+    }
+    uploadAnalyticLights(analytic_lights, renderer.analytic_light_ssbo);
+    glUniform1i(renderer.loc_analytic_light_count, (int)analytic_lights.size());
+}
+
 void loadScene() {
     vector<GPUTriangle> tris; vector<GPUMaterial> mats;
 
@@ -548,43 +551,27 @@ void loadScene() {
     mat4 transform = translate(mat4(1.0f), vec3(0, 0, -1));
     transform = scale(transform, vec3(10.0f));
     transform = rotate(transform, radians(90.0f), vec3(1, 0, 0));
-    //transform = rotate(transform, radians(180.0f), vec3(0, 1, 0));
-    //transform = rotate(transform, radians(180.0f), vec3(0, 0, 1));
 
     loadMesh("../models/NewYork-City-Manhattan.obj", tris, mats, transform, &bounds);
-    /*
-    for (auto& mat : mats) { //temp test
-        mat.albedo = vec4(0.8f, 0.3f, 0.1f, 1.0f);  // laranja
-        mat.type = 2;
-    }
-    */
+    
     vector<BVHNode> bvh_nodes;
     buildBVH(tris, bvh_nodes);
     
-    uploadMesh(tris, mats, triangle_ssbo, material_ssbo);
-    uploadBVH(bvh_nodes, bvh_ssbo);
-    int light_count = uploadLights(tris, mats, light_ssbo);
+    uploadMesh(tris, mats, renderer.triangle_ssbo, renderer.material_ssbo);
+    uploadBVH(bvh_nodes, renderer.bvh_ssbo);
 
-    //Sun directional light
-    vector<GPULight> lights = {
-        {
-            vec4(0.0f),
-            vec4(5.0f, 4.5f, 4.0f, 0.0f),
-            vec4(normalize(vec3(-0.5f, -1.0f, -0.3f)), 0.0f),
-            LIGHT_DIRECTIONAL,
-            0.0f, 0.0f, 0.0f
-        }
-    };
-
-    int analytics_light_count = uploadAnalyticLights(lights, analytic_light_ssbo);
-
+    //Lights
     glUseProgram(renderer.active_id);
-    glUniform1i(loc_tri_count, (int)tris.size());
-    glUniform1i(loc_light_count, light_count);
-    glUniform1i(loc_analytic_light_count, (int)lights.size());
-    glUniform1i(loc_bvh_root, 0);
-    glUniform3f(loc_aabb_min, bounds.min_bound.x, bounds.min_bound.y, bounds.min_bound.z);
-    glUniform3f(loc_aabb_max, bounds.max_bound.x, bounds.max_bound.y, bounds.max_bound.z);
+    int light_count = uploadLights(tris, mats, renderer.light_ssbo);
+
+    analytic_lights.clear();
+    uploadSun();
+
+    glUniform1i(renderer.loc_tri_count, (int)tris.size());
+    glUniform1i(renderer.loc_light_count, light_count);
+    glUniform1i(renderer.loc_bvh_root, 0);
+    glUniform3f(renderer.loc_aabb_min, bounds.min_bound.x, bounds.min_bound.y, bounds.min_bound.z);
+    glUniform3f(renderer.loc_aabb_max, bounds.max_bound.x, bounds.max_bound.y, bounds.max_bound.z);
 
 }
 
@@ -637,11 +624,11 @@ void cleanDataFromGPU() {
     glDeleteProgram(renderer.pathtr_frag_id);
     glDeleteProgram(renderer.display_id);
 
-    glDeleteBuffers(1, &triangle_ssbo);
-    glDeleteBuffers(1, &light_ssbo);
-    glDeleteBuffers(1, &analytic_light_ssbo);
-    glDeleteBuffers(1, &material_ssbo);
-    glDeleteBuffers(1, &bvh_ssbo);
+    glDeleteBuffers(1, &renderer.triangle_ssbo);
+    glDeleteBuffers(1, &renderer.light_ssbo);
+    glDeleteBuffers(1, &renderer.analytic_light_ssbo);
+    glDeleteBuffers(1, &renderer.material_ssbo);
+    glDeleteBuffers(1, &renderer.bvh_ssbo);
     
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
@@ -904,20 +891,14 @@ void drawUI() {
         }
         if(ImGui::CollapsingHeader("Sun", ImGuiTreeNodeFlags_DefaultOpen)) {
             bool sun_changed = false;
+            sun_changed |= ImGui::Checkbox("Enable", &config.sun_enabled);
             sun_changed |= ImGui::SliderFloat("Elevation", &config.sun_elevation, 0.0f, 90.0f, "%.1f°");
             sun_changed |= ImGui::SliderFloat("Horizontal", &config.sun_azimuth, 0.0f, 360.0f, "%.1f°");
             sun_changed |= ImGui::SliderFloat("Intensity", &config.sun_intensity, 0.0f, 20.0f, "%.1f");
+            sun_changed |= ImGui::ColorEdit3("Color", value_ptr(config.sun_color));
 
             if(sun_changed) {
-                vector<GPULight> lights = {{
-                    vec4(0.0f),
-                    vec4(config.sun_intensity, config.sun_intensity * 0.9f, config.sun_intensity * 0.8f, 0.0f),
-                    vec4(-config.sunDirection(), 0.0f),
-                    LIGHT_DIRECTIONAL,
-                    0.0f, 0.0f, 0.0f
-                }};
-
-                glNamedBufferData(analytic_light_ssbo, lights.size() * sizeof(GPULight), lights.data(), GL_DYNAMIC_DRAW);
+                uploadSun();
                 resetAccumulation();
             }
         }
