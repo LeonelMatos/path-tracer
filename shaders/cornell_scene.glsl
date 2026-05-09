@@ -169,6 +169,7 @@ bool intersects_cornell(const Ray ray, out Hit h) {
     }
 
     // 1 Triangle
+    /*
     vec3 tri_normal;
     vec3 tri_bary;
     ray_dist = triangleT(ray, vec3(-0.8, -0.8, -0.6), vec3( 0.8, -0.8, -0.6), vec3( 0.0,  0.8, -0.4), tri_normal, tri_bary);
@@ -184,6 +185,7 @@ bool intersects_cornell(const Ray ray, out Hit h) {
         h.material = MAT_TINTED_GLASS;
         h.ior = 1;
     }
+    */
 
 /*
     //AABB Early Rejection

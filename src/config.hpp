@@ -1,4 +1,6 @@
 #pragma once
+#include <string>
+#include <filesystem>
 #include <glm/glm.hpp>
 #include <GL/glew.h>
 #include <glm/gtc/matrix_transform.hpp>
@@ -10,6 +12,15 @@ int WINDOW_WIDTH = 1280, WINDOW_HEIGHT = 720;
 for the path tracer
 \note false = fragment; true = compute*/
 const bool USE_COMPUTE_SH = true;
+
+struct SceneModel {
+    std::string path = "";
+    glm::vec3 position = glm::vec3(0.0f);
+    glm::vec3 rotation = glm::vec3(0.0f);
+    glm::vec3 scale = glm::vec3(1.0f);
+    int tri_count = 0;
+    int mat_count = 0;
+};
 
 struct RenderConfig {
     int depth = 5;
@@ -30,7 +41,7 @@ struct RenderConfig {
     
     //Not part of the shader config
     ///render resolution when moving the camera
-    int moving_resolution = 128;
+    int moving_resolution = 256;
     ///controls the progressive resolution scaling up to the original
     bool progressive_refine = true;
 
@@ -57,6 +68,8 @@ struct Renderer {
     int v_sync = 0;
 
     uint MAX_SAMPLES = 200;
+
+    SceneModel current_model;
     
     GLuint display_id, pathtr_frag_id, pathtr_comp_id;
     GLuint active_id;
@@ -72,7 +85,7 @@ struct Renderer {
     GLint loc_display_render_res;
     GLint loc_display_res;
     
-    bool show_grid = true;
+    bool show_grid = false;
     GLuint grid_id = 0;
     GLint grid_loc_view, grid_loc_proj, grid_loc_near, grid_loc_far, grid_loc_cam_pos;
 

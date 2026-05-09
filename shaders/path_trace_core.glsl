@@ -177,18 +177,6 @@ vec3 sampleEmissiveTriangles(Hit h, int bounce, int spp_index, uvec2 px) {
     return h.albedo * emission * cos_surface / (PI * pdf);
 }
 
-vec3 estimateDirectLight(Hit h, int bounce, int spp_index, uvec2 px) {
-    vec3 result = vec3(0);
-
-    if(light_count > 0)
-        result += sampleEmissiveTriangles(h, bounce, spp_index, px);
-
-    if(analytic_light_count > 0)
-        result += sampleAnalyticLight(h, bounce, spp_index, px);
-
-    return result;
-}
-
 //----------------------------------------------------------
 //Path Tracer
 
@@ -237,8 +225,14 @@ vec3 pathTrace(vec2 uv, int spp_index, uvec2 px) {
         }
 
         //NEE
-        if (USE_NEE == 1 && h.material == MAT_DIFFUSE) {
-            color += throughput * estimateDirectLight(h, b, spp_index, px);
+        //Only analytic lights without geometry (point, directional, spot)
+        if(h.material == MAT_DIFFUSE && analytic_light_count > 0) {
+            color += throughput * sampleAnalyticLight(h, b, spp_index, px);
+        }
+
+        //NEE on emissive triangles
+        if (USE_NEE == 1 && h.material == MAT_DIFFUSE && light_count > 0) {
+            color += throughput * sampleEmissiveTriangles(h, b, spp_index, px);
         }
 
         vec3 r = rand3(b, spp_index, px);

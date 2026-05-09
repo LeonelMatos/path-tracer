@@ -26,6 +26,7 @@
 #include <string.h>
 #include <time.h>
 #include <vector>
+#include <algorithm>
 #define GLEW_NO_GLU
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -43,7 +44,7 @@
 #include "mesh.hpp"
 #include "bvh.hpp"
 
-#define VERSION "1.2.8"
+#define VERSION "1.3.1"
 
 using namespace std;
 using namespace glm;
@@ -161,7 +162,7 @@ void onMouseMove(GLFWwindow* w, double x, double y) {
     camera.yaw -= (float)dx * camera.mouse_sens;
     camera.pitch -= (float)dy * camera.mouse_sens;
 
-    camera.pitch = clamp(camera.pitch, -1.5f, 1.5f);
+    camera.pitch = std::clamp(camera.pitch, -1.5f, 1.5f);
 
     camera.moving = true;
 }
@@ -184,7 +185,7 @@ void onMouseButton(GLFWwindow* w, int button, int action, int mods) {
 void onMouseScroll(GLFWwindow* w, double xoffset, double yoffset) {
     //Simulate Unity's camera control speed multiplier
     camera.move_speed *= (yoffset > 0) ? 1.2f : 0.8f;
-    camera.move_speed = clamp(camera.move_speed, 0.001f, 10.0f);
+    camera.move_speed = std::clamp(camera.move_speed, 0.001f, 10.0f);
 
     printf("\nMove speed: %.3f\n", camera.move_speed);
 }
@@ -544,22 +545,56 @@ void uploadSun() {
     glUniform1i(renderer.loc_analytic_light_count, (int)analytic_lights.size());
 }
 
+vector<string> scanModels(const string& models_dir) {
+    vector<string> paths;
+
+    if(!filesystem::exists(models_dir)) {
+        printf("Models directory not found: %s\n", models_dir.c_str());
+        return paths;
+    }
+
+    for (auto& entry: filesystem::recursive_directory_iterator(models_dir)) {
+        string ext = entry.path().extension().string();
+        if(ext == ".gltf" || ext == ".glb" || ext == ".obj" || ext == ".fbx")
+            paths.push_back(entry.path().string());
+    }
+    sort(paths.begin(), paths.end());
+    return paths;
+}
+
 void loadScene() {
+    //Empty scene -> reset counters
+    if(renderer.current_model.path.empty()) {
+        glUseProgram(renderer.active_id);
+        glUniform1i(renderer.loc_tri_count, 0);
+        glUniform1i(renderer.loc_light_count, 0);
+        glUniform1i(renderer.loc_bvh_root, 0);
+        resetAccumulation();
+        return;
+    }
+
     vector<GPUTriangle> tris; vector<GPUMaterial> mats;
 
     MeshBounds bounds;
 
-    mat4 transform = translate(mat4(1.0f), vec3(0, 0, -1));
-    transform = scale(transform, vec3(10.0f));
-    transform = rotate(transform, radians(90.0f), vec3(1, 0, 0));
+    SceneModel& model = renderer.current_model;
 
-    loadMesh("../models/NewYork-City-Manhattan.obj", tris, mats, transform, &bounds);
+    mat4 transform = translate(mat4(1.0f), model.position);
+    transform = rotate(transform, radians(model.rotation.x), vec3(1,0,0));
+    transform = rotate(transform, radians(model.rotation.y), vec3(0,1,0));
+    transform = rotate(transform, radians(model.rotation.z), vec3(0,0,1));
+    transform = scale(transform, model.scale);
+
+    if (!loadMesh(model.path, tris, mats, transform, &bounds)) return;
     
     vector<BVHNode> bvh_nodes;
     buildBVH(tris, bvh_nodes);
     
     uploadMesh(tris, mats, renderer.triangle_ssbo, renderer.material_ssbo);
     uploadBVH(bvh_nodes, renderer.bvh_ssbo);
+
+    model.tri_count = (int)tris.size();
+    model.mat_count = (int)mats.size();
 
     //Lights
     glUseProgram(renderer.active_id);
@@ -607,8 +642,8 @@ bool transferDataToGPU(void) {
     glCreateVertexArrays(1, &renderer.vao);
     glBindVertexArray(renderer.vao);
 
-    //Mesh Loading//
-    loadScene();
+    analytic_lights.clear();
+    uploadSun();
 
     uploadConfig();
     uploadCamera();
@@ -803,6 +838,9 @@ void drawGrid() {
 /*----------------------------------------------------------
   UI Draw
 */
+static vector<string> model_list;
+static bool model_list_loaded = false;
+
 void drawUI() {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
@@ -890,18 +928,71 @@ void drawUI() {
             }
             if(changed) applyConfig();
         }
-        if(ImGui::CollapsingHeader("Sun", ImGuiTreeNodeFlags_DefaultOpen)) {
-            bool sun_changed = false;
-            sun_changed |= ImGui::Checkbox("Enable", &config.sun_enabled);
-            sun_changed |= ImGui::SliderFloat("Elevation", &config.sun_elevation, 0.0f, 90.0f, "%.1f°");
-            sun_changed |= ImGui::SliderFloat("Horizontal", &config.sun_azimuth, 0.0f, 360.0f, "%.1f°");
-            sun_changed |= ImGui::SliderFloat("Intensity", &config.sun_intensity, 0.0f, 20.0f, "%.1f");
-            sun_changed |= ImGui::ColorEdit3("Color", value_ptr(config.sun_color));
+        if(ImGui::CollapsingHeader("Model Explorer", ImGuiTreeNodeFlags_DefaultOpen)) {
+            if(!model_list_loaded) {
+                model_list = scanModels("../models");
+                model_list_loaded = true;
+            }
+            if(ImGui::SmallButton("Scan")) {
+                model_list = scanModels("../models");
+            }
+            ImGui::SameLine();
+            ImGui::Text("%zu models", model_list.size());
+            ImGui::Separator();
 
-            if(sun_changed) {
-                uploadSun();
+            //Model list interface
+            float list_height = WINDOW_HEIGHT * 0.2f;
+            ImGui::BeginChild("model_list", ImVec2(0, list_height), true);
+            for (int i = 0; i < (int)model_list.size(); i++) {
+                const string& path = model_list[i];
+                string name = filesystem::path(path).stem().string();
+                string label = name + "##" + to_string(i);
+
+                bool selected = (filesystem::path(path).lexically_normal() == filesystem::path(renderer.current_model.path).lexically_normal());
+
+                if (ImGui::Selectable(label.c_str(), selected)) {
+                    if(!selected) {
+                        renderer.current_model.path = path;
+                        renderer.current_model.position = vec3(0.0f);
+                        renderer.current_model.rotation = vec3(0.0f);
+                        renderer.current_model.scale = vec3(1.0f);
+                        loadScene();
+                        resetAccumulation();
+                    }
+                }
+                if(ImGui::IsItemHovered()) {
+                    string parent = filesystem::path(path).parent_path().filename().string();
+                    ImGui::SetTooltip("%s/%s", parent.c_str(), name.c_str());
+                }
+            }
+            ImGui::EndChild();
+        }
+        if(ImGui::CollapsingHeader("Transform")) {
+            bool t_changed = false;
+            SceneModel& model = renderer.current_model;
+
+            t_changed |= ImGui::DragFloat3("Position", value_ptr(model.position), 0.01f);
+            t_changed |= ImGui::DragFloat3("Rotation", value_ptr(model.rotation), 1.0f, -360.0f, 360.0f, "%.1f°");
+            t_changed |= ImGui::DragFloat("Scale", &model.scale.x, 0.01f, 0.001f, 100.0f);
+            if(t_changed) model.scale.y = model.scale.z = model.scale.x;
+
+            ImGui::SameLine();
+            if(ImGui::Button("Reset##transform")) {
+                model.position = vec3(0.0f);
+                model.rotation = vec3(0.0f);
+                model.scale = vec3(1.0f);
+                t_changed = true;
+            }
+
+            if(t_changed && !model.path.empty()) {
+                loadScene();
                 resetAccumulation();
             }
+
+            ImGui::Separator();
+            ImGui::Text("%d triangles", model.tri_count);
+            ImGui::Text("%d materials", model.mat_count);
+            ImGui::Text("%s", filesystem::path(model.path).filename().string().c_str());
         }
     }
     ImGui::End();
@@ -928,7 +1019,7 @@ void drawUI() {
             ImGui::SetItemTooltip("Vertical sync\nLocks framerate at 60FPS");
 
             ImGui::Checkbox("Show Grid", &renderer.show_grid);
-            ImGui::SetItemTooltip("Grid not visible on screenshots");
+            ImGui::SetItemTooltip("Grid not visible on screenshots\nRendered on top of the path tracer");
         }
 
         if(ImGui::CollapsingHeader("Render", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -971,6 +1062,20 @@ void drawUI() {
     
             const char* tm_names[] = {"None", "Reinhard", "ACES"};
             changed |= ImGui::Combo("Tone Map", &config.tone_mapping, tm_names, 3);
+
+            if(ImGui::CollapsingHeader("Sun", ImGuiTreeNodeFlags_DefaultOpen)) {
+            bool sun_changed = false;
+            sun_changed |= ImGui::Checkbox("Enable", &config.sun_enabled);
+            sun_changed |= ImGui::SliderFloat("Elevation", &config.sun_elevation, 0.0f, 90.0f, "%.1f°");
+            sun_changed |= ImGui::SliderFloat("Horizontal", &config.sun_azimuth, 0.0f, 360.0f, "%.1f°");
+            sun_changed |= ImGui::SliderFloat("Intensity", &config.sun_intensity, 0.0f, 20.0f, "%.1f");
+            sun_changed |= ImGui::ColorEdit3("Color", value_ptr(config.sun_color));
+
+            if(sun_changed) {
+                uploadSun();
+                resetAccumulation();
+            }
+        }
     
             if(changed) applyConfig();
         }
