@@ -246,13 +246,13 @@ vec3 pathTrace(vec2 uv, int spp_index, uvec2 px) {
                 float phi = TWO_PI * r.y;
                 ray.direction = onb(h.normal) * vec3(sinT*cos(phi), sinT*sin(phi), cosT);
                 throughput *= h.albedo;
-                ray.origin = h.pos + h.normal * EPS;
+                ray.origin = h.pos + h.normal * EPS_TRI;
                 break;
             }
             case MAT_MIRROR: {
                 ray.direction = reflect(ray.direction, h.normal);
                 throughput *= h.albedo;
-                ray.origin = h.pos + h.normal * EPS;
+                ray.origin = h.pos + h.normal * EPS_TRI;
                 break;
             }
             case MAT_GLASS: {
@@ -270,18 +270,18 @@ vec3 pathTrace(vec2 uv, int spp_index, uvec2 px) {
 
                 if (total_reflect || r.z < fresnel) {
                     ray.direction = reflect(ray.direction, normal);
-                    ray.origin = h.pos + normal * EPS;
+                    ray.origin = h.pos + normal * EPS_TRI;
                 }
                 else {
                     ray.direction = refract(ray.direction, normal, eta);
-                    ray.origin = h.pos - normal * EPS;
+                    ray.origin = h.pos - normal * EPS_TRI;
                 }
                 throughput *= h.albedo;
                 break;
             }
             case MAT_TINTED_GLASS: { //ray passes directly, no Fresnel reflection
                 throughput *= h.albedo;
-                ray.origin = h.pos + ray.direction * EPS;
+                ray.origin = h.pos + ray.direction * EPS_TRI;
                 break;
             }
         }

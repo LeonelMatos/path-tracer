@@ -984,6 +984,7 @@ void drawUI() {
             }
 
             if(t_changed && !model.path.empty()) {
+                loadScene();
                 resetAccumulation();
             }
 

@@ -49,7 +49,7 @@ bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMate
 
     Assimp::Importer importer;
     const aiScene* scene = importer.ReadFile(path,
-         aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_FlipUVs | aiProcess_JoinIdenticalVertices);
+         aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_FlipUVs | aiProcess_JoinIdenticalVertices | aiProcess_FixInfacingNormals);
 
     if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
         fprintf(stderr, "ASSIMP error loading path '%s': %s\n", path.c_str(), importer.GetErrorString());
