@@ -3,7 +3,7 @@ const float PI  = 3.14159265359;
 const float TWO_PI = 2.0 * PI;
 const float INV_PI = 1.0 / PI;
 const float INF = 1e30;
-const float EPS = 0.001;
+const float EPS = 1e-5;
 const float EPS_TRI = 1e-10;
 
 uniform int DEPTH;
