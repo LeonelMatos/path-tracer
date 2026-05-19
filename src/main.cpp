@@ -553,7 +553,7 @@ void loadScene() {
     transform = scale(transform, vec3(10.0f));
     transform = rotate(transform, radians(90.0f), vec3(1, 0, 0));
 
-    loadMesh("../models/NewYork-City-Manhattan.obj", tris, mats, transform, &bounds);
+    loadMesh("../models/stanford_dragon_sss_test/scene.gltf", tris, mats, transform, &bounds);
     
     vector<BVHNode> bvh_nodes;
     buildBVH(tris, bvh_nodes);
