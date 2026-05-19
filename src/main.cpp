@@ -580,7 +580,7 @@ void loadScene() {
     SceneModel& model = renderer.current_model;
 
     mat4 transform = translate(mat4(1.0f), model.position);
-    transform = rotate(transform, radians(model.rotation.x), vec3(1,0,0));
+    transform = rotate(transform, radians(model.rotation.x + 90.0f), vec3(1,0,0));
     transform = rotate(transform, radians(model.rotation.y), vec3(0,1,0));
     transform = rotate(transform, radians(model.rotation.z), vec3(0,0,1));
     transform = scale(transform, model.scale);
@@ -608,7 +608,6 @@ void loadScene() {
     glUniform1i(renderer.loc_bvh_root, 0);
     glUniform3f(renderer.loc_aabb_min, bounds.min_bound.x, bounds.min_bound.y, bounds.min_bound.z);
     glUniform3f(renderer.loc_aabb_max, bounds.max_bound.x, bounds.max_bound.y, bounds.max_bound.z);
-
 }
 
 bool transferDataToGPU(void) {
@@ -985,7 +984,6 @@ void drawUI() {
             }
 
             if(t_changed && !model.path.empty()) {
-                loadScene();
                 resetAccumulation();
             }
 
@@ -1063,7 +1061,9 @@ void drawUI() {
             const char* tm_names[] = {"None", "Reinhard", "ACES"};
             changed |= ImGui::Combo("Tone Map", &config.tone_mapping, tm_names, 3);
 
-            if(ImGui::CollapsingHeader("Sun", ImGuiTreeNodeFlags_DefaultOpen)) {
+            if(changed) applyConfig();
+        }
+        if(ImGui::CollapsingHeader("Sun", ImGuiTreeNodeFlags_DefaultOpen)) {
             bool sun_changed = false;
             sun_changed |= ImGui::Checkbox("Enable", &config.sun_enabled);
             sun_changed |= ImGui::SliderFloat("Elevation", &config.sun_elevation, 0.0f, 90.0f, "%.1f°");
@@ -1075,9 +1075,6 @@ void drawUI() {
                 uploadSun();
                 resetAccumulation();
             }
-        }
-    
-            if(changed) applyConfig();
         }
     }
     

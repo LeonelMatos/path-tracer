@@ -99,11 +99,10 @@ void intersects_mesh(const Ray ray, inout Hit h) {
             h.albedo   = heatmap_color;
         }
         else {
-            // Sem hit mas BVH foi traversada — raio entrou no AABB mas não acertou triângulos
             h.t        = aabb_t;
             h.pos      = ray.origin + aabb_t * ray.direction;
             h.normal   = aabb_normal;
-            h.albedo   = vec3(1.0, 1.0, 0.0);  // amarelo = buraco
+            h.albedo   = vec3(1.0, 1.0, 0.0);
             h.emission = vec3(0);
             h.material = MAT_DIFFUSE;
             h.ior      = 0.0;
