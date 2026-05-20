@@ -124,6 +124,13 @@ struct CameraConfig {
     float return_speed = 3.0f;
 };
 
+/*----------------------------------------------------------
+  Screenshots
+*/
+
+inline std::string screenshot_msg = "";
+inline double screenshot_msg_time = 0.0;
+
 ///ACES tone map on the CPU side, an approximation of the shader ACES
 ///\see saveScreenshot
 inline auto aces_approx = [](float x) -> float {

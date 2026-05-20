@@ -780,7 +780,7 @@ void draw(void) {
   Render Extras
 */
 
-/// @brief Takes a screenshot of the render
+///\brief Takes a screenshot of the render
 void saveScreenshot() {
     time_t now = time(nullptr);
     struct tm* t = localtime(&now);
@@ -808,6 +808,8 @@ void saveScreenshot() {
             swap(pixels[y * WINDOW_WIDTH * 3 + x], pixels[y2 * WINDOW_WIDTH * 3 + x]);
     }
     stbi_write_png(filename, WINDOW_WIDTH, WINDOW_HEIGHT, 3, pixels.data(), WINDOW_WIDTH * 3);
+    screenshot_msg = string("Saved ") + filename;
+    screenshot_msg_time = glfwGetTime();
     printf("\nSaved screenshot %s\n", filename);
 }
 
@@ -886,6 +888,14 @@ void drawUI() {
                 saveScreenshot();
             if(ImGui::Button("Reset Camera[H]"))
                 camera.returning_home = true;
+            if (!screenshot_msg.empty()) {
+                double time_elapsed = glfwGetTime() - screenshot_msg_time;
+                if(time_elapsed < 4.0) {
+                    ImGui::Spacing();
+                    ImGui::TextDisabled("%s", screenshot_msg.c_str());
+                }
+                else screenshot_msg = "";
+            }
         }
         if(ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
             ImGui::Text("x = %.2f, y = %.2f, z = %.2f", camera.position.x, camera.position.y, camera.position.z);
