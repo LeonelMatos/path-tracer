@@ -5,8 +5,8 @@
 #include <GL/glew.h>
 #include <glm/gtc/matrix_transform.hpp>
 
-/// @brief Program window resolution
-int WINDOW_WIDTH = 1280, WINDOW_HEIGHT = 720;
+///\brief Program window resolution
+inline int WINDOW_WIDTH = 1280, WINDOW_HEIGHT = 720;
 
 /**Switches between using fragment or compute shaders
 for the path tracer
@@ -126,7 +126,7 @@ struct CameraConfig {
 
 ///ACES tone map on the CPU side, an approximation of the shader ACES
 ///\see saveScreenshot
-auto aces_approx = [](float x) -> float {
+inline auto aces_approx = [](float x) -> float {
     float a = 2.51f, b = 0.03f, c = 2.43f, d = 0.59f, e = 0.14f;
     return glm::clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0f, 1.0f);
 };

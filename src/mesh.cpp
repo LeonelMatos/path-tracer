@@ -147,6 +147,23 @@ bool uploadMesh(const vector<GPUTriangle>& triangles, const vector<GPUMaterial>&
     return true;
 }
 
+void clearMesh() {
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, renderer.triangle_ssbo);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, 0, nullptr, GL_DYNAMIC_DRAW);
+
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, renderer.material_ssbo);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, 0, nullptr, GL_DYNAMIC_DRAW);
+
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, renderer.bvh_ssbo);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, 0, nullptr, GL_DYNAMIC_DRAW);
+
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, renderer.light_ssbo);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, 0, nullptr, GL_DYNAMIC_DRAW);
+
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+}
+
 vector<GPUTriangle> makeTestMesh() {
     GPUMaterial mat;
     mat.albedo = vec4(0.0f, 0.0f, 0.0f, 1.0f);

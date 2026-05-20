@@ -5,8 +5,12 @@
 #include <GL/glew.h>
 #include <glm/glm.hpp>
 
+#include "config.hpp"
+
 using namespace std;
 using namespace glm;
+
+extern Renderer renderer;
 
 struct GPUVertex {
     glm::vec3 position;
@@ -80,5 +84,7 @@ int uploadAnalyticLights(const vector<GPULight>& lights, GLuint& light_ssbo);
 bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMaterial>& materials, mat4 transform = mat4(1.0f), MeshBounds* bounds = nullptr);
 
 bool uploadMesh(const vector<GPUTriangle>& triangles, const vector<GPUMaterial>& materials, GLuint& tri_ssbo, GLuint& mat_ssbo);
+
+void clearMesh();
 
 vector<GPUTriangle> makeTestMesh();

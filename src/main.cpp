@@ -565,6 +565,7 @@ vector<string> scanModels(const string& models_dir) {
 void loadScene() {
     //Empty scene -> reset counters
     if(renderer.current_model.path.empty()) {
+        clearMesh();
         glUseProgram(renderer.active_id);
         glUniform1i(renderer.loc_tri_count, 0);
         glUniform1i(renderer.loc_light_count, 0);
@@ -928,6 +929,10 @@ void drawUI() {
             if(changed) applyConfig();
         }
         if(ImGui::CollapsingHeader("Model Explorer", ImGuiTreeNodeFlags_DefaultOpen)) {
+            if(renderer.current_model.path.empty()) {
+                ImGui::TextDisabled("Empty Scene\nSelect a model to load");
+                ImGui::Spacing();
+            }
             if(!model_list_loaded) {
                 model_list = scanModels("../models");
                 model_list_loaded = true;
@@ -937,6 +942,17 @@ void drawUI() {
             }
             ImGui::SameLine();
             ImGui::Text("%zu models", model_list.size());
+            
+            ImGui::SameLine();
+            //Reset Scene
+            if(ImGui::SmallButton("*")) {
+                renderer.current_model.path = "";
+                renderer.current_model.position = vec3(0.0f);
+                renderer.current_model.rotation = vec3(0.0f);
+                renderer.current_model.scale = vec3(1.0f);
+                loadScene();
+                resetAccumulation();
+            }
             ImGui::Separator();
 
             //Model list interface
@@ -944,7 +960,9 @@ void drawUI() {
             ImGui::BeginChild("model_list", ImVec2(0, list_height), true);
             for (int i = 0; i < (int)model_list.size(); i++) {
                 const string& path = model_list[i];
-                string name = filesystem::path(path).stem().string();
+                string folder = filesystem::path(path).parent_path().filename().string();
+                string stem = filesystem::path(path).stem().string();
+                string name = folder + "/" + stem;
                 string label = name + "##" + to_string(i);
 
                 bool selected = (filesystem::path(path).lexically_normal() == filesystem::path(renderer.current_model.path).lexically_normal());
