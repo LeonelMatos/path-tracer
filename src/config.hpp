@@ -25,6 +25,8 @@ struct SceneModel {
 };
 
 struct RenderConfig {
+    int scene_preset = 0;
+
     int depth = 5;
     int samples_per_pixel = 1;
     int rr_min_bounces = 3;
@@ -115,6 +117,9 @@ struct Renderer {
     GLint loc_light_count;
     GLuint analytic_light_ssbo;
     GLint loc_analytic_light_count;
+
+    //Scene Presets
+    GLint loc_scene_preset;
 };
 
 struct CameraConfig {

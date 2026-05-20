@@ -47,7 +47,7 @@
 #include "config.hpp"
 #include "loader.hpp"
 
-#define VERSION "1.3.1"
+#define VERSION "1.3.2"
 
 using namespace std;
 using namespace glm;
@@ -520,6 +520,8 @@ void initUniforms() {
     renderer.grid_loc_near = glGetUniformLocation(renderer.grid_id, "near_plane");
     renderer.grid_loc_far = glGetUniformLocation(renderer.grid_id, "far_plane");
     renderer.grid_loc_cam_pos = glGetUniformLocation(renderer.grid_id, "camera_pos");
+
+    renderer.loc_scene_preset = glGetUniformLocation(renderer.active_id, "SCENE_PRESET");
 }
 
 void uploadConfig() {
@@ -537,6 +539,7 @@ void uploadConfig() {
     glUniform1i(renderer.loc_background, config.background);
     glUniform1i(renderer.loc_tone_map, config.tone_mapping);
     glUniform1i(renderer.loc_use_nee, config.use_nee ? 1 : 0);
+    glUniform1i(renderer.loc_scene_preset, config.scene_preset);
 }
 
 void applyConfig() {
@@ -1052,6 +1055,13 @@ void drawUI() {
     changed = false;
     //----- Render Settings -------------
     if(ImGui::Begin("Render Inspector")) {
+        //----- Scene Presets --------------
+        const char* preset_names[] = {"Mesh Only", "Cornell Box + Mesh", "Cornell Box"};
+        if(ImGui::Combo("Scene Preset", &config.scene_preset, preset_names, 3)) {
+            glUseProgram(renderer.active_id);
+            glUniform1i(renderer.loc_scene_preset, config.scene_preset);
+            resetAccumulation();
+        }
         //----- Preview Config -------------
         if(ImGui::CollapsingHeader("Preview", ImGuiTreeNodeFlags_DefaultOpen)) {
             int res = config.moving_resolution;

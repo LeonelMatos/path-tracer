@@ -1,5 +1,9 @@
 #include "cornell_scene.glsl"
 
+///Chooses the current render preset
+///\note 0 = mesh only; 1 = cornell + mesh; 2 = cornell only
+uniform int SCENE_PRESET;
+
 void intersects_mesh(const Ray ray, inout Hit h) {
     //AABB Early Rejection
     //Converts uniform min/max corners to center/half_size for boxT
@@ -116,8 +120,10 @@ bool intersects(const Ray ray, out Hit h) {
     h.material = MAT_DIFFUSE;
     h.ior      = 0.0;
 
-    //intersects_cornell(ray, h);
-    intersects_mesh(ray, h);
+    if(SCENE_PRESET == 1 || SCENE_PRESET == 2)
+        intersects_cornell(ray, h);
+    if(SCENE_PRESET == 0 || SCENE_PRESET == 1)
+        intersects_mesh(ray, h);
 
     return h.t < INF;
 }
