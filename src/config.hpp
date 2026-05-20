@@ -1,8 +1,10 @@
 #pragma once
 #include <string>
+#include <vector>
 #include <filesystem>
 #include <glm/glm.hpp>
 #include <GL/glew.h>
+#include <atomic>
 #include <glm/gtc/matrix_transform.hpp>
 
 ///\brief Program window resolution

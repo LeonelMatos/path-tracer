@@ -41,10 +41,11 @@
 #include "imgui/imgui_impl_glfw.h"
 #include "imgui/imgui_impl_opengl3.h"
 
-#include "config.hpp"
 #include "common/shader.hpp"
 #include "mesh.hpp"
 #include "bvh.hpp"
+#include "config.hpp"
+#include "loader.hpp"
 
 #define VERSION "1.3.1"
 
@@ -52,7 +53,7 @@ using namespace std;
 using namespace glm;
 
 /*----------------------------------------------------------
-  Global Variables
+Global Variables
 */
 
 struct Metrics {
@@ -110,6 +111,7 @@ void loadScene();
 void uploadConfig();
 void applyConfig();
 void uploadCamera();
+void uploadSun();
 bool transferDataToGPU(void);
 void cleanDataFromGPU();
 void display(void);
@@ -395,6 +397,26 @@ int main(void) {
     while (!glfwWindowShouldClose(window) && glfwGetKey(window, GLFW_KEY_ESCAPE) != GLFW_PRESS) {
         //avoids render lock when in preview rendering and reaches max samples(moving camera)
         bool is_moving = (renderer.render_w != WINDOW_WIDTH);
+        //Checks if needs new model loading
+        if(loader.upload_pending) {
+            glUseProgram(renderer.active_id);
+            uploadMesh(loader.pending_tris, loader.pending_mats, renderer.triangle_ssbo, renderer.material_ssbo);
+            uploadBVH(loader.pending_bvh, renderer.bvh_ssbo);
+
+            int light_count = uploadLights(loader.pending_tris, loader.pending_mats, renderer.light_ssbo);
+            analytic_lights.clear();
+            uploadSun();
+
+            MeshBounds& b = loader.pending_bounds;
+            glUniform1i(renderer.loc_tri_count, (int)loader.pending_tris.size());
+            glUniform1i(renderer.loc_light_count, light_count);
+            glUniform1i(renderer.loc_bvh_root, 0);
+            glUniform3f(renderer.loc_aabb_min, b.min_bound.x, b.min_bound.y, b.min_bound.z);
+            glUniform3f(renderer.loc_aabb_max, b.max_bound.x, b.max_bound.y, b.max_bound.z);
+
+            loader.upload_pending = false;
+            resetAccumulation();
+        }
         //Suspend the rendering after completion to avoid useless GPU processing
         if (renderer.MAX_SAMPLES > 0 && renderer.frame_id >= renderer.MAX_SAMPLES && !is_moving) {
             clock_gettime(CLOCK_MONOTONIC, &ts_start);
@@ -579,44 +601,36 @@ void loadScene() {
     }
     renderer.is_model_loading = true;
 
-    vector<GPUTriangle> tris; vector<GPUMaterial> mats;
+    std::thread([]{
+        vector<GPUTriangle> tris; vector<GPUMaterial> mats;
+        SceneModel& model = renderer.current_model;
+        MeshBounds bounds;
 
-    MeshBounds bounds;
+        
+        mat4 transform = translate(mat4(1.0f), model.position);
+        transform = rotate(transform, radians(model.rotation.x + 90.0f), vec3(1,0,0));
+        transform = rotate(transform, radians(model.rotation.y), vec3(0,1,0));
+        transform = rotate(transform, radians(model.rotation.z), vec3(0,0,1));
+        transform = scale(transform, model.scale);
+        
+        if (!loadMesh(model.path, tris, mats, transform, &bounds)) {
+            renderer.is_model_loading = false;
+            return;
+        }
+        
+        vector<BVHNode> bvh_nodes;
+        buildBVH(tris, bvh_nodes);
+        
+        model.tri_count = (int)tris.size();
+        model.mat_count = (int)mats.size();
 
-    SceneModel& model = renderer.current_model;
-
-    mat4 transform = translate(mat4(1.0f), model.position);
-    transform = rotate(transform, radians(model.rotation.x + 90.0f), vec3(1,0,0));
-    transform = rotate(transform, radians(model.rotation.y), vec3(0,1,0));
-    transform = rotate(transform, radians(model.rotation.z), vec3(0,0,1));
-    transform = scale(transform, model.scale);
-
-    if (!loadMesh(model.path, tris, mats, transform, &bounds)) return;
-    
-    vector<BVHNode> bvh_nodes;
-    buildBVH(tris, bvh_nodes);
-    
-    uploadMesh(tris, mats, renderer.triangle_ssbo, renderer.material_ssbo);
-    uploadBVH(bvh_nodes, renderer.bvh_ssbo);
-
-    model.tri_count = (int)tris.size();
-    model.mat_count = (int)mats.size();
-
-    renderer.is_model_loading = false;
-
-    //Lights
-    glUseProgram(renderer.active_id);
-    int light_count = uploadLights(tris, mats, renderer.light_ssbo);
-
-    analytic_lights.clear();
-    uploadSun();
-
-    glUniform1i(renderer.loc_tri_count, (int)tris.size());
-    glUniform1i(renderer.loc_light_count, light_count);
-    glUniform1i(renderer.loc_bvh_root, 0);
-    glUniform3f(renderer.loc_aabb_min, bounds.min_bound.x, bounds.min_bound.y, bounds.min_bound.z);
-    glUniform3f(renderer.loc_aabb_max, bounds.max_bound.x, bounds.max_bound.y, bounds.max_bound.z);
-
+        loader.pending_tris = tris;
+        loader.pending_mats = mats;
+        loader.pending_bvh  = bvh_nodes;
+        loader.pending_bounds = bounds;
+        loader.upload_pending = true;
+        renderer.is_model_loading = false;
+    }).detach();
 }
 
 bool transferDataToGPU(void) {
@@ -624,7 +638,7 @@ bool transferDataToGPU(void) {
 
     //Select shader
     renderer.active_id = USE_COMPUTE_SH ? renderer.pathtr_comp_id : renderer.pathtr_frag_id;
-
+    
     initUniforms();
 
     //Textures DSA
