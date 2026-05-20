@@ -27,6 +27,8 @@
 #include <time.h>
 #include <vector>
 #include <algorithm>
+#include <thread>
+#include <atomic>
 #define GLEW_NO_GLU
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -575,6 +577,7 @@ void loadScene() {
         resetAccumulation();
         return;
     }
+    renderer.is_model_loading = true;
 
     vector<GPUTriangle> tris; vector<GPUMaterial> mats;
 
@@ -599,6 +602,8 @@ void loadScene() {
     model.tri_count = (int)tris.size();
     model.mat_count = (int)mats.size();
 
+    renderer.is_model_loading = false;
+
     //Lights
     glUseProgram(renderer.active_id);
     int light_count = uploadLights(tris, mats, renderer.light_ssbo);
@@ -611,6 +616,7 @@ void loadScene() {
     glUniform1i(renderer.loc_bvh_root, 0);
     glUniform3f(renderer.loc_aabb_min, bounds.min_bound.x, bounds.min_bound.y, bounds.min_bound.z);
     glUniform3f(renderer.loc_aabb_max, bounds.max_bound.x, bounds.max_bound.y, bounds.max_bound.z);
+
 }
 
 bool transferDataToGPU(void) {
@@ -1056,14 +1062,16 @@ void drawUI() {
                 glUniform1i(renderer.loc_bvh_heatmap, renderer.bvh_heatmap ? 1 : 0);
                 resetAccumulation();
             }
+            ImGui::SetItemTooltip("Map of bounding boxes heatmap on the mesh.\nRed = Nodes intersects by more rays.");
             if (renderer.bvh_heatmap) {
                 ImGui::SameLine();
-                ImGui::SetNextItemWidth(100);
+                ImGui::SetNextItemWidth(120);
                 if(ImGui::SliderInt("Scale", &renderer.heatmap_scale, 5, 150)) {
                     glUseProgram(renderer.active_id);
                     glUniform1i(renderer.loc_bvh_heatmap_scale, renderer.heatmap_scale);
                     resetAccumulation();
                 }
+                ImGui::SetItemTooltip("Number of BVH nodes intersected per ray");
             }
         }
 
@@ -1124,8 +1132,31 @@ void drawUI() {
             }
         }
     }
-    
     ImGui::End();
+
+    //-- Model Loading Window -------------
+    if(renderer.is_model_loading) {
+        ImVec2 screen = io.DisplaySize;
+
+        ImGui::SetNextWindowPos(ImVec2(screen.x * 0.5f, screen.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(400, 100), ImGuiCond_Always);
+        ImGui::SetNextWindowBgAlpha(0.80f);
+        ImGui::Begin("##loading", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove);
+
+        ImGui::SetWindowFontScale(1.5f);
+        float text_w = ImGui::CalcTextSize("Loading Scene...").x;
+        ImGui::SetCursorPosX((400 - text_w) * 0.5f);
+        ImGui::Text("Loading Scene...");
+
+        ImGui::SetWindowFontScale(1.0f);
+        string model_name = filesystem::path(renderer.current_model.path).string();
+        float model_name_w = ImGui::CalcTextSize(model_name.c_str()).x;
+        ImGui::SetCursorPosX((400 - model_name_w) * 0.5f);
+        ImGui::TextDisabled("%s", model_name.c_str());
+
+        ImGui::End();
+    }
+    
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

@@ -70,6 +70,8 @@ struct Renderer {
     uint MAX_SAMPLES = 200;
 
     SceneModel current_model;
+
+    bool is_model_loading = false;
     
     GLuint display_id, pathtr_frag_id, pathtr_comp_id;
     GLuint active_id;
