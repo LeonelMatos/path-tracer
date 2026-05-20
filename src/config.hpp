@@ -98,6 +98,9 @@ struct Renderer {
     //BVH
     GLuint bvh_ssbo;
     GLint loc_bvh_root;
+    GLint loc_bvh_heatmap, loc_bvh_heatmap_scale;
+    bool bvh_heatmap = false;
+    int heatmap_scale = 30;
 
     //NEE
     GLint loc_use_nee;

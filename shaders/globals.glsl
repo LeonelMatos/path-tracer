@@ -6,9 +6,8 @@ const float INF = 1e30;
 const float EPS = 1e-5;
 const float EPS_TRI = 1e-10;
 
-uniform int DEPTH;
 
-
+//----------------------------------------------------------
 ///\defgroup camera Camera Settings
 ///\{
 ///Lens aperture `0.0` = pinhole (no DOF), normal values up to `0.3`
@@ -37,6 +36,7 @@ uniform vec3 camera_up;
 ///\}
 
 
+//----------------------------------------------------------
 ///\defgroup ambient Ambient Settings
 ///\{
 //Background types
@@ -49,6 +49,7 @@ uniform int BACKGROUND;
 ///\}
 
 
+//----------------------------------------------------------
 ///\defgroup tone_map Tone Mapping
 ///\{
 const int TM_NONE = 0;
@@ -59,6 +60,7 @@ uniform int TONE_MAPPING;
 ///\}
 
 
+//----------------------------------------------------------
 ///\defgroup path Path Tracer
 ///\{
 struct Ray {
@@ -73,6 +75,8 @@ struct Hit {
     int material;
     float ior;
 };
+
+uniform int DEPTH;
 
 uniform int SAMPLES_PER_PIXEL;
                                                                                                                     
@@ -97,6 +101,7 @@ uniform int USE_NEE;
 ///\}
 
 
+//----------------------------------------------------------
 ///\defgroup materials Materials
 ///\{
 const int MAT_DIFFUSE = 0;
@@ -106,6 +111,7 @@ const int MAT_TINTED_GLASS = 3;
 ///\}
 
 
+//----------------------------------------------------------
 //\defgroup light Light Types
 ///\{
 ///\note values need to sync in mesh.hpp
@@ -176,6 +182,7 @@ uniform int analytic_light_count;
 ///\}
 
 
+//----------------------------------------------------------
 ///\defgroup mesh_aabb AABB Early rejection
 ///\brief Bounding box of the loaded mesh to skip the triangle loop for
 ///rays that don't interact with the model. Improves performance
@@ -192,6 +199,7 @@ uniform int triangle_count;
 ///\}
 
 
+//----------------------------------------------------------
 ///\defgroup bvh BVH
 ///\{
 struct BVHNode {
@@ -210,5 +218,11 @@ layout(std430, binding = 8) buffer BVHBuffer {
 };
 
 uniform int bvh_root;
+
+///enables the BVH's heatmap view
+uniform int USE_BVH_HEATMAP;
+
+///nodes to saturate \note default 30
+uniform int BVH_HEATMAP_SCALE;
 
 ///\}

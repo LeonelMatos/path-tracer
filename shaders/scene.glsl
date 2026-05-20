@@ -87,28 +87,24 @@ void intersects_mesh(const Ray ray, inout Hit h) {
             }
         }
     }
-    /*
-    if (nodes_visited > 0) {
-        float heat = clamp(float(nodes_visited) / 30.0, 0.0, 1.0);
+    
+    if (USE_BVH_HEATMAP == 1) {
+        float heat = clamp(float(nodes_visited) / float(BVH_HEATMAP_SCALE), 0.0, 1.0);
         vec3 cold = vec3(0.0, 0.0, 1.0);
         vec3 warm = vec3(0.0, 1.0, 0.0);
         vec3 hot = vec3(1.0, 0.0, 0.0);
+
         vec3 heatmap_color = heat < 0.5 ? mix(cold, warm, heat * 2.0) : mix(warm, hot, (heat - 0.5) * 2.0);
-        
-        if (h.t < INF) {
-            h.albedo   = heatmap_color;
-        }
-        else {
-            h.t        = aabb_t;
-            h.pos      = ray.origin + aabb_t * ray.direction;
-            h.normal   = aabb_normal;
-            h.albedo   = vec3(1.0, 1.0, 0.0);
-            h.emission = vec3(0);
-            h.material = MAT_DIFFUSE;
-            h.ior      = 0.0;
-        }
+
+        h.t        = max(aabb_t, 0.001);
+        h.pos      = ray.origin + h.t * ray.direction;
+        h.normal   = vec3(0.0, 1.0, 0.0);
+        h.albedo   = heatmap_color;
+        h.emission = vec3(0.0);
+        h.material = MAT_DIFFUSE;
+        h.ior      = 1.0;
     }
-    */
+    
 }
 
 bool intersects(const Ray ray, out Hit h) {

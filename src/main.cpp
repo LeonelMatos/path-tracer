@@ -462,6 +462,8 @@ void initUniforms() {
     renderer.loc_aabb_min = glGetUniformLocation(active, "mesh_aabb_min");
     renderer.loc_aabb_max = glGetUniformLocation(active, "mesh_aabb_max");
     renderer.loc_bvh_root = glGetUniformLocation(active, "bvh_root");
+    renderer.loc_bvh_heatmap = glGetUniformLocation(active, "USE_BVH_HEATMAP");
+    renderer.loc_bvh_heatmap_scale = glGetUniformLocation(active, "BVH_HEATMAP_SCALE");
     renderer.loc_light_count = glGetUniformLocation(active, "light_count");
     renderer.loc_analytic_light_count = glGetUniformLocation(active, "analytic_light_count");
 
@@ -1047,6 +1049,22 @@ void drawUI() {
 
             ImGui::Checkbox("Show Grid", &renderer.show_grid);
             ImGui::SetItemTooltip("Grid not visible on screenshots\nRendered on top of the path tracer");
+
+
+            if(ImGui::Checkbox("BVH Heatmap", &renderer.bvh_heatmap)) {
+                glUseProgram(renderer.active_id);
+                glUniform1i(renderer.loc_bvh_heatmap, renderer.bvh_heatmap ? 1 : 0);
+                resetAccumulation();
+            }
+            if (renderer.bvh_heatmap) {
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(100);
+                if(ImGui::SliderInt("Scale", &renderer.heatmap_scale, 5, 150)) {
+                    glUseProgram(renderer.active_id);
+                    glUniform1i(renderer.loc_bvh_heatmap_scale, renderer.heatmap_scale);
+                    resetAccumulation();
+                }
+            }
         }
 
         if(ImGui::CollapsingHeader("Render", ImGuiTreeNodeFlags_DefaultOpen)) {
