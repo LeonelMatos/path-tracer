@@ -60,6 +60,16 @@ Ray cameraRayDOF(vec2 uv, int spp_index, uvec2 px) {
 }
 
 //----------------------------------------------------------
+//Environment Mapping
+
+vec3 sampleEnvMap(vec3 dir) {
+    float phi = atan(dir.y, dir.x);
+    float theta = acos(clamp(dir.z, -1.0, 1.0));
+    vec2 uv = vec2(phi / TWO_PI + 0.5, theta / PI);
+    return texture(env_map, uv).rgb;
+}
+
+//----------------------------------------------------------
 //Next Event Estimation
 
 vec3 sampleAnalyticLight(Hit h, int bounce, int spp_index, uvec2 px) {
@@ -198,17 +208,22 @@ vec3 pathTrace(vec2 uv, int spp_index, uvec2 px) {
     for (int b = 0; b < DEPTH; b++) {
         Hit h;
         if (!intersects(ray, h)) {
-            //Background Alternative Colors
-            switch(BACKGROUND) {
-                case BG_BLACK:
-                break;
-                case BG_WHITE:
-                    color += throughput * vec3(0.9);
-                break;
-                case BG_GRADIENT: //skybox-like
-                    float t = clamp(ray.direction.z * 0.5 + 0.5, 0.0, 1.0);
-                    color += throughput * mix(vec3(0), vec3(1), t);
-                break;
+            //Environment Mapping
+            if(USE_ENV_MAP == 1)
+                color += throughput * sampleEnvMap(ray.direction);
+            else {
+                //Background Alternative Colors
+                switch(BACKGROUND) {
+                    case BG_BLACK:
+                    break;
+                    case BG_WHITE:
+                        color += throughput * vec3(0.9);
+                    break;
+                    case BG_GRADIENT: //skybox-like
+                        float t = clamp(ray.direction.z * 0.5 + 0.5, 0.0, 1.0);
+                        color += throughput * mix(vec3(0), vec3(1), t);
+                    break;
+                }
             }
             break;
         }

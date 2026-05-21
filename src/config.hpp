@@ -38,7 +38,7 @@ struct RenderConfig {
     
     float cam_aperture = 0.00;
     float cam_focal_distance = 4.7;
-    float cam_fov = 30.0f;
+    float cam_fov = 80.0f;
     
     bool focal_debug = false;
     float focal_band_debug = 0.05;
@@ -120,6 +120,12 @@ struct Renderer {
 
     //Scene Presets
     GLint loc_scene_preset;
+
+    //HDRI Environment Map
+    GLuint env_map_tex = 0;
+    GLint loc_env_map;
+    GLint loc_use_env_map;
+    bool use_env_map = false;
 };
 
 struct CameraConfig {

@@ -46,6 +46,9 @@ const int BG_GRADIENT = 2;
 
 ///Color result if the ray doesn't reach the light
 uniform int BACKGROUND;
+
+uniform sampler2D env_map;
+uniform int USE_ENV_MAP;
 ///\}
 
 

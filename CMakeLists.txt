@@ -44,6 +44,7 @@ add_executable(pathtracer
     src/main.cpp
     src/mesh.cpp
     src/bvh.cpp
+    src/hdri.cpp
     common/shader.cpp
     include/imgui/imgui.cpp
     include/imgui/imgui_draw.cpp

@@ -46,8 +46,9 @@
 #include "bvh.hpp"
 #include "config.hpp"
 #include "loader.hpp"
+#include "hdri.hpp"
 
-#define VERSION "1.3.2"
+#define VERSION "1.3.3"
 
 using namespace std;
 using namespace glm;
@@ -522,6 +523,9 @@ void initUniforms() {
     renderer.grid_loc_cam_pos = glGetUniformLocation(renderer.grid_id, "camera_pos");
 
     renderer.loc_scene_preset = glGetUniformLocation(renderer.active_id, "SCENE_PRESET");
+
+    renderer.loc_env_map = glGetUniformLocation(active, "env_map");
+    renderer.loc_use_env_map = glGetUniformLocation(active, "USE_ENV_MAP");
 }
 
 void uploadConfig() {
@@ -1141,6 +1145,22 @@ void drawUI() {
             changed |= ImGui::Combo("Tone Map", &config.tone_mapping, tm_names, 3);
 
             if(changed) applyConfig();
+
+            static char env_path[256] = "../hdri/studio.hdr";
+
+            //Env Map
+            ImGui::InputText("Path", env_path, sizeof(env_path));
+            if(ImGui::Button("Load HDRI")) {
+                loadEnvMap(string(env_path), renderer);
+                resetAccumulation();
+            }
+            if(renderer.use_env_map) {
+                if(ImGui::Checkbox("Use Env Map", &renderer.use_env_map)) {
+                    glUseProgram(renderer.active_id);
+                    glUniform1i(renderer.loc_use_env_map, renderer.use_env_map ? 1 : 0);
+                    resetAccumulation();
+                }
+            }
         }
         if(ImGui::CollapsingHeader("Sun", ImGuiTreeNodeFlags_DefaultOpen)) {
             bool sun_changed = false;
