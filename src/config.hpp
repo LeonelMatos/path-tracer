@@ -126,6 +126,7 @@ struct Renderer {
     GLint loc_env_map;
     GLint loc_use_env_map;
     bool use_env_map = false;
+    std::string current_env_map = "";
 };
 
 struct CameraConfig {

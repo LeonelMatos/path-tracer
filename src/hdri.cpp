@@ -9,7 +9,7 @@ bool loadEnvMap(const string& path, Renderer& renderer) {
     int width, height;
     float* data = stbi_loadf(path.c_str(), &width, &height, nullptr, 3);
     if(!data) {
-        printf("ENVMAP: Failed to load env map: %s\n", path.c_str());
+        printf("\nENV MAP: Failed to load env map: %s\n", path.c_str());
         return false;
     }
 

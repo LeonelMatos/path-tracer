@@ -48,7 +48,7 @@
 #include "loader.hpp"
 #include "hdri.hpp"
 
-#define VERSION "1.3.3"
+#define VERSION "1.3.4"
 
 using namespace std;
 using namespace glm;
@@ -582,13 +582,30 @@ vector<string> scanModels(const string& models_dir) {
     vector<string> paths;
 
     if(!filesystem::exists(models_dir)) {
-        printf("Models directory not found: %s\n", models_dir.c_str());
+        printf("\nModels directory not found: %s\n", models_dir.c_str());
         return paths;
     }
 
     for (auto& entry: filesystem::recursive_directory_iterator(models_dir)) {
         string ext = entry.path().extension().string();
         if(ext == ".gltf" || ext == ".glb" || ext == ".obj" || ext == ".fbx")
+            paths.push_back(entry.path().string());
+    }
+    sort(paths.begin(), paths.end());
+    return paths;
+}
+
+vector<string> scanHDRI(const string& hdri_dir) {
+    vector<string> paths;
+
+    if(!filesystem::exists(hdri_dir)) {
+        printf("\nHDRI directory not found: %s\n", hdri_dir.c_str());
+        return paths;
+    }
+
+    for(auto& entry : filesystem::recursive_directory_iterator(hdri_dir)) {
+        string ext = entry.path().extension().string();
+        if(ext == ".hdr" || ext == ".exr")
             paths.push_back(entry.path().string());
     }
     sort(paths.begin(), paths.end());
@@ -872,6 +889,10 @@ void drawGrid() {
 static vector<string> model_list;
 static bool model_list_loaded = false;
 
+static vector<string> hdri_list;
+static bool hdri_list_loaded = false;
+static bool show_hdri_selector = false;
+
 void drawUI() {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
@@ -1136,30 +1157,52 @@ void drawUI() {
             ImGui::SetItemTooltip("Probability of ray survival after each bounce");
             changed |= resetBtn("*##rrsur", config.rr_max_survival, render_defaults.rr_max_survival);
     
-            ImGui::SeparatorText("Environment");
-    
-            const char* bg_names[] = {"Black", "White"};
-            changed |= ImGui::Combo("Background", &config.background, bg_names, 2);
-    
-            const char* tm_names[] = {"None", "Reinhard", "ACES"};
-            changed |= ImGui::Combo("Tone Map", &config.tone_mapping, tm_names, 3);
 
-            if(changed) applyConfig();
+            if(ImGui::CollapsingHeader("Environment", ImGuiTreeNodeFlags_DefaultOpen)) {
+                //Simple Background
+                const char* bg_names[] = {"Black", "White"};
+                changed |= ImGui::Combo("Background", &config.background, bg_names, 2);
 
-            static char env_path[256] = "../hdri/studio.hdr";
+                //Tone Mapping
+                const char* tm_names[] = {"None", "Reinhard", "ACES"};
+                changed |= ImGui::Combo("Tone Map", &config.tone_mapping, tm_names, 3);
+                
+                if(changed) applyConfig();
 
-            //Env Map
-            ImGui::InputText("Path", env_path, sizeof(env_path));
-            if(ImGui::Button("Load HDRI")) {
-                loadEnvMap(string(env_path), renderer);
-                resetAccumulation();
-            }
-            if(renderer.use_env_map) {
-                if(ImGui::Checkbox("Use Env Map", &renderer.use_env_map)) {
+
+                /// Environment Map HDRI
+                if(ImGui::Checkbox("Enable Env Map", &renderer.use_env_map)) {
                     glUseProgram(renderer.active_id);
                     glUniform1i(renderer.loc_use_env_map, renderer.use_env_map ? 1 : 0);
                     resetAccumulation();
                 }
+                //Current HDRI file
+                if(!renderer.current_env_map.empty()) {
+                    string env_name = filesystem::path(renderer.current_env_map).filename().string();
+                    ImGui::TextDisabled("%s", env_name.c_str());
+                }
+                else ImGui::TextDisabled("No env map loaded");
+
+                //Select env map
+                if(ImGui::SmallButton("Select Texture")) {
+                    show_hdri_selector = true;
+                    if(!hdri_list_loaded) {
+                        hdri_list = scanHDRI("../hdri");
+                        hdri_list_loaded = true;
+                    }
+                }
+
+                if(!renderer.current_env_map.empty()) {
+                    ImGui::SameLine();
+                    if(ImGui::SmallButton("Clear")) {
+                        renderer.current_env_map = "";
+                        renderer.use_env_map = false;
+                        glUseProgram(renderer.active_id);
+                        glUniform1i(renderer.loc_use_env_map, 0);
+                        resetAccumulation();
+                    }
+                }
+                ///See external window for env map selector, outside of the side windows
             }
         }
         if(ImGui::CollapsingHeader("Sun", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -1178,9 +1221,10 @@ void drawUI() {
     }
     ImGui::End();
 
+    ImVec2 screen = io.DisplaySize;
+
     //-- Model Loading Window -------------
     if(renderer.is_model_loading) {
-        ImVec2 screen = io.DisplaySize;
 
         ImGui::SetNextWindowPos(ImVec2(screen.x * 0.5f, screen.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
         ImGui::SetNextWindowSize(ImVec2(400, 100), ImGuiCond_Always);
@@ -1198,6 +1242,52 @@ void drawUI() {
         ImGui::SetCursorPosX((400 - model_name_w) * 0.5f);
         ImGui::TextDisabled("%s", model_name.c_str());
 
+        ImGui::End();
+    }
+
+    //-- Env Map Selector Window -------------
+    if(show_hdri_selector) {
+        ImGui::SetNextWindowPos(ImVec2(screen.x * 0.5f, screen.y * 0.5f), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(400, 350), ImGuiCond_Appearing);
+        
+        if(ImGui::Begin("Select Environment Map", &show_hdri_selector)) {
+            if(ImGui::SmallButton("Scan")) {
+                hdri_list = scanHDRI("../hdri");
+                hdri_list_loaded = true;
+            }
+            ImGui::SameLine();
+            ImGui::Text("%zu maps", hdri_list.size());
+            ImGui::Separator();
+
+            //HDRI list interface
+            ImGui::BeginChild("hdri_list", ImVec2(0, -30), true);
+            for(int i = 0; i < (int)hdri_list.size(); i++) {
+                const string& path = hdri_list[i];
+                string folder = filesystem::path(path).parent_path().filename().string();
+                string stem = filesystem::path(path).stem().string();
+                string name = folder + "/" + stem;
+                string label = name + "###hdri" + to_string(i);
+
+                bool selected = (filesystem::path(path).lexically_normal() == filesystem::path(renderer.current_env_map).lexically_normal());
+
+                if(ImGui::Selectable(label.c_str(), selected)) {
+                    loadEnvMap(path, renderer);
+                    renderer.current_env_map = path;
+                    renderer.use_env_map = true;
+                    glUseProgram(renderer.active_id);
+                    glUniform1i(renderer.loc_use_env_map, 1);
+                    resetAccumulation();
+                    show_hdri_selector = false;
+                }
+                if(ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("%s", path.c_str());
+                }
+            }
+            ImGui::EndChild();
+
+            if(ImGui::Button("Close", ImVec2(-1, 0)))
+                show_hdri_selector = false;
+        }
         ImGui::End();
     }
     
