@@ -48,7 +48,7 @@
 #include "loader.hpp"
 #include "hdri.hpp"
 
-#define VERSION "1.3.4"
+#define VERSION "1.3.5"
 
 using namespace std;
 using namespace glm;
@@ -631,9 +631,11 @@ void loadScene() {
         MeshBounds bounds;
 
         
+        //Hardcoded model position better facing the camera
         mat4 transform = translate(mat4(1.0f), model.position);
+        transform = translate(transform, vec3(0, 0, -1.0f));
         transform = rotate(transform, radians(model.rotation.x + 90.0f), vec3(1,0,0));
-        transform = rotate(transform, radians(model.rotation.y), vec3(0,1,0));
+        transform = rotate(transform, radians(model.rotation.y + 180.0f), vec3(0,1,0));
         transform = rotate(transform, radians(model.rotation.z), vec3(0,0,1));
         transform = scale(transform, model.scale);
         
@@ -1045,27 +1047,31 @@ void drawUI() {
             ImGui::EndChild();
         }
         if(ImGui::CollapsingHeader("Transform")) {
-            bool t_changed = false;
+            static bool t_changed = false;
             SceneModel& model = renderer.current_model;
 
             t_changed |= ImGui::DragFloat3("Position", value_ptr(model.position), 0.01f);
             t_changed |= ImGui::DragFloat3("Rotation", value_ptr(model.rotation), 1.0f, -360.0f, 360.0f, "%.1f°");
             t_changed |= ImGui::DragFloat("Scale", &model.scale.x, 0.01f, 0.001f, 100.0f);
-            if(t_changed) model.scale.y = model.scale.z = model.scale.x;
-
+            if(t_changed && model.scale.x != model.scale.y) model.scale.y = model.scale.z = model.scale.x;
+            
+            if(ImGui::Button("Apply")) {
+                if(t_changed && !model.path.empty()) {
+                    loadScene();
+                    resetAccumulation();
+                    t_changed = false;
+                }
+            }
+            
             ImGui::SameLine();
+            
             if(ImGui::Button("Reset##transform")) {
                 model.position = vec3(0.0f);
                 model.rotation = vec3(0.0f);
                 model.scale = vec3(1.0f);
-                t_changed = true;
-            }
-
-            if(t_changed && !model.path.empty()) {
                 loadScene();
                 resetAccumulation();
             }
-
             ImGui::Separator();
             ImGui::Text("%d triangles", model.tri_count);
             ImGui::Text("%d materials", model.mat_count);
