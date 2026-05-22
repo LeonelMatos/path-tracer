@@ -5,6 +5,7 @@ const float INV_PI = 1.0 / PI;
 const float INF = 1e30;
 const float EPS = 1e-5;
 const float EPS_TRI = 1e-10;
+const float EPS_SHADOW = 1e-3;
 
 
 //----------------------------------------------------------
@@ -101,6 +102,10 @@ uniform float RR_MAX_SURVIVAL;
 ///Enables NEE
 uniform int USE_NEE;
 
+/**Firefly Clamping. Env Maps can create residual fireflies from
+samples with high color variance that converge slowly, specially in shadows
+*/
+uniform float FIREFLY_CLAMP;
 ///\}
 
 

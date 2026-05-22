@@ -125,12 +125,15 @@ vec3 sampleAnalyticLight(Hit h, int bounce, int spp_index, uvec2 px) {
     float cos_surface = dot(h.normal, dir_light);
     if (cos_surface <= 0.0) return vec3(0);
 
+    ///Adaptive EPS for shadow rays to avoid self-intersection
+    float shadow_eps = max(EPS, length(h.pos) * EPS_SHADOW);
+
     Ray shadow_ray;
-    shadow_ray.origin = h.pos + h.normal * EPS;
+    shadow_ray.origin = h.pos + h.normal * shadow_eps;
     shadow_ray.direction = dir_light;
 
     Hit shadow_hit;
-    bool occluded = intersects(shadow_ray, shadow_hit) && shadow_hit.t < dist - EPS;
+    bool occluded = intersects(shadow_ray, shadow_hit) && shadow_hit.t < dist - shadow_eps;
 
     if (occluded) return vec3(0);
 
@@ -168,14 +171,17 @@ vec3 sampleEmissiveTriangles(Hit h, int bounce, int spp_index, uvec2 px) {
     float cos_light = dot(-dir_light, light_normal);
     if(cos_light <= 0.0) return vec3(0);
 
+    ///Adaptive EPS for shadow rays to avoid self-intersection
+    float shadow_eps = max(EPS, length(h.pos) * c);
+
     //check occlusion of shadow rays
     Ray shadow_ray;
-    shadow_ray.origin = h.pos + h.normal * EPS;
+    shadow_ray.origin = h.pos + h.normal * shadow_eps;
     shadow_ray.direction = dir_light;
 
     Hit shadow_hit;
     
-    bool occluded = intersects(shadow_ray, shadow_hit) && shadow_hit.t < dist - EPS;
+    bool occluded = intersects(shadow_ray, shadow_hit) && shadow_hit.t < dist - shadow_eps;
 
     if (occluded) return vec3(0);
 
@@ -313,5 +319,13 @@ vec3 pathTrace(vec2 uv, int spp_index, uvec2 px) {
             throughput /= survival;
         }
     }
+
+    // Firefly Clamp
+    if (FIREFLY_CLAMP > 0.0) {
+        float lum = dot(color, vec3(0.2126, 0.7152, 0.0722));
+        if (lum > FIREFLY_CLAMP)
+            color *= FIREFLY_CLAMP / lum;
+    }
+
     return color;
 }

@@ -516,6 +516,8 @@ void initUniforms() {
     
     renderer.loc_use_nee = glGetUniformLocation(active, "USE_NEE");
 
+    renderer.loc_firefly_clamp = glGetUniformLocation(active, "FIREFLY_CLAMP");
+
     renderer.grid_loc_view = glGetUniformLocation(renderer.grid_id, "view");
     renderer.grid_loc_proj = glGetUniformLocation(renderer.grid_id, "projection");
     renderer.grid_loc_near = glGetUniformLocation(renderer.grid_id, "near_plane");
@@ -544,6 +546,7 @@ void uploadConfig() {
     glUniform1i(renderer.loc_tone_map, config.tone_mapping);
     glUniform1i(renderer.loc_use_nee, config.use_nee ? 1 : 0);
     glUniform1i(renderer.loc_scene_preset, config.scene_preset);
+    glUniform1f(renderer.loc_firefly_clamp, config.firefly_clamp);
 }
 
 void applyConfig() {
@@ -1146,6 +1149,14 @@ void drawUI() {
     
             changed |= ImGui::Checkbox("NEE", &config.use_nee);
             ImGui::SetItemTooltip("Next Event Estimation\nDisable to compare with brute force");
+
+            int firefly_int = (int)config.firefly_clamp;
+            if(ImGui::SliderInt("Firefly Clamp", &firefly_int, 0, 100)) {
+                firefly_int = (firefly_int / 10) * 10;
+                config.firefly_clamp = (float)firefly_int;
+                changed = true;
+            }
+            ImGui::SetItemTooltip("0 = disabled\nLower = less fireflies, more bias");
 
             ImGui::SeparatorText("Russian Roulette");
     

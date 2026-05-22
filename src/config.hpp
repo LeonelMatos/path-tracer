@@ -52,6 +52,12 @@ struct RenderConfig {
     ///Enables Next Event Estimation
     bool use_nee = true;
 
+    /**Firefly clamping
+    \note 0 is disabled\n10 is default
+    */
+    float firefly_clamp = 10.0f;
+
+
     //Sun
     bool sun_enabled = true;
     float sun_elevation = 45.0f;
@@ -110,6 +116,9 @@ struct Renderer {
 
     //NEE
     GLint loc_use_nee;
+
+    // Firefly Clamp
+    GLint loc_firefly_clamp;
 
     //Light
     //memory buffers
