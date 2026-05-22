@@ -187,12 +187,12 @@ void onMouseButton(GLFWwindow* w, int button, int action, int mods) {
     }
 }
 
+///Simulate Unity's camera control speed multiplier
+///Use SHIFT + Mouse Scroll to change camera speed
 void onMouseScroll(GLFWwindow* w, double xoffset, double yoffset) {
-    //Simulate Unity's camera control speed multiplier
+    if(glfwGetKey(w, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS)
     camera.move_speed *= (yoffset > 0) ? 1.2f : 0.8f;
     camera.move_speed = std::clamp(camera.move_speed, 0.001f, 10.0f);
-
-    printf("\nMove speed: %.3f\n", camera.move_speed);
 }
 
 vec3 cameraForward() {
