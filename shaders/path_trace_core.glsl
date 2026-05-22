@@ -129,7 +129,7 @@ vec3 sampleAnalyticLight(Hit h, int bounce, int spp_index, uvec2 px) {
     float shadow_eps = max(EPS, length(h.pos) * EPS_SHADOW);
 
     Ray shadow_ray;
-    shadow_ray.origin = h.pos + h.normal * shadow_eps;
+    shadow_ray.origin = h.pos + h.geom_normal * shadow_eps;
     shadow_ray.direction = dir_light;
 
     Hit shadow_hit;
@@ -172,11 +172,11 @@ vec3 sampleEmissiveTriangles(Hit h, int bounce, int spp_index, uvec2 px) {
     if(cos_light <= 0.0) return vec3(0);
 
     ///Adaptive EPS for shadow rays to avoid self-intersection
-    float shadow_eps = max(EPS, length(h.pos) * c);
+    float shadow_eps = max(EPS, length(h.pos) * EPS_SHADOW);
 
     //check occlusion of shadow rays
     Ray shadow_ray;
-    shadow_ray.origin = h.pos + h.normal * shadow_eps;
+    shadow_ray.origin = h.pos + h.geom_normal * shadow_eps;
     shadow_ray.direction = dir_light;
 
     Hit shadow_hit;

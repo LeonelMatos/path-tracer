@@ -5,7 +5,7 @@ const float INV_PI = 1.0 / PI;
 const float INF = 1e30;
 const float EPS = 1e-5;
 const float EPS_TRI = 1e-10;
-const float EPS_SHADOW = 1e-3;
+const float EPS_SHADOW = 1e-2;
 
 
 //----------------------------------------------------------
@@ -75,7 +75,8 @@ struct Ray {
 ///ior = index of refraction (only used with MAT_GLASS)
 struct Hit {
     float t;
-    vec3 pos, normal, albedo, emission;
+    vec3 pos, normal, geom_normal;
+    vec3 albedo, emission;
     int material;
     float ior;
 };

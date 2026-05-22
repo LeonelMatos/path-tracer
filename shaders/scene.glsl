@@ -46,9 +46,15 @@ void intersects_mesh(const Ray ray, inout Hit h) {
                     
                     h.t = t;
                     h.pos = ray.origin + t * ray.direction;
+
+                    ///\bug when the smooth normal is valid I lose the geometric normal. I need to save both 
+                    ///fixed
                     h.normal = length(smooth_normal) > EPS_TRI ? normalize(smooth_normal) : tri_normal;
                     if (dot(ray.direction, h.normal) > 0.0)
                         h.normal = -h.normal;
+                        
+                    h.geom_normal = tri_normal;
+
                     h.albedo = gpu_materials[m_id].albedo.rgb;
                     h.emission = gpu_materials[m_id].emission.rgb;
                     h.material = gpu_materials[m_id].type;
@@ -100,25 +106,25 @@ void intersects_mesh(const Ray ray, inout Hit h) {
 
         vec3 heatmap_color = heat < 0.5 ? mix(cold, warm, heat * 2.0) : mix(warm, hot, (heat - 0.5) * 2.0);
 
-        h.t        = max(aabb_t, 0.001);
-        h.pos      = ray.origin + h.t * ray.direction;
-        h.normal   = vec3(0.0, 1.0, 0.0);
-        h.albedo   = heatmap_color;
-        h.emission = vec3(0.0);
-        h.material = MAT_DIFFUSE;
-        h.ior      = 1.0;
+        h.t         = max(aabb_t, 0.001);
+        h.pos       = ray.origin + h.t * ray.direction;
+        h.normal    = vec3(0.0, 1.0, 0.0);
+        h.albedo    = heatmap_color;
+        h.emission  = vec3(0.0);
+        h.material  = MAT_DIFFUSE;
+        h.ior       = 1.0;
     }
-    
 }
 
 bool intersects(const Ray ray, out Hit h) {
-    h.t        = INF;
-    h.pos      = vec3(0);
-    h.normal   = vec3(0, 0, 1);
-    h.albedo   = WHITE;
-    h.emission = vec3(0);
-    h.material = MAT_DIFFUSE;
-    h.ior      = 0.0;
+    h.t         = INF;
+    h.pos       = vec3(0);
+    h.normal    = vec3(0, 0, 1);
+    h.geom_normal = vec3(0, 0, 1);
+    h.albedo    = WHITE;
+    h.emission  = vec3(0);
+    h.material  = MAT_DIFFUSE;
+    h.ior       = 0.0;
 
     if(SCENE_PRESET == 1 || SCENE_PRESET == 2)
         intersects_cornell(ray, h);
