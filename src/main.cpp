@@ -1150,13 +1150,12 @@ void drawUI() {
             changed |= ImGui::Checkbox("NEE", &config.use_nee);
             ImGui::SetItemTooltip("Next Event Estimation\nDisable to compare with brute force");
 
-            int firefly_int = (int)config.firefly_clamp;
-            if(ImGui::SliderInt("Firefly Clamp", &firefly_int, 0, 100)) {
-                firefly_int = (firefly_int / 10) * 10;
-                config.firefly_clamp = (float)firefly_int;
+            bool hide_fireflies = (config.firefly_clamp > 0.0f);
+            if(ImGui::Checkbox("Hide Fireflies", &hide_fireflies)) {
+                config.firefly_clamp = hide_fireflies ? 10.0f : 0.0f;
                 changed = true;
             }
-            ImGui::SetItemTooltip("0 = disabled\nLower = less fireflies, more bias");
+            ImGui::SetItemTooltip("Reduces bright noise spots in dark areas");
 
             ImGui::SeparatorText("Russian Roulette");
     
