@@ -48,7 +48,7 @@
 #include "loader.hpp"
 #include "hdri.hpp"
 
-#define VERSION "1.3.5"
+#define VERSION "1.3.6"
 
 using namespace std;
 using namespace glm;
