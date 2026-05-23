@@ -920,7 +920,8 @@ void drawUI() {
                 return false;
             };
 
-    //-- Left Window -------------
+    //-----------------------------
+    //-- Left Window --------------
     ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_Always, ImVec2(0, 0));
     ImGui::SetNextWindowSize(ImVec2(WINDOW_WIDTH * 0.22f, WINDOW_HEIGHT - 20.0f), ImGuiCond_Always);
     
@@ -952,6 +953,33 @@ void drawUI() {
                 else screenshot_msg = "";
             }
         }
+
+        //----- Window -------------
+        if(ImGui::CollapsingHeader("Window")) {
+            const char* res_names[] = {
+                "1280x720", "1920x1080", "2560x1440", "Fullscreen"
+            };
+            const int res_w[] = {1280, 1920, 2560, 0};
+            const int res_h[] = {720, 1080, 1440, 0};
+
+            static int current_res = 0;
+
+            if(ImGui::Combo("Resolution", &current_res, res_names, 4)) {
+                //Fullsreen
+                if(current_res == 3) {
+                    GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+                    const GLFWvidmode* vid_mode = glfwGetVideoMode(monitor);
+                    glfwSetWindowMonitor(window, monitor, 0, 0, vid_mode->width, vid_mode->height, vid_mode->refreshRate);
+                }
+                //Window
+                else {
+                    glfwSetWindowMonitor(window, nullptr, 100, 100, res_w[current_res], res_h[current_res], 0);
+                }
+            }
+        }
+
+
+        //----- Camera -------------
         if(ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
             ImGui::Text("x = %.2f, y = %.2f, z = %.2f", camera.position.x, camera.position.y, camera.position.z);
 
@@ -993,6 +1021,7 @@ void drawUI() {
             }
             if(changed) applyConfig();
         }
+        //----- Models -------------
         if(ImGui::CollapsingHeader("Model Explorer", ImGuiTreeNodeFlags_DefaultOpen)) {
             if(renderer.current_model.path.empty()) {
                 ImGui::TextDisabled("Empty Scene\nSelect a model to load");
@@ -1049,6 +1078,7 @@ void drawUI() {
             }
             ImGui::EndChild();
         }
+        //----- Transform -------------
         if(ImGui::CollapsingHeader("Transform")) {
             static bool t_changed = false;
             SceneModel& model = renderer.current_model;
@@ -1083,6 +1113,7 @@ void drawUI() {
     }
     ImGui::End();
 
+    //-----------------------------
     //-- Right Window -------------
     ImGui::SetNextWindowPos(ImVec2(WINDOW_WIDTH - WINDOW_WIDTH * 0.22f - 10, 10), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(WINDOW_WIDTH * 0.22f, WINDOW_HEIGHT - 20.0f), ImGuiCond_Always);
