@@ -318,6 +318,10 @@ vec3 pathTrace(vec2 uv, int spp_index, uvec2 px) {
 
             throughput /= survival;
         }
+
+        // Early Termination
+        //Mostly works as a safeguard for the RR (removes rays with < 0.1% intensity)
+        if(max(throughput.r, max(throughput.g, throughput.b)) < 1) break;
     }
 
     // Firefly Clamp
