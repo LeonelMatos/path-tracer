@@ -40,7 +40,8 @@ int uploadAnalyticLights(const vector<GPULight>& lights, GLuint& out_ssbo) {
     return (int)lights.size();
 }
 
-bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMaterial>& materials, mat4 transform, MeshBounds* bounds) {\
+bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMaterial>& materials, vector<CPUMaterial>& cpu_materials, 
+    mat4 transform, MeshBounds* bounds) {
     //Initialize bounds
     if (bounds) {
         bounds->min_bound = vec3(FLT_MAX);
@@ -64,6 +65,7 @@ bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMate
     for (unsigned int m = 0; m < scene->mNumMaterials; m++) {
         aiMaterial* mat = scene->mMaterials[m];
         GPUMaterial gpu_mat{};
+        CPUMaterial cpu_mat{};
 
         aiColor3D color(0.8f, 0.8f, 0.8f);
         mat->Get(AI_MATKEY_COLOR_DIFFUSE, color);
@@ -71,8 +73,28 @@ bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMate
         gpu_mat.emission = vec4(0.0f);
         gpu_mat.type = 0;
         gpu_mat.ior = 1.5f;
+        gpu_mat.tex_index = -1;
+
+        //Get material texture
+        aiString tex_path;
+        if(mat->GetTexture(aiTextureType_DIFFUSE, 0, &tex_path) == AI_SUCCESS) {
+            string full_path;
+
+            //embedded texture glfw base 64
+            if(tex_path.data[0] == '*') {
+                cpu_mat.embedded_index = atoi(tex_path.C_Str() + 1);
+                cpu_mat.has_texture = 1;
+            }
+            //external texture
+            else {
+                filesystem::path model_dir = filesystem::path(path).parent_path();
+                cpu_mat.tex_path = (model_dir / tex_path.C_Str()).string();
+                cpu_mat.has_texture = 1;
+            }
+        }
 
         materials.push_back(gpu_mat);
+        cpu_materials.push_back(cpu_mat);
     }
     if(materials.empty()) {
         GPUMaterial default_mat{};

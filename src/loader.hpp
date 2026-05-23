@@ -14,6 +14,7 @@
 struct ModelLoader {
     std::vector<GPUTriangle> pending_tris;
     std::vector<GPUMaterial> pending_mats;
+    std::vector<CPUMaterial> pending_cpu_mats;
     std::vector<BVHNode> pending_bvh;
     MeshBounds pending_bounds;
     std::atomic<bool> upload_pending = false;

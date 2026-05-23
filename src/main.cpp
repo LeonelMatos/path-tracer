@@ -629,7 +629,7 @@ void loadScene() {
     renderer.is_model_loading = true;
 
     std::thread([]{
-        vector<GPUTriangle> tris; vector<GPUMaterial> mats;
+        vector<GPUTriangle> tris; vector<GPUMaterial> mats; vector<CPUMaterial> cpu_mats;
         SceneModel& model = renderer.current_model;
         MeshBounds bounds;
 
@@ -642,7 +642,7 @@ void loadScene() {
         transform = rotate(transform, radians(model.rotation.z), vec3(0,0,1));
         transform = scale(transform, model.scale);
         
-        if (!loadMesh(model.path, tris, mats, transform, &bounds)) {
+        if (!loadMesh(model.path, tris, mats, cpu_mats, transform, &bounds)) {
             renderer.is_model_loading = false;
             return;
         }
@@ -655,6 +655,7 @@ void loadScene() {
 
         loader.pending_tris = tris;
         loader.pending_mats = mats;
+        loader.pending_cpu_mats = cpu_mats;
         loader.pending_bvh  = bvh_nodes;
         loader.pending_bounds = bounds;
         loader.upload_pending = true;

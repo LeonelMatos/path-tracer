@@ -33,7 +33,15 @@ struct GPUMaterial {
     glm::vec4 emission;
     int type; //material
     float ior;
-    float _pad[2];
+    //-1 = no texture
+    int tex_index;
+    float _pad;
+};
+
+struct CPUMaterial {
+    int has_texture = 0;
+    string tex_path = "";
+    int embedded_index = -1;
 };
 
 ///\brief Mesh light storage to pass emissive triangles
@@ -81,7 +89,7 @@ int uploadAnalyticLights(const vector<GPULight>& lights, GLuint& light_ssbo);
 \return true if loaded correctly
 \see MeshBounds, uploadMesh
  */
-bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMaterial>& materials, mat4 transform = mat4(1.0f), MeshBounds* bounds = nullptr);
+bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMaterial>& materials, vector<CPUMaterial>& cpu_materials, mat4 transform, MeshBounds* bounds);
 
 bool uploadMesh(const vector<GPUTriangle>& triangles, const vector<GPUMaterial>& materials, GLuint& tri_ssbo, GLuint& mat_ssbo);
 

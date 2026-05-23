@@ -152,7 +152,8 @@ struct GPUMaterial {
     vec4 emission;
     int type;
     float ior;
-    float _pad[2];
+    int tex_index;
+    float _pad;
 };
 
 struct GPULight {
