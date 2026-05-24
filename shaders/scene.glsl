@@ -55,10 +55,18 @@ void intersects_mesh(const Ray ray, inout Hit h) {
                         
                     h.geom_normal = tri_normal;
 
-                    h.albedo = gpu_materials[m_id].albedo.rgb;
                     h.emission = gpu_materials[m_id].emission.rgb;
                     h.material = gpu_materials[m_id].type;
                     h.ior = gpu_materials[m_id].ior;
+
+                    if(gpu_materials[m_id].tex_index >= 0) {
+                        vec2 uv = triangles[i].v0.texcoord * tri_bary.z + triangles[i].v1.texcoord * tri_bary.x + triangles[i].v2.texcoord * tri_bary.y;
+                        vec3 tex_color = texture(tex_albedo, vec3(uv, float(gpu_materials[m_id].tex_index))).rgb;
+                        h.albedo = tex_color;
+                    }
+                    else {
+                        h.albedo = gpu_materials[m_id].albedo.rgb;
+        }
                 }
             }
         }

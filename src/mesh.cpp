@@ -77,7 +77,7 @@ bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMate
 
         //Get material texture
         aiString tex_path;
-        if(mat->GetTexture(aiTextureType_DIFFUSE, 0, &tex_path) == AI_SUCCESS) {
+        if(mat->GetTexture(aiTextureType_BASE_COLOR, 0, &tex_path) == AI_SUCCESS) {
             string full_path;
 
             //embedded texture glfw base 64

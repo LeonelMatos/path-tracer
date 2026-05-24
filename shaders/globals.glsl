@@ -156,6 +156,8 @@ struct GPUMaterial {
     float _pad;
 };
 
+uniform sampler2DArray tex_albedo;
+
 struct GPULight {
     vec4 position;
     vec4 emission;

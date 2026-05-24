@@ -46,9 +46,9 @@
 #include "bvh.hpp"
 #include "config.hpp"
 #include "loader.hpp"
-#include "hdri.hpp"
+#include "texture.hpp"
 
-#define VERSION "1.3.6"
+#define VERSION "1.4.0"
 
 using namespace std;
 using namespace glm;
@@ -398,7 +398,9 @@ int main(void) {
     while (!glfwWindowShouldClose(window) && glfwGetKey(window, GLFW_KEY_ESCAPE) != GLFW_PRESS) {
         //avoids render lock when in preview rendering and reaches max samples(moving camera)
         bool is_moving = (renderer.render_w != WINDOW_WIDTH);
+
         //Checks if needs new model loading
+        //Handling of mesh, textures and env maps running in parallel
         if(loader.upload_pending) {
             glUseProgram(renderer.active_id);
             uploadMesh(loader.pending_tris, loader.pending_mats, renderer.triangle_ssbo, renderer.material_ssbo);
@@ -414,6 +416,10 @@ int main(void) {
             glUniform1i(renderer.loc_bvh_root, 0);
             glUniform3f(renderer.loc_aabb_min, b.min_bound.x, b.min_bound.y, b.min_bound.z);
             glUniform3f(renderer.loc_aabb_max, b.max_bound.x, b.max_bound.y, b.max_bound.z);
+
+            uploadTexture(loader.pending_cpu_mats, loader.pending_mats, renderer);
+
+            glNamedBufferData(renderer.material_ssbo, loader.pending_mats.size() * sizeof(GPUMaterial), loader.pending_mats.data(), GL_STATIC_DRAW);
 
             loader.upload_pending = false;
             resetAccumulation();
@@ -528,6 +534,8 @@ void initUniforms() {
 
     renderer.loc_env_map = glGetUniformLocation(active, "env_map");
     renderer.loc_use_env_map = glGetUniformLocation(active, "USE_ENV_MAP");
+
+    renderer.loc_tex_array = glGetUniformLocation(active, "tex_albedo");
 }
 
 void uploadConfig() {

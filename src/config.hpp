@@ -136,6 +136,10 @@ struct Renderer {
     GLint loc_use_env_map;
     bool use_env_map = false;
     std::string current_env_map = "";
+
+    //Textures
+    GLuint tex_array = 0;
+    GLint loc_tex_array;
 };
 
 struct CameraConfig {
