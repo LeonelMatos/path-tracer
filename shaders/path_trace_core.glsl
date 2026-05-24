@@ -193,6 +193,40 @@ vec3 sampleEmissiveTriangles(Hit h, int bounce, int spp_index, uvec2 px) {
     return h.albedo * emission * cos_surface / (PI * pdf);
 }
 
+/**
+\note Because `cos_theta / (PI * pdf)` is 1.0, the last return value can be `return h.albedo * env_color`
+But I kept the entire formula
+*/
+vec3 sampleEnvLight(Hit h, int bounce, int spp_index, uvec2 px) {
+    if(USE_ENV_MAP == 0) return vec3(0);
+
+    vec3 r = rand3(bounce * 300, spp_index, px);
+
+    //Cosine-weighted hemisphere sampling
+    float cosT = sqrt(r.x);
+    float sinT = sqrt(1.0 - r.x);
+    float phi = TWO_PI * r.y;
+    vec3 local_dir = vec3(sinT * cos(phi), sinT * sin(phi), cosT);
+    vec3 world_dir = onb(h.normal) * local_dir;
+
+    //Shadow ray to check occlusion
+    float shadow_eps = max(EPS, length(h.pos) * EPS_SHADOW);
+    Ray shadow_ray;
+    shadow_ray.origin = h.pos + h.geom_normal * shadow_eps;
+    shadow_ray.direction = world_dir;
+
+    Hit shadow_hit;
+    if(intersects(shadow_ray, shadow_hit)) return vec3(0);
+
+    //Cosine-weighted sampling PDF = cos(theta) / PI
+    float cos_theta = max(dot(h.normal, world_dir), 0.0);
+    float pdf = cos_theta / PI;
+    if (pdf < 1e-4) return vec3(0);
+
+    vec3 env_color = sampleEnvMap(world_dir);
+    return h.albedo * env_color * cos_theta / (PI * pdf);
+}
+
 //----------------------------------------------------------
 //Path Tracer
 
@@ -255,6 +289,12 @@ vec3 pathTrace(vec2 uv, int spp_index, uvec2 px) {
         if (USE_NEE == 1 && h.material == MAT_DIFFUSE && light_count > 0) {
             color += throughput * sampleEmissiveTriangles(h, b, spp_index, px);
         }
+
+        //NEE on Environment Map HDRI
+        if (USE_NEE == 1 && h.material == MAT_DIFFUSE && USE_ENV_MAP == 1) {
+            color += throughput * sampleEnvLight(h, b, spp_index, px);
+        }
+
 
         vec3 r = rand3(b, spp_index, px);
 

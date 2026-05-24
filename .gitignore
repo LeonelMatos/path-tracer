@@ -47,5 +47,12 @@
 /build/*
 /docs/*
 
+# hdri
+/hdri/*
+
+!hdri/studio.hdr
+!hdri/abandoned_garage_2k.hdr
+!hdri/mirrored_hall_2k.hdr
+
 # scripts/notes
 *.py
