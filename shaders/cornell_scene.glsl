@@ -41,13 +41,14 @@ bool intersects_basic(const Ray ray, inout Hit h) {
 \return true if ray intersected with scene, false if ray escaped
 */
 bool intersects_cornell(const Ray ray, out Hit h) {
-    h.t        = INF;
-    h.pos      = vec3(0);
-    h.normal   = vec3(0, 0, 1);
-    h.albedo   = WHITE;
+    h.t = INF;
+    h.pos = vec3(0);
+    h.normal = vec3(0, 0, 1);
+    h.geom_normal = vec3(0, 0, 1);
+    h.albedo = WHITE;
     h.emission = vec3(0);
     h.material = MAT_DIFFUSE;
-    h.ior      = 0.0;
+    h.ior = 0.0;
 
     float ray_dist;
     vec3  hit_p;

@@ -48,7 +48,7 @@
 #include "loader.hpp"
 #include "texture.hpp"
 
-#define VERSION "1.4.0"
+#define VERSION "1.4.1"
 
 using namespace std;
 using namespace glm;
@@ -587,6 +587,21 @@ void uploadSun() {
     }
     uploadAnalyticLights(analytic_lights, renderer.analytic_light_ssbo);
     glUniform1i(renderer.loc_analytic_light_count, (int)analytic_lights.size());
+}
+
+///Brute-forced way to set the Cornell's top light to follow
+///the light types emissions, since now plain geometry aren't considered LIGHT types
+void uploadCornellTopLight() {
+    analytic_lights.clear();
+
+    if(config.scene_preset == 1 || config.scene_preset == 2) {
+        GPULight cornell_light{};
+        cornell_light.position = vec4(0.0f, 0.0f, 0.9f, 0.0f);
+        cornell_light.emission = vec4(5.0f, 5.0f, 5.0f, 0.0f);
+        cornell_light.type = LIGHT_POINT;
+        cornell_light.radius = 0.5f;
+        analytic_lights.push_back(cornell_light);
+    }
 }
 
 vector<string> scanModels(const string& models_dir) {
@@ -1134,6 +1149,20 @@ void drawUI() {
         if(ImGui::Combo("Scene Preset", &config.scene_preset, preset_names, 3)) {
             glUseProgram(renderer.active_id);
             glUniform1i(renderer.loc_scene_preset, config.scene_preset);
+            if(config.scene_preset == 2) {
+                camera.position = vec3(0.0f, -5.0f, 0.0f);
+                camera.yaw = glm::radians(90.0f);
+                camera.pitch = 0.0f;
+                camera.lookat = camera.position + cameraForward();
+                config.cam_fov = 30.0f;
+                uploadConfig();
+                uploadCamera();
+            }
+            else {
+                config.cam_fov = 80.0f;
+            }
+            uploadCornellTopLight();
+            uploadSun();
             resetAccumulation();
         }
         //----- Preview Config -------------

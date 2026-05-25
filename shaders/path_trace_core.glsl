@@ -202,6 +202,9 @@ vec3 sampleEnvLight(Hit h, int bounce, int spp_index, uvec2 px) {
 
     vec3 r = rand3(bounce * 300, spp_index, px);
 
+    ///Geometric normal safeguard for hits that don't have geom_normal but are forced to use it
+    vec3 safe_geom_normal = length(h.geom_normal) > 0.1 ? h.geom_normal : h.normal;
+
     //Cosine-weighted hemisphere sampling
     float cosT = sqrt(r.x);
     float sinT = sqrt(1.0 - r.x);
@@ -212,7 +215,7 @@ vec3 sampleEnvLight(Hit h, int bounce, int spp_index, uvec2 px) {
     //Shadow ray to check occlusion
     float shadow_eps = max(EPS, length(h.pos) * EPS_SHADOW);
     Ray shadow_ray;
-    shadow_ray.origin = h.pos + h.geom_normal * shadow_eps;
+    shadow_ray.origin = h.pos + safe_geom_normal * shadow_eps;
     shadow_ray.direction = world_dir;
 
     Hit shadow_hit;
