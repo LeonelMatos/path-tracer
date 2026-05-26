@@ -5,6 +5,8 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
+#include "stb_image.h"
+
 using namespace std;
 using namespace glm;
 
@@ -82,8 +84,34 @@ bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMate
 
             //embedded texture glfw base 64
             if(tex_path.data[0] == '*') {
-                cpu_mat.embedded_index = atoi(tex_path.C_Str() + 1);
-                cpu_mat.has_texture = 1;
+                int idx = atoi(tex_path.C_Str() + 1);
+                const aiTexture* tex = scene->mTextures[idx];
+
+                if (tex->mHeight == 0) {
+                    //Compressed png or jpg (jpg? jpeg?)
+                    int width, height, channels;
+                    unsigned char* decoded = stbi_load_from_memory((unsigned char*)tex->pcData, tex->mWidth,
+                                        &width, &height, &channels, 4);
+                    if (decoded) {
+                        cpu_mat.embedded_data = vector<unsigned char>(decoded, decoded + width * height * 4);
+                        cpu_mat.embedded_width = width;
+                        cpu_mat.embedded_height = height;
+                        cpu_mat.has_texture = 1;
+                        stbi_image_free(decoded);
+                    }
+                    else {
+                        printf("MESH: loadMesh() failed to decode embedded texture %d\n", idx);
+                    }
+                }
+                else {
+                    //Raw RGBA
+                    int size = tex->mWidth * tex->mHeight * 4;
+                    cpu_mat.embedded_data = vector<unsigned char>((unsigned char* )tex->pcData, (unsigned char*)tex->pcData + size);
+                    cpu_mat.embedded_width = tex->mWidth;
+                    cpu_mat.embedded_height = tex->mHeight;
+                    cpu_mat.has_texture = 1;
+                }
+                
             }
             //external texture
             else {

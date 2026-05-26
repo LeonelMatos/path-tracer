@@ -42,6 +42,10 @@ struct CPUMaterial {
     int has_texture = 0;
     string tex_path = "";
     int embedded_index = -1;
+    //Embedded texture data
+    std::vector<unsigned char> embedded_data;
+    int embedded_width = 0;
+    int embedded_height = 0;
 };
 
 ///\brief Mesh light storage to pass emissive triangles

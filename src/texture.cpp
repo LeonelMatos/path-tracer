@@ -66,11 +66,25 @@ bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>
         const CPUMaterial& cpu_mat = cpu_materials[i];
         if (!cpu_mat.has_texture) continue;
 
-        int w, h, channels;
-        unsigned char* data = stbi_load(cpu_mat.tex_path.c_str(), &w, &h, &channels, 4);
-        if(!data) {
-            printf("\nTEXTURES: Failed to load %s\n", cpu_mat.tex_path.c_str());
-            continue;
+        int w, h;
+        unsigned char* data = nullptr;
+        unsigned char* to_free = nullptr;
+
+        //data already decoded at CPUMaterial
+        if(!cpu_mat.embedded_data.empty()) {
+            data = const_cast<unsigned char*>(cpu_mat.embedded_data.data());
+            w = cpu_mat.embedded_width;
+            h = cpu_mat.embedded_height;
+        }
+        //external texture, load from disk
+        else {
+            int channels;
+            data = stbi_load(cpu_mat.tex_path.c_str(), &w, &h, &channels, 4);
+            to_free = data;
+            if(!data) {
+                printf("\nTEXTURES: Failed to load %s\n", cpu_mat.tex_path.c_str());
+                continue;
+            }
         }
 
         //Texture resize to TEX_SIZE for uniformity
@@ -89,11 +103,10 @@ bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>
         //connects mat index to layer
         gpu_materials[i].tex_index = i;
 
-        stbi_image_free(data);
-        if(resized)
-            free(resized);
+        if(to_free) stbi_image_free(to_free);
+        if(resized) free(resized);
 
-        printf("\nLoaded layer %d: %s (%dx%d)\n", i, cpu_mat.tex_path.c_str(), w, h);
+        printf("\tLoaded texture layer %d: %s (%dx%d)\n", i, cpu_mat.tex_path.c_str(), w, h);
     }
 
     //Texture bind
