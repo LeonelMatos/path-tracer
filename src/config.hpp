@@ -52,11 +52,13 @@ struct RenderConfig {
     ///Enables Next Event Estimation
     bool use_nee = true;
 
+    ///Texture enable
+    bool use_textures = true;
+
     /**Firefly clamping
     \note 0 is disabled\n10 is default
     */
     float firefly_clamp = 10.0f;
-
 
     //Sun
     bool sun_enabled = true;
@@ -140,6 +142,7 @@ struct Renderer {
     //Textures
     GLuint tex_array = 0;
     GLint loc_tex_array;
+    GLint loc_use_textures;
 };
 
 struct CameraConfig {

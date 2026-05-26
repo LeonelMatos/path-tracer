@@ -48,7 +48,7 @@
 #include "loader.hpp"
 #include "texture.hpp"
 
-#define VERSION "1.4.1"
+#define VERSION "1.4.2"
 
 using namespace std;
 using namespace glm;
@@ -536,6 +536,7 @@ void initUniforms() {
     renderer.loc_use_env_map = glGetUniformLocation(active, "USE_ENV_MAP");
 
     renderer.loc_tex_array = glGetUniformLocation(active, "tex_albedo");
+    renderer.loc_use_textures = glGetUniformLocation(active, "USE_TEXTURES");
 }
 
 void uploadConfig() {
@@ -555,6 +556,7 @@ void uploadConfig() {
     glUniform1i(renderer.loc_use_nee, config.use_nee ? 1 : 0);
     glUniform1i(renderer.loc_scene_preset, config.scene_preset);
     glUniform1f(renderer.loc_firefly_clamp, config.firefly_clamp);
+    glUniform1i(renderer.loc_use_textures, config.use_textures ? 1 : 0);
 }
 
 void applyConfig() {
@@ -1218,6 +1220,9 @@ void drawUI() {
     
             changed |= ImGui::Checkbox("NEE", &config.use_nee);
             ImGui::SetItemTooltip("Next Event Estimation\nDisable to compare with brute force");
+
+            changed |= ImGui::Checkbox("Textures", &config.use_textures);
+            ImGui::SetItemTooltip("Enable textures on model");
 
             bool hide_fireflies = (config.firefly_clamp > 0.0f);
             if(ImGui::Checkbox("Hide Fireflies", &hide_fireflies)) {
