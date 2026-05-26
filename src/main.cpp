@@ -537,6 +537,8 @@ void initUniforms() {
 
     renderer.loc_tex_array = glGetUniformLocation(active, "tex_albedo");
     renderer.loc_use_textures = glGetUniformLocation(active, "USE_TEXTURES");
+
+    renderer.loc_force_material = glGetUniformLocation(active, "FORCE_MATERIAL");   
 }
 
 void uploadConfig() {
@@ -1105,7 +1107,7 @@ void drawUI() {
             ImGui::EndChild();
         }
         //----- Transform -------------
-        if(ImGui::CollapsingHeader("Transform")) {
+        if(ImGui::CollapsingHeader("Transform/Mesh")) {
             static bool t_changed = false;
             SceneModel& model = renderer.current_model;
 
@@ -1132,9 +1134,31 @@ void drawUI() {
                 resetAccumulation();
             }
             ImGui::Separator();
+            const char* mat_names[] = {"Disabled", "Diffuse", "Mirror", "Glass", "Tinted Glass"};
+            int mat_idx = config.force_material + 1;
+            if(ImGui::Combo("Force Material", &mat_idx, mat_names, 5)) {
+                config.force_material = mat_idx - 1;
+                glUseProgram(renderer.active_id);
+                glUniform1i(renderer.loc_force_material, config.force_material);
+                resetAccumulation();
+            }
+
             ImGui::Text("%d triangles", model.tri_count);
             ImGui::Text("%d materials", model.mat_count);
             ImGui::Text("%s", filesystem::path(model.path).filename().string().c_str());
+        }
+        for (int i = 0; i < (int)loader.pending_cpu_mats.size(); i++) {
+            const CPUMaterial& cpu_mat = loader.pending_cpu_mats[i];
+            const GPUMaterial& gpu_mat = loader.pending_mats[i];
+
+            const char* type_name = "Diffuse";
+            if(gpu_mat.type == 1) type_name = "Mirror";
+            if(gpu_mat.type == 2) type_name = "Glass";
+            if(gpu_mat.type == 3) type_name = "Tinted Glass";
+
+            ImGui::Text("[%d] %s | tex:%d | ior:%.2f", i, type_name, gpu_mat.tex_index, gpu_mat.ior);
+            if(cpu_mat.has_texture)
+                ImGui::TextDisabled("  %s", cpu_mat.tex_path.c_str());
         }
     }
     ImGui::End();

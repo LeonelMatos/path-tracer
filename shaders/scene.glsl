@@ -56,7 +56,12 @@ void intersects_mesh(const Ray ray, inout Hit h) {
                     h.geom_normal = tri_normal;
 
                     h.emission = gpu_materials[m_id].emission.rgb;
+                    
                     h.material = gpu_materials[m_id].type;
+                    if(FORCE_MATERIAL >= 0) {
+                        h.material = FORCE_MATERIAL;
+                    }
+
                     h.ior = gpu_materials[m_id].ior;
 
                     //Texture sample

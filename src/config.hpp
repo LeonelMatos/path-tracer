@@ -52,6 +52,10 @@ struct RenderConfig {
     ///Enables Next Event Estimation
     bool use_nee = true;
 
+    ///Forces one material on the mesh
+    ///\note -1 = disabled
+    int force_material = -1;
+
     ///Texture enable
     bool use_textures = true;
 
@@ -143,6 +147,9 @@ struct Renderer {
     GLuint tex_array = 0;
     GLint loc_tex_array;
     GLint loc_use_textures;
+
+    //Materials
+    GLint loc_force_material;
 };
 
 struct CameraConfig {
