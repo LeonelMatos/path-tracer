@@ -803,8 +803,9 @@ void draw(void) {
         glBindImageTexture(1, renderer.tex[renderer.prev_f], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
 
         //Dispatch 16x16 work groups
-        int groups_x = (renderer.render_w + COMPUTE_LOCAL_X - 1) / 16;
-        int groups_y = (renderer.render_h + COMPUTE_LOCAL_Y - 1) / 16;
+        int groups_x = (renderer.render_w + COMPUTE_LOCAL_X - 1) / COMPUTE_LOCAL_X;
+        int groups_y = (renderer.render_h + COMPUTE_LOCAL_Y - 1) / COMPUTE_LOCAL_X;
+        
         glDispatchCompute(groups_x, groups_y, 1);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     }

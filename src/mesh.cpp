@@ -10,6 +10,11 @@
 using namespace std;
 using namespace glm;
 
+#define MAT_DIFFUSE 0
+#define MAT_MIRROR 1
+#define MAT_GLASS 2
+#define MAT_TINTED_GLASS 3
+
 int uploadLights(const vector<GPUTriangle>& triangles, const vector<GPUMaterial>& materials, GLuint& out_light_ssbo) {
     vector<int> light_indices;
 
@@ -73,9 +78,48 @@ bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMate
         mat->Get(AI_MATKEY_COLOR_DIFFUSE, color);
         gpu_mat.albedo = vec4(color.r, color.g, color.b, 1.0f);
         gpu_mat.emission = vec4(0.0f);
-        gpu_mat.type = 0;
+        gpu_mat.type = MAT_DIFFUSE;
         gpu_mat.ior = 1.5f;
         gpu_mat.tex_index = -1;
+
+        //Material type + properties
+
+        //Light emission
+        aiColor3D emission(0.0f, 0.0f, 0.0f);
+        mat->Get(AI_MATKEY_COLOR_EMISSIVE, emission);
+        if(emission.r > 0.01f || emission.g > 0.01f || emission.b > 0.01f) {
+            float emissive_strength = 1.0f;
+            mat->Get(AI_MATKEY_EMISSIVE_INTENSITY, emissive_strength);
+            gpu_mat.emission = vec4(emission.r, emission.g, emission.b, 0.0f) * emissive_strength;
+        }
+
+        //Transmission (Glass)
+        float transmission = 0.0f;
+        mat->Get(AI_MATKEY_TRANSMISSION_FACTOR, transmission);
+        float opacity = 1.0f;
+        mat->Get(AI_MATKEY_OPACITY, opacity);
+        
+        if(transmission > 0.5f) {
+            gpu_mat.type = MAT_GLASS;
+            float ior = 1.5f;
+            mat->Get(AI_MATKEY_REFRACTI, ior);
+            gpu_mat.ior = ior;
+        }
+        else if (opacity < 0.5f) {
+            gpu_mat.type = MAT_TINTED_GLASS; //(not tested, I'll ignore it)
+            ///\bug don't know if this will work well with spectral rendering
+        }
+        else {
+            //Metallic <-> Mirror
+            float metallic = 0.0f, roughness = 1.0f;
+            mat->Get(AI_MATKEY_METALLIC_FACTOR, metallic);
+            mat->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughness);
+            if(metallic > 0.8f && roughness < 0.1f)
+                gpu_mat.type = MAT_MIRROR;
+            ///\bug this is a very incorrect way to force the mirror type, but I don't have metallic/roughness
+            ///value types, so it is what it is...
+        }
+        printf("\tMaterial %d   ( type=%d ior=%.2f emission=(%.2f,%.2f,%.2f) )\n", m, gpu_mat.type, gpu_mat.ior, gpu_mat.emission.r, gpu_mat.emission.g, gpu_mat.emission.b);
 
         //Get material texture
         aiString tex_path;
@@ -127,7 +171,7 @@ bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMate
     if(materials.empty()) {
         GPUMaterial default_mat{};
         default_mat.albedo = vec4(0.8f, 0.8f, 0.8f, 1.0f);
-        default_mat.type = 0;
+        default_mat.type = MAT_DIFFUSE;
         materials.push_back(default_mat);
     }
 
@@ -218,7 +262,7 @@ vector<GPUTriangle> makeTestMesh() {
     GPUMaterial mat;
     mat.albedo = vec4(0.0f, 0.0f, 0.0f, 1.0f);
     mat.emission = vec4(0.0f);
-    mat.type = 0;
+    mat.type = MAT_DIFFUSE;
     mat.ior = 0.0f;
 
     vec3 A = vec3(-0.4, 0.0, 0.1);

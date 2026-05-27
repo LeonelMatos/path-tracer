@@ -49,7 +49,8 @@ struct BVHBuilder {
 
         calculate_aabb(tris, start, count, nodes[node_id].aabb_min, nodes[node_id].aabb_max);
 
-        if(count <= 4) {
+        //Leaf size, number of triangles (default =4)
+        if(count <= 8) {
             nodes[node_id].left_child = -1;
             nodes[node_id].right_child = -1;
             nodes[node_id].first_tri = start;
