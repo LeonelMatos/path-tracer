@@ -48,7 +48,7 @@
 #include "loader.hpp"
 #include "texture.hpp"
 
-#define VERSION "1.4.2"
+#define VERSION "1.4.5"
 
 using namespace std;
 using namespace glm;
@@ -101,6 +101,7 @@ void onMouseMove(GLFWwindow* w, double x, double y);
 void onMouseButton(GLFWwindow* w, int button, int action, int mods);
 void onMouseScroll(GLFWwindow* w, double xoffset, double yoffset);
 void onWindowResize(GLFWwindow* w, int width, int height);
+void toggleFullscreen();
 vec3 cameraForward();
 void setPreviewResolution();
 void setFullResolution();
@@ -121,6 +122,7 @@ void resetAccumulation();
 void draw(void);
 void saveScreenshot();
 void drawGrid();
+void syncResolutionDropdown();
 void drawUI();
 
 /*----------------------------------------------------------
@@ -133,6 +135,9 @@ void onKeyPress(GLFWwindow* window, int key, int scancode, int action, int mods)
     switch (key) {
         case GLFW_KEY_F12:
             saveScreenshot();
+        break;
+        case GLFW_KEY_F11:
+            toggleFullscreen();
         break;
         case GLFW_KEY_R:
             resetAccumulation();
@@ -342,10 +347,28 @@ void onWindowResize(GLFWwindow* window, int width, int height) {
     renderer.render_w = width;
     renderer.render_h = height;
 
+    syncResolutionDropdown();
+
     glUseProgram(renderer.active_id);
     glUniform2f(renderer.loc_res, (float)width, (float)height);
 
     resetAccumulation();
+}
+
+void toggleFullscreen() {
+    if(!is_fullscreen) {
+        glfwGetWindowPos(window, &windowed_x, &windowed_y);
+        glfwGetWindowSize(window, &windowed_w, &windowed_h);
+
+        GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+        const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+        glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
+        is_fullscreen = true;
+    }
+    else {
+        glfwSetWindowMonitor(window, nullptr, windowed_x, windowed_y, windowed_w, windowed_h, 0);
+        is_fullscreen = false;
+    }
 }
 
 //----------------------------------------------------------
@@ -927,6 +950,23 @@ static vector<string> hdri_list;
 static bool hdri_list_loaded = false;
 static bool show_hdri_selector = false;
 
+inline int current_res_idx = 0;
+const int res_w[] = {1280, 1920, 2560, 4096, 0, 0};
+const int res_h[] = {720, 1080, 1440, 2160, 0, 0};
+
+void syncResolutionDropdown() {
+    if(is_fullscreen) {
+        current_res_idx = 4;
+    }
+    current_res_idx = 5;
+    for(int i = 0; i < 4; i++) {
+        if(WINDOW_WIDTH == res_w[i] && WINDOW_HEIGHT == res_h[i]) {
+            current_res_idx = i;
+            break;
+        }
+    }
+}
+
 void drawUI() {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
@@ -986,25 +1026,21 @@ void drawUI() {
         //----- Window -------------
         if(ImGui::CollapsingHeader("Window")) {
             const char* res_names[] = {
-                "1280x720", "1920x1080", "2560x1440", "Fullscreen"
+                "1280x720", "1920x1080", "2560x1440", "4096x2160", "Fullscreen", "Custom"
             };
-            const int res_w[] = {1280, 1920, 2560, 0};
-            const int res_h[] = {720, 1080, 1440, 0};
-
-            static int current_res = 0;
-
-            if(ImGui::Combo("Resolution", &current_res, res_names, 4)) {
+            if(ImGui::Combo("Resolution", &current_res_idx, res_names, 6)) {
                 //Fullsreen
-                if(current_res == 3) {
-                    GLFWmonitor* monitor = glfwGetPrimaryMonitor();
-                    const GLFWvidmode* vid_mode = glfwGetVideoMode(monitor);
-                    glfwSetWindowMonitor(window, monitor, 0, 0, vid_mode->width, vid_mode->height, vid_mode->refreshRate);
-                }
+                if(current_res_idx == 4)
+                    toggleFullscreen();
                 //Window
-                else {
-                    glfwSetWindowMonitor(window, nullptr, 100, 100, res_w[current_res], res_h[current_res], 0);
+                else if (current_res_idx < 4) {
+                    if(is_fullscreen)
+                        toggleFullscreen();
+                    glfwSetWindowMonitor(window, nullptr, 100, 100, res_w[current_res_idx], res_h[current_res_idx], 0);
                 }
             }
+            if(current_res_idx == 5)
+                ImGui::TextDisabled("%dx%d", WINDOW_WIDTH, WINDOW_HEIGHT);
         }
 
 

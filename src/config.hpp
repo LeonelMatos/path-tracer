@@ -9,6 +9,9 @@
 
 ///\brief Program window resolution
 inline int WINDOW_WIDTH = 1280, WINDOW_HEIGHT = 720;
+inline bool is_fullscreen = false;
+inline int windowed_x = 100, windowed_y = 100;
+inline int windowed_w = 1280, windowed_h = 720;
 
 /**Switches between using fragment or compute shaders
 for the path tracer
