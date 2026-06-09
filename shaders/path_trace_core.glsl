@@ -271,15 +271,18 @@ vec3 pathTrace(vec2 uv, int spp_index, uvec2 px) {
             break;
         }
 
-        if(b == 0) {
-            if(FOCAL_DEBUG) {
-                float dist_to_focal = abs(h.t - CAM_FOCAL_DISTANCE);
-                if(dist_to_focal < FOCAL_BAND_DEBUG)
-                    color += vec3(0.0, 1.0, 0.0) * 0.5;
-            }
+        //Focal debug only on 1st bounce
+        if(b == 0 && FOCAL_DEBUG) {
+            float dist_to_focal = abs(h.t - CAM_FOCAL_DISTANCE);
+            if(dist_to_focal < FOCAL_BAND_DEBUG)
+                color += vec3(0.0, 1.0, 0.0) * 0.5;
+        }
 
-            color += throughput * h.emission;
-            if (dot(h.emission, h.emission) > 0.0) break;
+        //Avoids double counting with NEE for emission
+        if (dot(h.emission, h.emission) > 0.0) {
+            if(b == 0 || USE_NEE == 0) 
+                color += throughput * h.emission;
+            break;
         }
 
         //NEE
@@ -294,10 +297,10 @@ vec3 pathTrace(vec2 uv, int spp_index, uvec2 px) {
         }
 
         //NEE on Environment Map HDRI
-        if (USE_NEE == 1 && h.material == MAT_DIFFUSE && USE_ENV_MAP == 1) {
+        //Env map lighting only affects up-to 3 bounces for performance
+        if (USE_NEE == 1 && h.material == MAT_DIFFUSE && USE_ENV_MAP == 1 && b < 3) {
             color += throughput * sampleEnvLight(h, b, spp_index, px);
         }
-
 
         vec3 r = rand3(b, spp_index, px);
 
@@ -364,7 +367,7 @@ vec3 pathTrace(vec2 uv, int spp_index, uvec2 px) {
 
         // Early Termination
         //Mostly works as a safeguard for the RR (removes rays with < 0.1% intensity)
-        //if(max(throughput.r, max(throughput.g, throughput.b)) < 0.001) break;
+        if(max(throughput.r, max(throughput.g, throughput.b)) < 0.001) break;
     }
 
     // Firefly Clamp
