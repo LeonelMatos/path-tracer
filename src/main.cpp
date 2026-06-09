@@ -48,7 +48,8 @@
 #include "loader.hpp"
 #include "texture.hpp"
 
-#define VERSION "1.4.5"
+#define VERSION "1.4.6"
+#define VERSION_NOTE "With Optimization"
 
 using namespace std;
 using namespace glm;
@@ -82,7 +83,7 @@ RenderConfig config;
 
 #define WINDOW_TITLE "Path Tracer"
 
-#define WINDOW_TITLE_VERSION WINDOW_TITLE " v" VERSION
+#define WINDOW_TITLE_VERSION WINDOW_TITLE " v" VERSION " - " VERSION_NOTE
 
 static const int COMPUTE_LOCAL_X = 16;
 static const int COMPUTE_LOCAL_Y = 16;
