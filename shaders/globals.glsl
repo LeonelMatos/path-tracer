@@ -50,6 +50,13 @@ uniform int BACKGROUND;
 
 uniform sampler2D env_map;
 uniform int USE_ENV_MAP;
+
+//Ground
+///Enable the ground
+uniform int USE_GROUND_PLANE;
+uniform float GROUND_ELEVATION;
+uniform float GROUND_ALBEDO;
+uniform float GROUND_RADIUS;
 ///\}
 
 

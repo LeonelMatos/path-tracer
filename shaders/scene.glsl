@@ -13,6 +13,25 @@ void intersects_mesh(const Ray ray, inout Hit h) {
     vec3 aabb_normal;
     float aabb_t = boxT(ray, aabb_center, aabb_half_size, 0.0, 0.0, aabb_normal);
 
+    if(USE_GROUND_PLANE == 1) {
+        float ray_dist = planeT_Z(ray, GROUND_ELEVATION);
+        if(ray_dist > 0.0 && ray_dist < h.t) {
+            vec3 hit_plane = ray.origin + ray_dist * ray.direction;
+            float dist_from_center = length(hit_plane.xy);
+            
+            if(dist_from_center < GROUND_RADIUS) {
+                h.t = ray_dist;
+                h.pos = hit_plane;
+                h.normal = vec3(0,0,1);
+                h.geom_normal = vec3(0,0,1);
+                h.albedo = vec3(GROUND_ALBEDO);
+                h.emission = vec3(0);
+                h.material = MAT_DIFFUSE;
+                h.ior = 0.0;
+            } 
+        }
+    }
+
     if(aabb_t >= h.t) return;
 
     int stack[128];

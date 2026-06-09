@@ -48,7 +48,7 @@
 #include "loader.hpp"
 #include "texture.hpp"
 
-#define VERSION "1.4.6"
+#define VERSION "1.4.8"
 #define VERSION_NOTE ""
 
 using namespace std;
@@ -563,6 +563,11 @@ void initUniforms() {
     renderer.loc_use_textures = glGetUniformLocation(active, "USE_TEXTURES");
 
     renderer.loc_force_material = glGetUniformLocation(active, "FORCE_MATERIAL");   
+
+    renderer.loc_use_ground_plane = glGetUniformLocation(active, "USE_GROUND_PLANE");
+    renderer.loc_ground_elevation = glGetUniformLocation(active, "GROUND_ELEVATION");
+    renderer.loc_ground_albedo = glGetUniformLocation(active, "GROUND_ALBEDO");
+    renderer.loc_ground_radius = glGetUniformLocation(active, "GROUND_RADIUS");
 }
 
 void uploadConfig() {
@@ -583,6 +588,10 @@ void uploadConfig() {
     glUniform1i(renderer.loc_scene_preset, config.scene_preset);
     glUniform1f(renderer.loc_firefly_clamp, config.firefly_clamp);
     glUniform1i(renderer.loc_use_textures, config.use_textures ? 1 : 0);
+    glUniform1i(renderer.loc_use_ground_plane, config.use_ground_plane ? 1 : 0);
+    glUniform1f(renderer.loc_ground_elevation, config.ground_elevation);
+    glUniform1f(renderer.loc_ground_albedo, config.ground_albedo);
+    glUniform1f(renderer.loc_ground_radius, config.ground_radius);
 }
 
 void applyConfig() {
@@ -1265,7 +1274,7 @@ void drawUI() {
                 ImGui::SetItemTooltip("Number of BVH nodes intersected per ray");
             }
         }
-
+        //----- RENDER -------------
         if(ImGui::CollapsingHeader("Render", ImGuiTreeNodeFlags_DefaultOpen)) {
             
             int samples = (int)renderer.MAX_SAMPLES;
@@ -1293,6 +1302,7 @@ void drawUI() {
             }
             ImGui::SetItemTooltip("Reduces bright noise spots in dark areas");
 
+            //----- RR -------------
             ImGui::SeparatorText("Russian Roulette");
     
             bool rr_enabled = (config.rr_min_bounces > 0);
@@ -1309,7 +1319,8 @@ void drawUI() {
             ImGui::SetItemTooltip("Probability of ray survival after each bounce");
             changed |= resetBtn("*##rrsur", config.rr_max_survival, render_defaults.rr_max_survival);
     
-
+            
+            //----- Environment -------------
             if(ImGui::CollapsingHeader("Environment", ImGuiTreeNodeFlags_DefaultOpen)) {
                 //Simple Background
                 const char* bg_names[] = {"Black", "White"};
@@ -1320,7 +1331,6 @@ void drawUI() {
                 changed |= ImGui::Combo("Tone Map", &config.tone_mapping, tm_names, 3);
                 
                 if(changed) applyConfig();
-
 
                 /// Environment Map HDRI
                 if(ImGui::Checkbox("Enable Env Map", &renderer.use_env_map)) {
@@ -1355,6 +1365,17 @@ void drawUI() {
                     }
                 }
                 ///See external window for env map selector, outside of the side windows
+
+                if(ImGui::CollapsingHeader("Ground Plane")) {
+                    bool gp_changed = false;
+                    gp_changed |= ImGui::Checkbox("Enable plane", &config.use_ground_plane);
+                    if(config.use_ground_plane) {
+                        gp_changed |= ImGui::SliderFloat("Elevation", &config.ground_elevation, -5.0f, 5.0f, "%.2f");
+                        gp_changed |= ImGui::SliderFloat("Albedo", &config.ground_albedo, 0.0f, 1.0f, "%.2f");
+                        gp_changed |= ImGui::SliderFloat("Radius", &config.ground_radius, 1.0f, 30.0f, "%.1f");
+                    }
+                    if(gp_changed) applyConfig();
+                }
             }
         }
         if(ImGui::CollapsingHeader("Sun", ImGuiTreeNodeFlags_DefaultOpen)) {

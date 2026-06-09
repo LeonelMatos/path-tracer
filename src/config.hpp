@@ -38,6 +38,11 @@ struct RenderConfig {
     int background = 1;
     
     int tone_mapping = 2;
+
+    bool use_ground_plane = false;
+    float ground_elevation = -1.0f;
+    float ground_albedo = 0.8f;
+    float ground_radius = 5.0f;
     
     float cam_aperture = 0.00;
     float cam_focal_distance = 4.7;
@@ -153,6 +158,12 @@ struct Renderer {
 
     //Materials
     GLint loc_force_material;
+
+    //Ground plane
+    GLint loc_use_ground_plane;
+    GLint loc_ground_elevation;
+    GLint loc_ground_albedo;
+    GLint loc_ground_radius;
 };
 
 struct CameraConfig {
