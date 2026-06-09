@@ -234,6 +234,19 @@ vec3 sampleEnvLight(Hit h, int bounce, int spp_index, uvec2 px) {
 //Path Tracer
 
 /**
+Used to debug the brute-force path tracer for only the primary ray,
+no bounces, no materials, no optimizations, no NEE
+\return hit normal in color
+*/
+vec3 pathTraceDebug(vec2 uv, int spp_index, uvec2 px) {
+    Ray ray = cameraRayDOF(uv, spp_index, px);
+    Hit h;
+    if(!intersects(ray, h)) return vec3(0);
+    return h.normal * 0.5 + 0.5;
+}
+
+
+/**
 Traces a path for each pixel and returns the radiance
 \param uv pixel coordinates [0,1]
 \return vec3 color
@@ -246,6 +259,8 @@ vec3 pathTrace(vec2 uv, int spp_index, uvec2 px) {
     Ray ray = cameraRayDOF(uv, spp_index, px);
     vec3 color = vec3(0);
     vec3 throughput = vec3(1);
+
+    int diffuse_bounces = 0;
 
     //foreach ray bounce
     for (int b = 0; b < DEPTH; b++) {
@@ -297,8 +312,8 @@ vec3 pathTrace(vec2 uv, int spp_index, uvec2 px) {
         }
 
         //NEE on Environment Map HDRI
-        //Env map lighting only affects up-to 3 bounces for performance
-        if (USE_NEE == 1 && h.material == MAT_DIFFUSE && USE_ENV_MAP == 1 && b < 3) {
+        //Env map lighting only affects up-to 2 bounces for performance
+        if (USE_NEE == 1 && h.material == MAT_DIFFUSE && USE_ENV_MAP == 1 && b < 2) {
             color += throughput * sampleEnvLight(h, b, spp_index, px);
         }
 
@@ -307,6 +322,9 @@ vec3 pathTrace(vec2 uv, int spp_index, uvec2 px) {
         switch(h.material) {
             //Diffuse Materials
             case MAT_DIFFUSE: {
+                //Reduces diffuse bounces without losing quality because of NEE
+                if(diffuse_bounces++ >= 2 && USE_NEE == 1) break;
+
                 //Cosine-weighted hemisphere
                 float cosT = sqrt(r.x);
                 float sinT = sqrt(1.0 - r.x);

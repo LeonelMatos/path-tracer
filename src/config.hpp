@@ -32,8 +32,8 @@ struct RenderConfig {
 
     int depth = 5;
     int samples_per_pixel = 1;
-    int rr_min_bounces = 3;
-    float rr_max_survival = 0.75;
+    int rr_min_bounces = 2;
+    float rr_max_survival = 0.60;
     
     int background = 1;
     
@@ -86,7 +86,7 @@ struct Renderer {
 
     int v_sync = 0;
 
-    uint MAX_SAMPLES = 200;
+    uint MAX_SAMPLES = 100;
 
     SceneModel current_model;
 

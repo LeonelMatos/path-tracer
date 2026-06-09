@@ -49,7 +49,7 @@
 #include "texture.hpp"
 
 #define VERSION "1.4.6"
-#define VERSION_NOTE "With Optimization"
+#define VERSION_NOTE ""
 
 using namespace std;
 using namespace glm;
