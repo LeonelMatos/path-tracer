@@ -1370,9 +1370,9 @@ void drawUI() {
                     bool gp_changed = false;
                     gp_changed |= ImGui::Checkbox("Enable plane", &config.use_ground_plane);
                     if(config.use_ground_plane) {
-                        gp_changed |= ImGui::SliderFloat("Elevation", &config.ground_elevation, -5.0f, 5.0f, "%.2f");
-                        gp_changed |= ImGui::SliderFloat("Albedo", &config.ground_albedo, 0.0f, 1.0f, "%.2f");
-                        gp_changed |= ImGui::SliderFloat("Radius", &config.ground_radius, 1.0f, 30.0f, "%.1f");
+                        gp_changed |= ImGui::SliderFloat("Elevation##ground", &config.ground_elevation, -5.0f, 5.0f, "%.2f");
+                        gp_changed |= ImGui::SliderFloat("Albedo##ground", &config.ground_albedo, 0.0f, 1.0f, "%.2f");
+                        gp_changed |= ImGui::SliderFloat("Radius##ground", &config.ground_radius, 1.0f, 30.0f, "%.1f");
                     }
                     if(gp_changed) applyConfig();
                 }
@@ -1380,11 +1380,11 @@ void drawUI() {
         }
         if(ImGui::CollapsingHeader("Sun", ImGuiTreeNodeFlags_DefaultOpen)) {
             bool sun_changed = false;
-            sun_changed |= ImGui::Checkbox("Enable", &config.sun_enabled);
-            sun_changed |= ImGui::SliderFloat("Elevation", &config.sun_elevation, 0.0f, 90.0f, "%.1f°");
-            sun_changed |= ImGui::SliderFloat("Horizontal", &config.sun_azimuth, 0.0f, 360.0f, "%.1f°");
-            sun_changed |= ImGui::SliderFloat("Intensity", &config.sun_intensity, 0.0f, 20.0f, "%.1f");
-            sun_changed |= ImGui::ColorEdit3("Color", value_ptr(config.sun_color));
+            sun_changed |= ImGui::Checkbox("Enable##sun", &config.sun_enabled);
+            sun_changed |= ImGui::SliderFloat("Elevation##sun", &config.sun_elevation, 0.0f, 90.0f, "%.1f°");
+            sun_changed |= ImGui::SliderFloat("Horizontal##sun", &config.sun_azimuth, 0.0f, 360.0f, "%.1f°");
+            sun_changed |= ImGui::SliderFloat("Intensity##sun", &config.sun_intensity, 0.0f, 20.0f, "%.1f");
+            sun_changed |= ImGui::ColorEdit3("Color##sun", value_ptr(config.sun_color));
 
             if(sun_changed) {
                 uploadSun();
