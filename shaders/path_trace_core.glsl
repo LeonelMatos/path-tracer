@@ -133,7 +133,7 @@ vec3 sampleAnalyticLight(Hit h, int bounce, int spp_index, uvec2 px) {
     shadow_ray.direction = dir_light;
 
     Hit shadow_hit;
-    bool occluded = intersects(shadow_ray, shadow_hit) && shadow_hit.t < dist - shadow_eps;
+    bool occluded = intersects(shadow_ray, shadow_hit) && shadow_hit.t < dist - shadow_eps && shadow_hit.material != MAT_SHADOW_CATCHER;
 
     if (occluded) return vec3(0);
 
@@ -181,7 +181,7 @@ vec3 sampleEmissiveTriangles(Hit h, int bounce, int spp_index, uvec2 px) {
 
     Hit shadow_hit;
     
-    bool occluded = intersects(shadow_ray, shadow_hit) && shadow_hit.t < dist - shadow_eps;
+    bool occluded = intersects(shadow_ray, shadow_hit) && shadow_hit.t < dist - shadow_eps && shadow_hit.material != MAT_SHADOW_CATCHER;
 
     if (occluded) return vec3(0);
 
@@ -200,7 +200,7 @@ But I kept the entire formula
 vec3 sampleEnvLight(Hit h, int bounce, int spp_index, uvec2 px) {
     if(USE_ENV_MAP == 0) return vec3(0);
 
-    vec3 r = rand3(bounce * 300, spp_index, px);
+    vec3 r = rand3(bounce + 300, spp_index, px);
 
     ///Geometric normal safeguard for hits that don't have geom_normal but are forced to use it
     vec3 safe_geom_normal = length(h.geom_normal) > 0.1 ? h.geom_normal : h.normal;
@@ -219,7 +219,7 @@ vec3 sampleEnvLight(Hit h, int bounce, int spp_index, uvec2 px) {
     shadow_ray.direction = world_dir;
 
     Hit shadow_hit;
-    if(intersects(shadow_ray, shadow_hit)) return vec3(0);
+    if(intersects(shadow_ray, shadow_hit) && shadow_hit.material != MAT_SHADOW_CATCHER) return vec3(0);
 
     //Cosine-weighted sampling PDF = cos(theta) / PI
     float cos_theta = max(dot(h.normal, world_dir), 0.0);
@@ -390,7 +390,7 @@ vec4 pathTrace(vec2 uv, int spp_index, uvec2 px) {
                     }
                 }
                 if(in_shadow) {
-                    color = vec3(0.3);
+                    color = vec3(0.0);
                     alpha = GROUND_SHADOW_OPACITY;
                 }
                 else {

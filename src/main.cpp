@@ -48,7 +48,7 @@
 #include "loader.hpp"
 #include "texture.hpp"
 
-#define VERSION "1.5.0"
+#define VERSION "1.5.1"
 #define VERSION_NOTE ""
 
 using namespace std;
@@ -825,7 +825,7 @@ void resetAccumulation() {
 */
 void draw(void) {
     struct timespec ts_now;
-    double time_now, time_elapsed;
+    double time_now, time_elapsed = 0.0;
 
     processMovement();
     
@@ -841,7 +841,7 @@ void draw(void) {
 
         //Dispatch 16x16 work groups
         int groups_x = (renderer.render_w + COMPUTE_LOCAL_X - 1) / COMPUTE_LOCAL_X;
-        int groups_y = (renderer.render_h + COMPUTE_LOCAL_Y - 1) / COMPUTE_LOCAL_X;
+        int groups_y = (renderer.render_h + COMPUTE_LOCAL_Y - 1) / COMPUTE_LOCAL_Y;
         
         glDispatchCompute(groups_x, groups_y, 1);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
