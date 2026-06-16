@@ -11,7 +11,7 @@ bool loadEnvMap(const string& path, Renderer& renderer) {
     int width, height;
     float* data = stbi_loadf(path.c_str(), &width, &height, nullptr, 3);
     if(!data) {
-        printf("\nENV MAP: Failed to load env map: %s\n", path.c_str());
+        printf("\n[ENVMAP] Failed to load env map: %s\n", path.c_str());
         return false;
     }
 
@@ -33,7 +33,7 @@ bool loadEnvMap(const string& path, Renderer& renderer) {
     glUniform1i(renderer.loc_use_env_map, 1);
     renderer.use_env_map = true;
 
-    printf("\nENVMAP: Loaded env map %s (%dx%d)\n", path.c_str(), width, height);
+    printf("\n[ENVMAP] %s  (%dx%d)\n", path.c_str(), width, height);
     return true;
 }
 
@@ -46,7 +46,7 @@ bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>
         if(m.has_texture) tex_count++;
 
     if (tex_count == 0) {
-        printf("\nTEXTURES: Model has no textures to upload\n");
+        printf("\n[TEXTURES] Model has no textures to upload\n");
         return false;
     }
 
@@ -82,7 +82,7 @@ bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>
             data = stbi_load(cpu_mat.tex_path.c_str(), &w, &h, &channels, 4);
             to_free = data;
             if(!data) {
-                printf("\nTEXTURES: Failed to load %s\n", cpu_mat.tex_path.c_str());
+                printf("\n[TEXTURES] Failed to load %s\n", cpu_mat.tex_path.c_str());
                 continue;
             }
         }
@@ -106,7 +106,7 @@ bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>
         if(to_free) stbi_image_free(to_free);
         if(resized) free(resized);
 
-        printf("\tLoaded texture layer %d: %s (%dx%d)\n", i, cpu_mat.tex_path.c_str(), w, h);
+        printf("[TEXTURES] Loaded %d: %s (%dx%d)\n", i, cpu_mat.tex_path.c_str(), w, h);
     }
 
     //Texture bind
@@ -114,7 +114,7 @@ bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>
     glUseProgram(renderer.active_id);
     glUniform1i(renderer.loc_tex_array, 3);
 
-    printf("TEXTURES: Uploaded %d textures to array (%dx%d)\n", tex_count, TEX_SIZE, TEX_SIZE);
+    printf("[TEXTURES] Uploaded %d textures to array (%dx%d)\n", tex_count, TEX_SIZE, TEX_SIZE);
     return true;
 }
 

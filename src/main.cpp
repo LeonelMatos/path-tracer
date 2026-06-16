@@ -48,7 +48,7 @@
 #include "loader.hpp"
 #include "texture.hpp"
 
-#define VERSION "1.5.1"
+#define VERSION "1.5.2"
 #define VERSION_NOTE ""
 
 using namespace std;
@@ -88,7 +88,7 @@ RenderConfig config;
 static const int COMPUTE_LOCAL_X = 16;
 static const int COMPUTE_LOCAL_Y = 16;
 
-const char* txt_sep = "----------------------------";
+const char* txt_sep = "---------------------------------------------";
 
 
 vector<GPULight> analytic_lights;
@@ -411,8 +411,9 @@ int main(void) {
     if(!transferDataToGPU())
         return -1;
     
-    printf("%s\n%s v%s\nResolution: %dx%d\n", txt_sep, WINDOW_TITLE, VERSION, WINDOW_WIDTH, WINDOW_HEIGHT);
-    printf("Shader: %s\nPress \tESC to quit\n \tF12 to screenshot render\n \t0 or H to center camera\n%s\n", USE_COMPUTE_SH ? "Compute" : "Fragment", txt_sep);
+    printf("%s\n%s v%s\nResolution: %dx%d", txt_sep, WINDOW_TITLE, VERSION, WINDOW_WIDTH, WINDOW_HEIGHT);
+    printf("\tUsing %s shader", USE_COMPUTE_SH ? "Compute" : "Fragment");
+    printf("\n\tESC   quit\n\tF12   screenshot render\n\tH/0   center camera\n\tR     reset accumulation\n%s\n", txt_sep);
 
     //Time init
     struct timespec ts, ts_start, ts_end;
@@ -601,7 +602,7 @@ void uploadConfig() {
 void applyConfig() {
     uploadConfig();
     resetAccumulation();
-    printf("\nConfig applied, accumulation reset\n");
+    printf("\n[RENDERER] Config applied, resetting accumulation\n");
 }
 
 void uploadCamera() {
@@ -861,7 +862,7 @@ void draw(void) {
     renderer.frame_id++;
 
     if(renderer.frame_id == (int)renderer.MAX_SAMPLES)
-        printf("\n%s\nRender complete - %d samples in %.1fs\n", txt_sep, renderer.frame_id, time_elapsed);
+        printf("\n%s\n|Render complete| %d samples in %.01fs\n", txt_sep, renderer.frame_id, time_elapsed);
     
     //Step 2 Display: accumulated texture to screen
     display();
@@ -887,7 +888,7 @@ void draw(void) {
         
         formatTime(time_elapsed, metrics.time_buf, sizeof(metrics.time_buf));
 
-        printf("\rSamples/pixel: %d | FPS: %.1f | %.1fms/frame | %.1f | Time:%s",
+        printf("\r\tSample Count: %d | FPS: %.1f : %.1fms/frame | %.1fMS/s | Time:%s",
             renderer.frame_id, metrics.fps, metrics.ms_frame, metrics.samples_per_s / 1e6, metrics.time_buf);
         fflush(stdout);
     }
@@ -927,7 +928,7 @@ void saveScreenshot() {
     stbi_write_png(filename, WINDOW_WIDTH, WINDOW_HEIGHT, 3, pixels.data(), WINDOW_WIDTH * 3);
     screenshot_msg = string("Saved ") + filename;
     screenshot_msg_time = glfwGetTime();
-    printf("\nSaved screenshot %s\n", filename);
+    printf("\n[SCREENSHOT] Saved %s\n", filename);
 }
 
 /// @brief Renders the world view grid

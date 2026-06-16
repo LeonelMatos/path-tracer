@@ -96,10 +96,10 @@ struct BVHBuilder {
 
 bool buildBVH(vector<GPUTriangle>& triangles, vector<BVHNode>& bvh_nodes) {
     if (triangles.empty()) {
-        printf("\tBVH: No triangles to build\n");
+        printf("\t[BVH] No triangles to build\n");
         return false;
     }
-    printf("\tBVH: Building BVH\n");
+    printf("[BVH] Building...\n");
     bvh_nodes.clear();
     bvh_nodes.reserve(triangles.size() * 2);
 
@@ -113,7 +113,7 @@ bool buildBVH(vector<GPUTriangle>& triangles, vector<BVHNode>& bvh_nodes) {
 
     builder.build(0, triangles.size());
 
-    printf("\tBVH: %zu nodes for %zu triangles\n", bvh_nodes.size(), triangles.size());
+    printf("\n\t[BVH] %zu nodes for %zu triangles\n", bvh_nodes.size(), triangles.size());
     return true;
 }
 

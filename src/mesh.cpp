@@ -63,7 +63,7 @@ bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMate
         fprintf(stderr, "ASSIMP error loading path '%s': %s\n", path.c_str(), importer.GetErrorString());
         return false;
     }
-    printf("Loading %s : %d meshes, %d materials\n", path.c_str(), scene->mNumMeshes, scene->mNumMaterials);
+    printf("\n[MODEL] Loading %s : %d meshes, %d materials\n", path.c_str(), scene->mNumMeshes, scene->mNumMaterials);
 
     mat3 normal_mat = transpose(inverse(mat3(transform)));
 
@@ -144,7 +144,7 @@ bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMate
                         stbi_image_free(decoded);
                     }
                     else {
-                        printf("MESH: loadMesh() failed to decode embedded texture %d\n", idx);
+                        printf("[MODEL] loadMesh() failed to decode embedded texture %d\n", idx);
                     }
                 }
                 else {
@@ -217,10 +217,10 @@ bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMate
             triangles.push_back(tri);
         }
     }
-    printf("\tTotal %zu triangles, %zu materials", triangles.size(), materials.size());
+    printf("\n\tTotal %zu triangles, %zu materials", triangles.size(), materials.size());
 
     if(bounds)
-        printf("\n\tBounds: (%.2f,%.2f,%.2f) to (%.2f,%.2f,%.2f)\n",
+        printf("\n\tBounds: (%.2f,%.2f,%.2f),(%.2f,%.2f,%.2f)\n",
              bounds->min_bound.x, bounds->min_bound.y, bounds->min_bound.z,
              bounds->max_bound.x, bounds->max_bound.y, bounds->max_bound.z);
 
