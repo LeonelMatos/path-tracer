@@ -284,7 +284,6 @@ vec4 pathTrace(vec2 uv, int spp_index, uvec2 px) {
                     break;
                 }
             }
-            alpha = 0.0;
             break;
         }
 
