@@ -50,8 +50,6 @@ void intersects_mesh(const Ray ray, inout Hit h) {
                     ///\bug when the smooth normal is valid I lose the geometric normal. I need to save both 
                     ///fixed
                     h.normal = length(smooth_normal) > EPS_TRI ? normalize(smooth_normal) : tri_normal;
-                    if (dot(ray.direction, h.normal) > 0.0)
-                        h.normal = -h.normal;
                         
                     h.geom_normal = tri_normal;
 

@@ -126,7 +126,7 @@ vec3 sampleAnalyticLight(Hit h, int bounce, int spp_index, uvec2 px) {
     if (cos_surface <= 0.0) return vec3(0);
 
     ///Adaptive EPS for shadow rays to avoid self-intersection
-    float shadow_eps = max(EPS, length(h.pos) * EPS_SHADOW);
+    float shadow_eps = length(mesh_aabb_max - mesh_aabb_min) * EPS_SHADOW;
 
     Ray shadow_ray;
     shadow_ray.origin = h.pos + h.geom_normal * shadow_eps;
@@ -172,7 +172,7 @@ vec3 sampleEmissiveTriangles(Hit h, int bounce, int spp_index, uvec2 px) {
     if(cos_light <= 0.0) return vec3(0);
 
     ///Adaptive EPS for shadow rays to avoid self-intersection
-    float shadow_eps = max(EPS, length(h.pos) * EPS_SHADOW);
+    float shadow_eps = length(mesh_aabb_max - mesh_aabb_min) * EPS_SHADOW;
 
     //check occlusion of shadow rays
     Ray shadow_ray;
@@ -213,7 +213,7 @@ vec3 sampleEnvLight(Hit h, int bounce, int spp_index, uvec2 px) {
     vec3 world_dir = onb(h.normal) * local_dir;
 
     //Shadow ray to check occlusion
-    float shadow_eps = max(EPS, length(h.pos) * EPS_SHADOW);
+    float shadow_eps = length(mesh_aabb_max - mesh_aabb_min) * EPS_SHADOW;
     Ray shadow_ray;
     shadow_ray.origin = h.pos + safe_geom_normal * shadow_eps;
     shadow_ray.direction = world_dir;
@@ -303,7 +303,7 @@ vec4 pathTrace(vec2 uv, int spp_index, uvec2 px) {
 
         //NEE
         //Only analytic lights without geometry (point, directional, spot)
-        if(h.material == MAT_DIFFUSE && analytic_light_count > 0) {
+        if(USE_NEE == 1 && h.material == MAT_DIFFUSE && analytic_light_count > 0) {
             color += throughput * sampleAnalyticLight(h, b, spp_index, px);
         }
 

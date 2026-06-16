@@ -5,7 +5,7 @@ const float INV_PI = 1.0 / PI;
 const float INF = 1e30;
 const float EPS = 1e-5;
 const float EPS_TRI = 1e-10;
-const float EPS_SHADOW = 1e-2;
+const float EPS_SHADOW = 1e-4;
 
 
 //----------------------------------------------------------
