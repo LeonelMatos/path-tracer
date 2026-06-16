@@ -22,7 +22,7 @@ uniform sampler2D prev_frame;
 #include "path_trace_core.glsl"
 
 void main() {
-    vec3 linear = vec3(0);
+    vec4 linear = vec4(0);
     uvec2 px = uvec2(gl_FragCoord.xy);
 
     for (int s = 0; s < SAMPLES_PER_PIXEL; s++) {
@@ -30,12 +30,12 @@ void main() {
     }
     linear /= float(SAMPLES_PER_PIXEL);
 
-    vec3 accumulated;
+    vec4 accumulated;
     if (frame_id == 0) {
         accumulated = linear;
     } else {
-        vec3 prev = texture(prev_frame, vUV).rgb;
+        vec4 prev = texture(prev_frame, vUV);
         accumulated = mix(prev, linear, 1.0 / float(frame_id + 1));
     }
-    frag_color = vec4(accumulated, 1.0);
+    frag_color = accumulated;
 }

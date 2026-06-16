@@ -57,6 +57,9 @@ uniform int USE_GROUND_PLANE;
 uniform float GROUND_ELEVATION;
 uniform float GROUND_ALBEDO;
 uniform float GROUND_RADIUS;
+
+uniform int GROUND_SHADOW_CATCHER;
+uniform float GROUND_SHADOW_OPACITY;
 ///\}
 
 
@@ -124,6 +127,7 @@ const int MAT_DIFFUSE = 0;
 const int MAT_MIRROR = 1;
 const int MAT_GLASS = 2;
 const int MAT_TINTED_GLASS = 3;
+const int MAT_SHADOW_CATCHER = 4;
 
 ///Forces one material from the gui
 ///\note -1 = disabled

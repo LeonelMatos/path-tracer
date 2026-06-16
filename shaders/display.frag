@@ -50,5 +50,9 @@ vec3 toneMap(vec3 color) {
 void main() {
     vec2 uv = vUV * (render_resolution / display_resolution);
     vec3 linear = texture(tex, uv).rgb;
-    frag_color = vec4(pow(toneMap(linear), vec3(1.0/2.2)), 1.0);
+    float alpha = texture(tex, uv).a;
+    vec3 tone_map = pow(toneMap(linear), vec3(1.0/2.2));
+    vec3 bg = vec3(1.0);
+    vec3 composited = mix(bg, tone_map, alpha);
+    frag_color = vec4(composited, 1.0);
 }

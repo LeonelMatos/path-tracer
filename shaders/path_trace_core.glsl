@@ -238,11 +238,11 @@ Used to debug the brute-force path tracer for only the primary ray,
 no bounces, no materials, no optimizations, no NEE
 \return hit normal in color
 */
-vec3 pathTraceDebug(vec2 uv, int spp_index, uvec2 px) {
+vec4 pathTraceDebug(vec2 uv, int spp_index, uvec2 px) {
     Ray ray = cameraRayDOF(uv, spp_index, px);
     Hit h;
-    if(!intersects(ray, h)) return vec3(0);
-    return h.normal * 0.5 + 0.5;
+    if(!intersects(ray, h)) return vec4(0.0, 0.0, 0.0, 1.0);
+    return vec4(h.normal * 0.5 + 0.5, 1.0);
 }
 
 
@@ -255,10 +255,11 @@ and Fresnel+Snell for glass materials
 \see BACKGROUND, FOCAL_DEBUG, RR_MAX_SURVIVAL
 \todo check brdf, deve ser como uma árvore
 */
-vec3 pathTrace(vec2 uv, int spp_index, uvec2 px) {
+vec4 pathTrace(vec2 uv, int spp_index, uvec2 px) {
     Ray ray = cameraRayDOF(uv, spp_index, px);
     vec3 color = vec3(0);
     vec3 throughput = vec3(1);
+    float alpha = 1.0;
 
     int diffuse_bounces = 0;
 
@@ -283,6 +284,7 @@ vec3 pathTrace(vec2 uv, int spp_index, uvec2 px) {
                     break;
                 }
             }
+            alpha = 0.0;
             break;
         }
 
@@ -369,6 +371,34 @@ vec3 pathTrace(vec2 uv, int spp_index, uvec2 px) {
                 ray.origin = h.pos + ray.direction * EPS_TRI;
                 break;
             }
+            case MAT_SHADOW_CATCHER: {
+                float shadow_eps = max(EPS, length(h.pos) * EPS_SHADOW);
+                bool in_shadow = false;
+
+                for (int li = 0; li < analytic_light_count; li++) {
+                    GPULight light = analytic_lights[li];
+                    vec3 to_light = (light.type == LIGHT_DIRECTIONAL) ? -light.direction.xyz : normalize(light.position.xyz - h.pos);
+                    float dist = (light.type == LIGHT_DIRECTIONAL) ? 1e10 : length(light.position.xyz - h.pos);
+
+                    Ray shadow_ray;
+                    shadow_ray.origin = h.pos + h.geom_normal * shadow_eps;
+                    shadow_ray.direction = to_light;
+                    Hit shadow_h;
+
+                    if(intersects(shadow_ray, shadow_h) && shadow_h.t < dist - shadow_eps && shadow_h.material != MAT_SHADOW_CATCHER) {
+                        in_shadow = true;
+                        break;
+                    }
+                }
+                if(in_shadow) {
+                    color = vec3(0.3);
+                    alpha = GROUND_SHADOW_OPACITY;
+                }
+                else {
+                    alpha = 0.0;
+                }
+                return vec4(color, alpha);
+            }
         }
 
         // Russian Roulette
@@ -395,5 +425,5 @@ vec3 pathTrace(vec2 uv, int spp_index, uvec2 px) {
             color *= FIREFLY_CLAMP / lum;
     }
 
-    return color;
+    return vec4(color, alpha);
 }

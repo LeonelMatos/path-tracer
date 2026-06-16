@@ -48,7 +48,7 @@
 #include "loader.hpp"
 #include "texture.hpp"
 
-#define VERSION "1.4.8"
+#define VERSION "1.5.0"
 #define VERSION_NOTE ""
 
 using namespace std;
@@ -568,6 +568,8 @@ void initUniforms() {
     renderer.loc_ground_elevation = glGetUniformLocation(active, "GROUND_ELEVATION");
     renderer.loc_ground_albedo = glGetUniformLocation(active, "GROUND_ALBEDO");
     renderer.loc_ground_radius = glGetUniformLocation(active, "GROUND_RADIUS");
+    renderer.loc_ground_shadow_catcher = glGetUniformLocation(active, "GROUND_SHADOW_CATCHER");
+    renderer.loc_ground_shadow_opacity = glGetUniformLocation(active, "GROUND_SHADOW_OPACITY");
 }
 
 void uploadConfig() {
@@ -592,6 +594,8 @@ void uploadConfig() {
     glUniform1f(renderer.loc_ground_elevation, config.ground_elevation);
     glUniform1f(renderer.loc_ground_albedo, config.ground_albedo);
     glUniform1f(renderer.loc_ground_radius, config.ground_radius);
+    glUniform1i(renderer.loc_ground_shadow_catcher, config.ground_shadow_catcher ? 1 : 0);
+    glUniform1f(renderer.loc_ground_shadow_opacity, config.ground_shadow_opacity);
 }
 
 void applyConfig() {
@@ -1368,11 +1372,18 @@ void drawUI() {
 
                 if(ImGui::CollapsingHeader("Ground Plane")) {
                     bool gp_changed = false;
+                    bool shadow_catch = config.ground_shadow_catcher;
+
                     gp_changed |= ImGui::Checkbox("Enable plane", &config.use_ground_plane);
                     if(config.use_ground_plane) {
                         gp_changed |= ImGui::SliderFloat("Elevation##ground", &config.ground_elevation, -5.0f, 5.0f, "%.2f");
                         gp_changed |= ImGui::SliderFloat("Albedo##ground", &config.ground_albedo, 0.0f, 1.0f, "%.2f");
                         gp_changed |= ImGui::SliderFloat("Radius##ground", &config.ground_radius, 1.0f, 30.0f, "%.1f");
+                        if(ImGui::Checkbox("Shadow Catcher##ground", &shadow_catch)) {
+                            config.ground_shadow_catcher = shadow_catch;
+                            gp_changed = true;
+                        }
+                        gp_changed |= ImGui::SliderFloat("Shadow Opacity##ground", &config.ground_shadow_opacity, 0.0f, 1.0f, "%.2f");
                     }
                     if(gp_changed) applyConfig();
                 }

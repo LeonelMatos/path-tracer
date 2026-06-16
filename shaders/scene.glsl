@@ -26,7 +26,7 @@ void intersects_mesh(const Ray ray, inout Hit h) {
                 h.geom_normal = vec3(0,0,1);
                 h.albedo = vec3(GROUND_ALBEDO);
                 h.emission = vec3(0);
-                h.material = MAT_DIFFUSE;
+                h.material = (GROUND_SHADOW_CATCHER == 1) ? MAT_SHADOW_CATCHER : MAT_DIFFUSE;
                 h.ior = 0.0;
             } 
         }

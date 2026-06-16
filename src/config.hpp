@@ -72,6 +72,11 @@ struct RenderConfig {
     */
     float firefly_clamp = 10.0f;
 
+    ///Shadow catcher for ground to only have shadows visible
+    bool ground_shadow_catcher = false;
+
+    float ground_shadow_opacity = 0.6f;
+
     //Sun
     bool sun_enabled = true;
     float sun_elevation = 45.0f;
@@ -164,6 +169,9 @@ struct Renderer {
     GLint loc_ground_elevation;
     GLint loc_ground_albedo;
     GLint loc_ground_radius;
+
+    GLint loc_ground_shadow_catcher;
+    GLint loc_ground_shadow_opacity;
 };
 
 struct CameraConfig {
