@@ -47,8 +47,9 @@
 #include "config.hpp"
 #include "loader.hpp"
 #include "texture.hpp"
+#include "denoiser.hpp"
 
-#define VERSION "1.5.2"
+#define VERSION "1.5.3"
 #define VERSION_NOTE ""
 
 using namespace std;
@@ -72,6 +73,7 @@ GLFWwindow* window;
 
 Renderer renderer;
 CameraConfig camera;
+Denoiser denoiser;
 
 double mouse_last_x = 0.0, mouse_last_y = 0.0;
 bool mouse_first = true;
@@ -119,6 +121,8 @@ bool transferDataToGPU(void);
 void cleanDataFromGPU();
 void display(void);
 void clearTextures();
+void setDenoiseCheckpoints();
+void createDenoisedTex(int w, int h);
 void resetAccumulation();
 void draw(void);
 void saveScreenshot();
@@ -345,9 +349,10 @@ void onWindowResize(GLFWwindow* window, int width, int height) {
     for(int i = 0; i < 2; i++)
         glNamedFramebufferTexture(renderer.fbo[i], GL_COLOR_ATTACHMENT0, renderer.tex[i], 0);
 
-    renderer.render_w = width;
-    renderer.render_h = height;
-
+        renderer.render_w = width;
+        renderer.render_h = height;
+        
+    createDenoisedTex(width, height);
     syncResolutionDropdown();
 
     glUseProgram(renderer.active_id);
@@ -746,6 +751,9 @@ bool transferDataToGPU(void) {
         glTextureParameteri(renderer.tex[i], GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     }
 
+    //Denoised
+    createDenoisedTex(renderer.render_w, renderer.render_h);
+
     //FBO DSA ping-pong
     glCreateFramebuffers(2, renderer.fbo);
     for (int i = 0; i < 2; i++) {
@@ -772,6 +780,8 @@ void cleanDataFromGPU() {
     glDeleteVertexArrays(1, &renderer.vao);
     glDeleteTextures(2, renderer.tex);
     glDeleteFramebuffers(2, renderer.fbo);
+    if(renderer.denoised_tex)
+        glDeleteTextures(1, &renderer.denoised_tex);
     
     glDeleteProgram(renderer.pathtr_comp_id);
     glDeleteProgram(renderer.pathtr_frag_id);
@@ -796,11 +806,78 @@ void display(void) {
     glUniform2f(renderer.loc_display_render_res, (float)renderer.render_w, (float)renderer.render_h);
     glUniform2f(renderer.loc_display_res, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT);
     
-    glBindTextureUnit(0, renderer.tex[renderer.cur_f]);
+    GLuint tex_to_show = (renderer.denoiser_active && renderer.denoised_tex) ? renderer.denoised_tex : renderer.tex[renderer.cur_f];
+
+    glBindTextureUnit(0, tex_to_show);
     glUniform1i(renderer.loc_tex, 0);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
 }
+
+/*----------------------------------------------------------
+  Denoiser
+*/
+void setDenoiseCheckpoints() {
+    renderer.denoise_checkpoints.clear();
+    renderer.next_denoise_idx = 0;
+    renderer.denoiser_active = false;
+
+    int n = (int)renderer.MAX_SAMPLES;
+    if (n <= 32)
+        renderer.denoise_checkpoints = {n};
+    else if (n <= 128)
+        renderer.denoise_checkpoints = {n * 3/4, n};
+    else
+        renderer.denoise_checkpoints = { n/2, n * 3/4, n};
+}
+
+void createDenoisedTex(int w, int h) {
+    if(renderer.denoised_tex)
+        glDeleteTextures(1, &renderer.denoised_tex);
+    glCreateTextures(GL_TEXTURE_2D, 1, &renderer.denoised_tex);
+    glTextureStorage2D(renderer.denoised_tex, 1, GL_RGBA32F, w, h);
+    glTextureParameteri(renderer.denoised_tex, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTextureParameteri(renderer.denoised_tex, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTextureParameteri(renderer.denoised_tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTextureParameteri(renderer.denoised_tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+}
+
+void runDenoiser(int checkpoint_num, int total) {
+    int w = renderer.render_w, h = renderer.render_h;
+
+    if(!denoiser.initialized || denoiser.width != w || denoiser.height != h)
+        denoiser.init(w, h);
+    
+    std::vector<float> rgba(w * h * 4);
+    glGetTextureImage(renderer.tex[renderer.cur_f], 0, GL_RGBA, GL_FLOAT, rgba.size() * sizeof(float), rgba.data());
+
+    //revert RGBA to RGB before running denoiser
+    for (int i = 0; i < w * h; i++) {
+        denoiser.input_buf[i*3 +0] = rgba[i*4 +0];
+        denoiser.input_buf[i*3 +1] = rgba[i*4 +1];
+        denoiser.input_buf[i*3 +2] = rgba[i*4 +2];
+    }
+    denoiser.run();
+
+    //revert RGB to RGBA to upload on OpenGL tex
+    std::vector<float> out_rgba(w*h *4);
+    for(int i = 0; i < w*h; i++) {
+        out_rgba[i*4 +0] = denoiser.output_buf[i*3 +0];
+        out_rgba[i*4 +1] = denoiser.output_buf[i*3 +1];
+        out_rgba[i*4 +2] = denoiser.output_buf[i*3 +2];
+        out_rgba[i*4 +3] = 1.0f;
+    }
+    glTextureSubImage2D(renderer.denoised_tex, 0, 0, 0, w, h, GL_RGBA, GL_FLOAT, out_rgba.data());
+    renderer.denoiser_active = true;
+
+    char buf[64];
+    snprintf(buf, sizeof(buf), "Denoised %dx%d", checkpoint_num, total);
+    renderer.denoise_status_msg = buf;
+    renderer.denoise_msg_time = glfwGetTime();
+
+    printf("\n[DENOISER] %s at sample %d\n", buf, renderer.frame_id);
+}
+//----------------------------------------------------------
 
 void clearTextures() {
     float zero[4] = {0.0f, 0.0f, 0.0f, 0.0f};
@@ -813,6 +890,7 @@ void resetAccumulation() {
     renderer.cur_f = 0;
     renderer.prev_f = 1;
     clearTextures();
+    setDenoiseCheckpoints();
 
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -860,6 +938,15 @@ void draw(void) {
 
     int tmp = renderer.cur_f; renderer.cur_f = renderer.prev_f; renderer.prev_f = tmp;
     renderer.frame_id++;
+
+    //Denoiser phase
+    if(renderer.denoiser_enabled && renderer.next_denoise_idx < (int)renderer.denoise_checkpoints.size() &&
+        renderer.frame_id == renderer.denoise_checkpoints[renderer.next_denoise_idx]) {
+            int idx = renderer.next_denoise_idx +1;
+            int total = (int)renderer.denoise_checkpoints.size();
+            runDenoiser(idx, total);
+            renderer.next_denoise_idx++;
+        }
 
     if(renderer.frame_id == (int)renderer.MAX_SAMPLES)
         printf("\n%s\n|Render complete| %d samples in %.01fs\n", txt_sep, renderer.frame_id, time_elapsed);
@@ -1288,6 +1375,18 @@ void drawUI() {
                 renderer.MAX_SAMPLES = (uint)samples;
             }
             ImGui::SetItemTooltip("Max progressive samples per pixel");
+
+            ImGui::Checkbox("Auto Denoise", &renderer.denoiser_enabled);
+            ImGui::SetItemTooltip("Applies OIDN denoiser automatically");
+
+            if(!renderer.denoise_status_msg.empty()) {
+                double elapsed = glfwGetTime() - renderer.denoise_msg_time;
+                if(elapsed < 4.0)
+                    ImGui::TextDisabled("%s", renderer.denoise_status_msg.c_str());
+                else  
+                    renderer.denoise_status_msg = "";
+            }
+
             changed |= ImGui::SliderInt("Depth", &config.depth, 1, 50);
             changed |= resetBtn("*##depth", config.depth, render_defaults.depth);
     

@@ -172,6 +172,17 @@ struct Renderer {
 
     GLint loc_ground_shadow_catcher;
     GLint loc_ground_shadow_opacity;
+
+    //Denoiser
+    GLuint denoised_tex = 0;
+    //denoiser status showing the result
+    bool denoiser_active = false;
+    //enable toggle on UI
+    bool denoiser_enabled = true;
+    int next_denoise_idx = 0;
+    std::vector<int> denoise_checkpoints;
+    std::string denoise_status_msg = "";
+    double denoise_msg_time = 0.0;
 };
 
 struct CameraConfig {
