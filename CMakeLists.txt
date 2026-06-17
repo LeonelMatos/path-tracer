@@ -62,7 +62,7 @@ add_executable(pathtracer
     include/imgui/imgui_impl_glfw.cpp
     include/imgui/imgui_impl_opengl3.cpp)
 
-target_include_directories(pathtracer PRIVATE . include imgui)
+target_include_directories(pathtracer PRIVATE . include src)
 
 target_link_libraries(pathtracer
     GL
