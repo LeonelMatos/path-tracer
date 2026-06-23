@@ -153,7 +153,6 @@ struct GPUVertex {
     vec3 normal;
     float _pad1;
     vec2 texcoord;
-    vec2 _pad2;
 };
 
 struct GPUTriangle {

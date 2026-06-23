@@ -18,7 +18,6 @@ struct GPUVertex {
     glm::vec3 normal;
     float _pad1;
     glm::vec2 texcoord;
-    glm::vec2 _pad2;
 };
 
 struct GPUTriangle {
