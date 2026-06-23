@@ -49,7 +49,7 @@
 #include "texture.hpp"
 #include "denoiser.hpp"
 
-#define VERSION "1.5.4"
+#define VERSION "1.5.5"
 #define VERSION_NOTE ""
 
 using namespace std;
@@ -229,6 +229,8 @@ void setPreviewResolution() {
     target_w = glm::max(16, (target_w / 16) * 16);
     target_h = glm::max(16, (target_h / 16) * 16);
     
+    if(renderer.render_w == target_w && renderer.render_h == target_h) return;
+
     applyResolution(target_w, target_h);
     clearTextures();
     renderer.denoiser_active = false;
