@@ -228,14 +228,29 @@ bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMate
 }
 
 bool uploadMesh(const vector<GPUTriangle>& triangles, const vector<GPUMaterial>& materials, GLuint& tri_ssbo, GLuint& mat_ssbo) {
+    size_t tri_size = triangles.size() * sizeof(GPUTriangle);
+    size_t mat_size = materials.size() * sizeof(GPUMaterial);
+
+    printf("\t[UPLOAD] Triangles: %.1f MB | Materials: %.1f MB\n", tri_size / 1e6f, mat_size / 1e6f);
+
     //Triangles DSA
     glCreateBuffers(1, &tri_ssbo);
     glNamedBufferData(tri_ssbo, triangles.size() * sizeof(GPUTriangle), triangles.data(), GL_STATIC_DRAW);
+    GLenum error = glGetError();
+    if(error != GL_NO_ERROR) {
+        fprintf(stderr, "\t[UPLOAD MESH] Error: Triangle SSBO failed (GL error 0x%x)\n", error);
+        return false;
+    }
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, tri_ssbo);
 
     //Materialss
     glCreateBuffers(1, &mat_ssbo);
     glNamedBufferData(mat_ssbo, materials.size() * sizeof(GPUMaterial), materials.data(), GL_STATIC_DRAW);
+    error = glGetError();
+    if(error != GL_NO_ERROR) {
+        fprintf(stderr, "\t[UPLOAD MESH] Error: Material SSBO failed (GL error 0x%x)\n", error);
+        return false;
+    }
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, mat_ssbo);
 
     return true;

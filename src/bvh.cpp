@@ -118,8 +118,17 @@ bool buildBVH(vector<GPUTriangle>& triangles, vector<BVHNode>& bvh_nodes) {
 }
 
 bool uploadBVH(const vector<BVHNode>& bvh_nodes, GLuint& ssbo) {
+    size_t bvh_size = bvh_nodes.size() * sizeof(BVHNode);
+    printf("\t[UPLOAD] BVH nodes: %.1f MB\n", bvh_size / 1e6f);
+
     glCreateBuffers(1, &ssbo);
     glNamedBufferData(ssbo, bvh_nodes.size() * sizeof(BVHNode), bvh_nodes.data(), GL_STATIC_DRAW);
+    GLenum error = glGetError();
+    if (error != GL_NO_ERROR) {
+        fprintf(stderr, "\t[UPLOAD BVH] Error: BVH SSBO failed (GL error 0x%x)\n", error);
+        return false;
+    }
+
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, ssbo);
     return true;
 }
