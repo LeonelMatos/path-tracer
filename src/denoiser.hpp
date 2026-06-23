@@ -37,7 +37,7 @@ struct Denoiser {
         filter.commit();
 
         initialized = true;
-        printf("[DENOISER] Initialized %dx%d\n", w, h);
+        printf("\n[DENOISER] Initialized %dx%d\n", w, h);
     }
 
     void resize(int w, int h) {
@@ -49,7 +49,7 @@ struct Denoiser {
         filter.execute();
         const char* error;
         if(device.getError(error) != oidn::Error::None) {
-            printf("[DENOISER] Error: %s\n", error);
+            printf("\n[DENOISER] Error: %s\n", error);
             return false;
         }
         return true;

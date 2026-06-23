@@ -49,7 +49,7 @@
 #include "texture.hpp"
 #include "denoiser.hpp"
 
-#define VERSION "1.5.3"
+#define VERSION "1.5.4"
 #define VERSION_NOTE ""
 
 using namespace std;
@@ -209,7 +209,18 @@ vec3 cameraForward() {
     return normalize(vec3(cos(camera.pitch) * cos(camera.yaw), cos(camera.pitch) * sin(camera.yaw), sin(camera.pitch)));
 }
 
-int frames_since_moved = 9999;
+void applyResolution(int w, int h) {
+    if (renderer.render_w == w && renderer.render_h == h) return;
+
+    renderer.render_w = w;
+    renderer.render_h = h;
+    glUseProgram(renderer.active_id);
+    glUniform2f(renderer.loc_res, (float)w, (float)h);
+    if(!USE_COMPUTE_SH) {
+        glBindFramebuffer(GL_FRAMEBUFFER, renderer.fbo[renderer.cur_f]);
+        glViewport(0, 0, w, h);
+    }
+}
 
 /// Changes the render resolution to preview mode, aux function
 void setPreviewResolution() {
@@ -217,41 +228,28 @@ void setPreviewResolution() {
     int target_h = glm::max(16, (int)(config.moving_resolution * (float)WINDOW_HEIGHT / (float)WINDOW_WIDTH));
     target_w = glm::max(16, (target_w / 16) * 16);
     target_h = glm::max(16, (target_h / 16) * 16);
-
-    if (renderer.render_w == target_w || renderer.render_h == target_h) return;
-
-    renderer.render_w = target_w;
-    renderer.render_h = target_h;
-    glUseProgram(renderer.active_id);
-    glUniform2f(renderer.loc_res, (float)renderer.render_w, (float)renderer.render_h);
-    if (!USE_COMPUTE_SH) {
-        glBindFramebuffer(GL_FRAMEBUFFER, renderer.fbo[renderer.cur_f]);
-        glViewport(0, 0, renderer.render_w, renderer.render_h);
-    }
+    
+    applyResolution(target_w, target_h);
     clearTextures();
+    renderer.denoiser_active = false;
     renderer.cur_f  = 0;
     renderer.prev_f = 1;
 }
 
 /// Changes the render resolution to full mode
 void setFullResolution() {
-    if (renderer.render_w == WINDOW_WIDTH && renderer.render_h == WINDOW_HEIGHT) return;
-
-    renderer.render_w = WINDOW_WIDTH;
-    renderer.render_h = WINDOW_HEIGHT;
-    glUseProgram(renderer.active_id);
-    glUniform2f(renderer.loc_res, (float)renderer.render_w, (float)renderer.render_h);
-    if(!USE_COMPUTE_SH) {
-        glBindFramebuffer(GL_FRAMEBUFFER, renderer.fbo[renderer.cur_f]);
-        glViewport(0, 0, renderer.render_w, renderer.render_h);
-    }
+    if(config.lock_preview_res) return;
+    
+    applyResolution(WINDOW_WIDTH, WINDOW_HEIGHT);
     clearTextures();
-    resetAccumulation();
 }
+
+int frames_since_moved = 9999;
 
 void startMoving() {
     setPreviewResolution();
     renderer.frame_id = 0;
+    renderer.denoiser_active = false;
     frames_since_moved = 0;
 }
 
@@ -259,9 +257,9 @@ void startMoving() {
 /// \return true if any WASD key pressed
 bool useMoveKeys() {
     return (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS ||
-            glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS ||
-            glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS ||
-            glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS);
+    glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS ||
+    glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS ||
+    glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS);
 }
 
 void processMovement() {
@@ -427,7 +425,7 @@ int main(void) {
 
     while (!glfwWindowShouldClose(window) && glfwGetKey(window, GLFW_KEY_ESCAPE) != GLFW_PRESS) {
         //avoids render lock when in preview rendering and reaches max samples(moving camera)
-        bool is_moving = (renderer.render_w != WINDOW_WIDTH);
+        bool is_moving = !config.lock_preview_res && (renderer.render_w != WINDOW_WIDTH);
 
         //Checks if needs new model loading
         //Handling of mesh, textures and env maps running in parallel
@@ -806,7 +804,7 @@ void display(void) {
     glUniform2f(renderer.loc_display_render_res, (float)renderer.render_w, (float)renderer.render_h);
     glUniform2f(renderer.loc_display_res, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT);
     
-    GLuint tex_to_show = (renderer.denoiser_active && renderer.denoised_tex) ? renderer.denoised_tex : renderer.tex[renderer.cur_f];
+    GLuint tex_to_show = (renderer.denoiser_active && renderer.denoised_tex && renderer.frame_id > 10) ? renderer.denoised_tex : renderer.tex[renderer.cur_f];
 
     glBindTextureUnit(0, tex_to_show);
     glUniform1i(renderer.loc_tex, 0);
@@ -889,6 +887,7 @@ void resetAccumulation() {
     renderer.frame_id = 0;
     renderer.cur_f = 0;
     renderer.prev_f = 1;
+    renderer.denoiser_active = false;
     clearTextures();
     setDenoiseCheckpoints();
 
@@ -1333,6 +1332,9 @@ void drawUI() {
         //----- Preview Config -------------
         if(ImGui::CollapsingHeader("Preview", ImGuiTreeNodeFlags_DefaultOpen)) {
             int res = config.moving_resolution;
+            ImGui::Checkbox("##lock_preview", &config.lock_preview_res);
+            ImGui::SetItemTooltip("Lock preview mode");
+            ImGui::SameLine();
             if(ImGui::SliderInt("Preview Res", &res, 32, 512)) {
                 res = (res / 16) * 16;
                 res = glm::max(32, res);
