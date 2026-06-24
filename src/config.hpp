@@ -83,7 +83,7 @@ struct RenderConfig {
     bool sun_enabled = true;
     float sun_elevation = 45.0f;
     float sun_azimuth = 180.0f;
-    float sun_intensity = 5.0f;
+    float sun_intensity = 2.5f;
     glm::vec3 sun_color = glm::vec3(1.0f, 0.95f, 0.8f);
 
     glm::vec3 sunDirection() {
