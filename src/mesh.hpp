@@ -99,3 +99,21 @@ bool uploadMesh(const vector<GPUTriangle>& triangles, const vector<GPUMaterial>&
 void clearMesh();
 
 vector<GPUTriangle> makeTestMesh();
+
+/*----------------------------------------------------------
+  Debux Aux
+*/
+
+///\brief quick checkpoint to check OpenGL silent error throws.
+///Catches the error and sends it, or it prints an OK check
+///\param label 
+inline void checkGL(const char* label) {
+    GLenum e;
+    bool found = false;
+    while ((e = glGetError()) != GL_NO_ERROR) {
+        printf("[GL ERROR] %s : 0x%x\n", label, e);
+        found = true;
+    }
+    if(!found)
+        printf("[GL OK] %s\n", label);
+}

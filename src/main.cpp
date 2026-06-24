@@ -49,7 +49,7 @@
 #include "texture.hpp"
 #include "denoiser.hpp"
 
-#define VERSION "1.5.5"
+#define VERSION "1.5.6"
 #define VERSION_NOTE ""
 
 using namespace std;
@@ -393,6 +393,8 @@ int main(void) {
     
     glewExperimental = GL_TRUE;
     glewInit();
+    //Clear init errors
+    while(glGetError() != GL_NO_ERROR) {}
 
     glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
     glfwSetKeyCallback(window, onKeyPress);
@@ -420,6 +422,11 @@ int main(void) {
     printf("\tUsing %s shader", USE_COMPUTE_SH ? "Compute" : "Fragment");
     printf("\n\tESC   quit\n\tF12   screenshot render\n\tH/0   center camera\n\tR     reset accumulation\n%s\n", txt_sep);
 
+    //Check GPU's SSBO size limite
+    GLint max_ssbo;
+    glGetIntegerv(GL_MAX_SHADER_STORAGE_BLOCK_SIZE, &max_ssbo);
+    printf("[OPENGL] Max SSBO size: %.0f MB\n", max_ssbo / 1e6f);
+
     //Time init
     struct timespec ts, ts_start, ts_end;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -431,8 +438,11 @@ int main(void) {
 
         //Checks if needs new model loading
         //Handling of mesh, textures and env maps running in parallel
+        //Each pass goes through a checkpoint checkGL to catch errors
         if(loader.upload_pending) {
+            checkGL("before useProgram");
             glUseProgram(renderer.active_id);
+            checkGL("useProgram");
             uploadMesh(loader.pending_tris, loader.pending_mats, renderer.triangle_ssbo, renderer.material_ssbo);
             uploadBVH(loader.pending_bvh, renderer.bvh_ssbo);
 
@@ -446,8 +456,10 @@ int main(void) {
             glUniform1i(renderer.loc_bvh_root, 0);
             glUniform3f(renderer.loc_aabb_min, b.min_bound.x, b.min_bound.y, b.min_bound.z);
             glUniform3f(renderer.loc_aabb_max, b.max_bound.x, b.max_bound.y, b.max_bound.z);
+            checkGL("uniforms");
 
             uploadTexture(loader.pending_cpu_mats, loader.pending_mats, renderer);
+            checkGL("uploadTextures");
 
             glNamedBufferData(renderer.material_ssbo, loader.pending_mats.size() * sizeof(GPUMaterial), loader.pending_mats.data(), GL_STATIC_DRAW);
 
@@ -880,6 +892,7 @@ void runDenoiser(int checkpoint_num, int total) {
 //----------------------------------------------------------
 
 void clearTextures() {
+    if(!renderer.tex[0] || !renderer.tex[1]) return;
     float zero[4] = {0.0f, 0.0f, 0.0f, 0.0f};
     glClearTexImage(renderer.tex[0], 0, GL_RGBA, GL_FLOAT, zero);
     glClearTexImage(renderer.tex[1], 0, GL_RGBA, GL_FLOAT, zero);

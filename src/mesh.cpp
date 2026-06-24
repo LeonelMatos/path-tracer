@@ -231,6 +231,8 @@ bool uploadMesh(const vector<GPUTriangle>& triangles, const vector<GPUMaterial>&
     size_t tri_size = triangles.size() * sizeof(GPUTriangle);
     size_t mat_size = materials.size() * sizeof(GPUMaterial);
 
+    printf("\t[UPLOAD] tri_ssbo handle before create: %u\n", tri_ssbo);
+
     printf("\t[UPLOAD] Triangles: %.1f MB | Materials: %.1f MB\n", tri_size / 1e6f, mat_size / 1e6f);
 
     //Triangles DSA
