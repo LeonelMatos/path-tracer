@@ -98,7 +98,7 @@ struct Renderer {
 
     int v_sync = 0;
 
-    uint MAX_SAMPLES = 100;
+    uint MAX_SAMPLES = 15;
 
     SceneModel current_model;
 

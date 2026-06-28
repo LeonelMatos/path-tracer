@@ -41,38 +41,35 @@ void intersects_mesh(const Ray ray, inout Hit h) {
 
                 if (t < h.t) {
                     int m_id = triangles[i].material_id;
-                    vec3 smooth_normal = triangles[i].v0.normal * tri_bary.z + triangles[i].v1.normal * tri_bary.x +
-                        triangles[i].v2.normal * tri_bary.y;
-                    
+
+                    vec2 uv = triangles[i].v0.texcoord * tri_bary.z + triangles[i].v1.texcoord * tri_bary.x + triangles[i].v2.texcoord * tri_bary.y;
+ 
+                    if(USE_TEXTURES == 1 && gpu_materials[m_id].tex_index >= 0) {
+                        if (texture(tex_albedo, vec3(uv, float(gpu_materials[m_id].tex_index))).a < 0.5)
+                            continue;
+                    }
+
+                    vec3 smooth_normal = triangles[i].v0.normal * tri_bary.z + triangles[i].v1.normal * tri_bary.x + triangles[i].v2.normal * tri_bary.y;
+
                     h.t = t;
                     h.pos = ray.origin + t * ray.direction;
-
-                    ///\bug when the smooth normal is valid I lose the geometric normal. I need to save both 
-                    ///fixed
                     h.normal = length(smooth_normal) > EPS_TRI ? normalize(smooth_normal) : tri_normal;
-                        
                     h.geom_normal = tri_normal;
-
                     h.emission = gpu_materials[m_id].emission.rgb;
-                    
                     h.material = gpu_materials[m_id].type;
                     if(FORCE_MATERIAL >= 0) {
                         h.material = FORCE_MATERIAL;
                     }
-
                     h.ior = gpu_materials[m_id].ior;
 
                     //Texture sample
                     if(USE_TEXTURES == 1 && gpu_materials[m_id].tex_index >= 0) {
-                        vec2 uv = triangles[i].v0.texcoord * tri_bary.z + triangles[i].v1.texcoord * tri_bary.x + triangles[i].v2.texcoord * tri_bary.y;
                         vec3 tex_color = texture(tex_albedo, vec3(uv, float(gpu_materials[m_id].tex_index))).rgb;
-                        
-                        //Simple gamma correction
-                        h.albedo = pow(tex_color, vec3(2.2));
+                        h.albedo = pow(tex_color, vec3(2.2)); //Simple gamma correction
                     }
                     else {
                         h.albedo = gpu_materials[m_id].albedo.rgb;
-        }
+                    }
                 }
             }
         }
