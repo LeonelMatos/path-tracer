@@ -59,6 +59,12 @@ struct RenderConfig {
     ///controls the progressive resolution scaling up to the original
     bool progressive_refine = true;
 
+    ///Splits the dispatch of the compute shader in smaller tiles
+    ///\note necessary method on weak GPUs to avoid watchdog driver timeout if one dispatch takes too long.
+    bool tile_dispatch = false;
+    ///Number of work groups per tile. Less is more safe, but more sync overhead
+    int tile_rows = 4;
+
     ///Enables Next Event Estimation
     bool use_nee = true;
 
@@ -109,6 +115,8 @@ struct Renderer {
     GLuint tex[2], fbo[2], vao;
     GLint loc_res, loc_frame, loc_prev, loc_tex;
     int frame_id = 0, cur_f = 0, prev_f = 1;
+
+    GLint loc_tile_offset;
     
     GLint loc_depth, loc_spp, loc_rr_min, loc_rr_max, loc_aperture, loc_cam_fov;
     GLint loc_focal_dist, loc_focal_debug, loc_focal_band, loc_background, loc_tone_map;

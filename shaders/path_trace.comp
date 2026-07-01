@@ -15,6 +15,7 @@ layout(rgba32f, binding = 1) uniform image2D prev_image;
 
 uniform vec2 resolution;
 uniform int frame_id;
+uniform ivec2 tile_offset;
 
 #include "globals.glsl"
 #include "sampling.glsl"
@@ -23,7 +24,7 @@ uniform int frame_id;
 #include "path_trace_core.glsl"
 
 void main() {
-    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy) + tile_offset;
     if(pixel.x >= int(resolution.x) || pixel.y >= int(resolution.y)) return;
 
     vec2 uv = (vec2(pixel) + 0.5) / resolution;

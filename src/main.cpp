@@ -49,7 +49,7 @@
 #include "texture.hpp"
 #include "denoiser.hpp"
 
-#define VERSION "1.5.8"
+#define VERSION "1.5.9"
 #define VERSION_NOTE ""
 
 using namespace std;
@@ -530,6 +530,7 @@ void initUniforms() {
 
     renderer.loc_res = glGetUniformLocation(active, "resolution");
     renderer.loc_frame = glGetUniformLocation(active, "frame_id");
+    renderer.loc_tile_offset = glGetUniformLocation(active, "tile_offset");
     renderer.loc_tex = glGetUniformLocation(active, "tex");
     renderer.loc_tri_count = glGetUniformLocation(active, "triangle_count");
     renderer.loc_aabb_min = glGetUniformLocation(active, "mesh_aabb_min");
@@ -934,10 +935,24 @@ void draw(void) {
 
         //Dispatch 16x16 work groups
         int groups_x = (renderer.render_w + COMPUTE_LOCAL_X - 1) / COMPUTE_LOCAL_X;
-        int groups_y = (renderer.render_h + COMPUTE_LOCAL_Y - 1) / COMPUTE_LOCAL_Y;
+        int total_groups_y = (renderer.render_h + COMPUTE_LOCAL_Y - 1) / COMPUTE_LOCAL_Y;
+
+        //dispatch in vertical tiles with sync between each other; avoid watchdog timeout crash on slower GPUs
+        if(config.tile_dispatch) {
+            for(int gy = 0; gy < total_groups_y; gy += config.tile_rows) {
+                int rows = std::min(config.tile_rows, total_groups_y - gy);
+                glUniform2i(renderer.loc_tile_offset, 0, gy * COMPUTE_LOCAL_Y);
+                glDispatchCompute(groups_x, rows, 1);
+                glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+                glFinish();
+            }
+        }
+        else {
+            glUniform2i(renderer.loc_tile_offset, 0, 0);
+            glDispatchCompute(groups_x, total_groups_y, 1);
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        }
         
-        glDispatchCompute(groups_x, groups_y, 1);
-        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     }
     else {
         //Fragment pass
@@ -1355,6 +1370,16 @@ void drawUI() {
                 res = glm::max(32, res);
                 config.moving_resolution = res;
             }
+
+            ImGui::Checkbox("Tile Dispatch", &config.tile_dispatch);
+            ImGui::SetItemTooltip("Splits the render into smaller tiles per dispatch\nUse with weaker GPUs, avoids timeout crash");
+            if(config.tile_dispatch) {
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(80);
+                ImGui::SliderInt("Rows", &config.tile_rows, 1, 16);
+                ImGui::SetItemTooltip("Work groups per tile (16px each)\nLess = safe, but slower");
+            }
+
             bool vsync = renderer.v_sync == 1;
             if(ImGui::Checkbox("Enable V-Sync", &vsync)) {
                 renderer.v_sync = vsync ? 1 : 0;
