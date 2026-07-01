@@ -49,7 +49,7 @@
 #include "texture.hpp"
 #include "denoiser.hpp"
 
-#define VERSION "1.5.7"
+#define VERSION "1.5.8"
 #define VERSION_NOTE ""
 
 using namespace std;
@@ -85,7 +85,7 @@ RenderConfig config;
 
 #define WINDOW_TITLE "Path Tracer"
 
-#define WINDOW_TITLE_VERSION WINDOW_TITLE " v" VERSION " - " VERSION_NOTE
+#define WINDOW_TITLE_VERSION WINDOW_TITLE " v" VERSION "  " VERSION_NOTE
 
 static const int COMPUTE_LOCAL_X = 16;
 static const int COMPUTE_LOCAL_Y = 16;

@@ -47,6 +47,28 @@ int uploadAnalyticLights(const vector<GPULight>& lights, GLuint& out_ssbo) {
     return (int)lights.size();
 }
 
+///Aux function to convert aiMatrix4x4 to glm::mat4 (for .glb hierarchical node transforms)
+static mat4 aiToGlm(const aiMatrix4x4 m) {
+    return mat4(
+        m.a1, m.b1, m.c1, m.d1,
+        m.a2, m.b2, m.c2, m.d2,
+        m.a3, m.b3, m.c3, m.d3,
+        m.a4, m.b4, m.c4, m.d4
+    );
+}
+
+///Recursively accumulates the transform of each node and associates it to the refering meshes
+static void collectMeshTransforms(const aiNode* node, aiMatrix4x4 parent_transform, vector<aiMatrix4x4>& mesh_transforms) {
+    aiMatrix4x4 global = parent_transform * node->mTransformation;
+
+    for(unsigned int i = 0; i < node->mNumMeshes; i++) {
+        mesh_transforms[node->mMeshes[i]] = global;
+    }
+    for(unsigned int i = 0; i < node->mNumChildren; i++) {
+        collectMeshTransforms(node->mChildren[i], global, mesh_transforms);
+    }
+}
+
 bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMaterial>& materials, vector<CPUMaterial>& cpu_materials, 
     mat4 transform, MeshBounds* bounds) {
     //Initialize bounds
@@ -176,9 +198,16 @@ bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMate
     }
 
     //Load triangles
+    vector<aiMatrix4x4> mesh_node_transform(scene->mNumMeshes, aiMatrix4x4());
+    collectMeshTransforms(scene->mRootNode, aiMatrix4x4(), mesh_node_transform);
+
     triangles.clear();
     for (unsigned int m = 0; m < scene->mNumMeshes; m++) {
         aiMesh* mesh = scene->mMeshes[m];
+
+        mat4 node_transform = aiToGlm(mesh_node_transform[m]);
+        mat4 final_transform = transform * node_transform;
+        mat3 normal_mat = transpose(inverse(mat3(final_transform)));
 
         for(unsigned f = 0; f < mesh->mNumFaces; f++) {
             aiFace& face = mesh->mFaces[f];
@@ -190,7 +219,7 @@ bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMate
             for (int v = 0; v < 3; v++) {
                 unsigned int idx = face.mIndices[v];
 
-                verts[v]->position = vec3(transform * vec4(mesh->mVertices[idx].x, mesh->mVertices[idx].y, mesh->mVertices[idx].z, 1.0f));
+                verts[v]->position = vec3(final_transform * vec4(mesh->mVertices[idx].x, mesh->mVertices[idx].y, mesh->mVertices[idx].z, 1.0f));
 
                 //normal validation
                 if(mesh->HasNormals()) {
