@@ -1024,24 +1024,29 @@ void saveScreenshot() {
         t->tm_year + 1900, t->tm_mon + 1, t->tm_mday,
         t->tm_hour, t->tm_min, t->tm_sec, renderer.frame_id);
 
-    // Reads directly from texture (maybe avoids problems with Wayland or X11 windows)
-    vector<float> pixels_float(WINDOW_WIDTH * WINDOW_HEIGHT * 4);
-    glGetTextureImage(renderer.tex[renderer.cur_f], 0, GL_RGBA, GL_FLOAT, pixels_float.size() * sizeof(float), pixels_float.data());
+    GLuint src_tex = (renderer.denoiser_active && renderer.denoised_tex && renderer.frame_id > 10) ? renderer.denoised_tex : renderer.tex[renderer.cur_f];
 
-    vector<unsigned char> pixels(WINDOW_WIDTH * WINDOW_HEIGHT * 3);
-    for (int i = 0; i < WINDOW_WIDTH * WINDOW_HEIGHT; i++) {
+    const int w = renderer.render_w;
+    const int h = renderer.render_h;
+
+    vector<float> pixels_float(w * h * 4);
+    glGetTextureImage(src_tex, 0, GL_RGBA, GL_FLOAT, pixels_float.size() * sizeof(float), pixels_float.data());
+
+    vector<unsigned char> pixels(w * h * 3);
+    for (int i = 0; i < w * h; i++) {
         pixels[i*3+0] = (unsigned char)(pow(aces_approx(pixels_float[i*4+0]), 1.0f/2.2f) * 255.0f);
         pixels[i*3+1] = (unsigned char)(pow(aces_approx(pixels_float[i*4+1]), 1.0f/2.2f) * 255.0f);
         pixels[i*3+2] = (unsigned char)(pow(aces_approx(pixels_float[i*4+2]), 1.0f/2.2f) * 255.0f);
     }
 
     //flip y
-    for (int y = 0; y < WINDOW_HEIGHT / 2; y++) {
-        int y2 = WINDOW_HEIGHT - 1 - y;
-        for (int x = 0; x < WINDOW_WIDTH * 3; x++)
-            swap(pixels[y * WINDOW_WIDTH * 3 + x], pixels[y2 * WINDOW_WIDTH * 3 + x]);
+    for (int y = 0; y < h / 2; y++) {
+        int y2 = h - 1 - y;
+        for (int x = 0; x < w * 3; x++)
+            swap(pixels[y * w * 3 + x], pixels[y2 * w * 3 + x]);
     }
-    stbi_write_png(filename, WINDOW_WIDTH, WINDOW_HEIGHT, 3, pixels.data(), WINDOW_WIDTH * 3);
+
+    stbi_write_png(filename, w, h, 3, pixels.data(), w * 3);
     screenshot_msg = string("Saved ") + filename;
     screenshot_msg_time = glfwGetTime();
     printf("\n[SCREENSHOT] Saved %s\n", filename);
