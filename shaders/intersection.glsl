@@ -117,7 +117,7 @@ float boxT(Ray ray, vec3 center, vec3 half_size, float pitch, float yaw, out vec
    float t1 = min(t_far.x, min(t_far.y, t_far.z));
 
    if (t1 < t0 || t1 < EPS) return INF;
-   float t = (t0 > EPS) ? t0 : t1;
+   float t = max(t0, 0.0);
 
    //normal in local space, then converts to world space
    vec3 hit_local = local_origin + t * local_dir;
@@ -160,7 +160,7 @@ float triangleT(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec3 out_normal, out vec
 
    //relative EPS with the triangle size
    float tri_size = length(flat_normal);
-   float eps = max(EPS_TRI, tri_size * 0.0001);
+   float eps = max(EPS_TRI, t * 1e-5);
 
    if (t < eps) return INF;
 

@@ -49,7 +49,7 @@
 #include "texture.hpp"
 #include "denoiser.hpp"
 
-#define VERSION "1.5.9"
+#define VERSION "1.6.0"
 #define VERSION_NOTE ""
 
 using namespace std;
