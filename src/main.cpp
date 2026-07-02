@@ -205,6 +205,7 @@ void onMouseScroll(GLFWwindow* w, double xoffset, double yoffset) {
     camera.move_speed = std::clamp(camera.move_speed, 0.001f, 10.0f);
 }
 
+///\return vec3 camera forward vector from pitch and yaw 
 vec3 cameraForward() {
     return normalize(vec3(cos(camera.pitch) * cos(camera.yaw), cos(camera.pitch) * sin(camera.yaw), sin(camera.pitch)));
 }
@@ -222,7 +223,7 @@ void applyResolution(int w, int h) {
     }
 }
 
-/// Changes the render resolution to preview mode, aux function
+///Switches the render resolution to the low-res mode
 void setPreviewResolution() {
     int target_w = config.moving_resolution;
     int target_h = glm::max(16, (int)(config.moving_resolution * (float)WINDOW_HEIGHT / (float)WINDOW_WIDTH));
@@ -238,7 +239,7 @@ void setPreviewResolution() {
     renderer.prev_f = 1;
 }
 
-/// Changes the render resolution to full mode
+///Switches the render resolution to full render mode
 void setFullResolution() {
     if(config.lock_preview_res) return;
     
@@ -248,6 +249,8 @@ void setFullResolution() {
 
 int frames_since_moved = 9999;
 
+
+///Enters the preview render mode and restarts accumulation
 void startMoving() {
     setPreviewResolution();
     renderer.frame_id = 0;
@@ -255,8 +258,8 @@ void startMoving() {
     frames_since_moved = 0;
 }
 
-/// \brief Checks if the user pressed the WASD keys
-/// \return true if any WASD key pressed
+///\brief Checks if the user pressed the WASD keys
+///\return true if any WASD key pressed
 bool useMoveKeys() {
     return (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS ||
     glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS ||
@@ -264,6 +267,7 @@ bool useMoveKeys() {
     glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS);
 }
 
+///Process WASD movement
 void processMovement() {
     //Reset camera position to start
     if(camera.returning_home) {
@@ -491,6 +495,7 @@ int main(void) {
     return 0;
 }
 
+///Formats a duration in seconds as "Xs" or "XmYs"
 void formatTime(double seconds, char*buf, int buf_size) {
     if (seconds < 60.0)
         snprintf(buf, buf_size, "%.1fs", seconds);
@@ -503,6 +508,8 @@ void formatTime(double seconds, char*buf, int buf_size) {
 
 //----------------------------------------------------------
 
+///Compiles and links all shaders 
+///\return true on success
 bool initShaders() {
     renderer.display_id = LoadShaders({
         { GL_VERTEX_SHADER,   "shaders/common.vert"    },
@@ -525,6 +532,7 @@ bool initShaders() {
     return true;
 }
 
+///\brief Caches every uniform location of the active shader into Renderer
 void initUniforms() {
     GLuint active = renderer.active_id;
 
@@ -591,6 +599,7 @@ void initUniforms() {
     renderer.loc_ground_shadow_opacity = glGetUniformLocation(active, "GROUND_SHADOW_OPACITY");
 }
 
+///\brief Updates every RenderConfig parameter, called when any changed
 void uploadConfig() {
     GLuint active = renderer.active_id;
     glUseProgram(active);
@@ -617,6 +626,7 @@ void uploadConfig() {
     glUniform1f(renderer.loc_ground_shadow_opacity, config.ground_shadow_opacity);
 }
 
+///\brief Calls uploadConfig and resets the scene
 void applyConfig() {
     uploadConfig();
     resetAccumulation();
@@ -664,6 +674,9 @@ void uploadCornellTopLight() {
     }
 }
 
+///\brief Recursively lists supported model files under the /models directory
+///\param models_dir Directory to scan
+///\return Sorted list of file paths
 vector<string> scanModels(const string& models_dir) {
     vector<string> paths;
 
@@ -681,6 +694,9 @@ vector<string> scanModels(const string& models_dir) {
     return paths;
 }
 
+///\brief Recursively lists HDRI files under the /hdri directory
+/// @param hdri_dir Directory to scan
+/// @return Sorted list of file paths
 vector<string> scanHDRI(const string& hdri_dir) {
     vector<string> paths;
 
@@ -698,6 +714,7 @@ vector<string> scanHDRI(const string& hdri_dir) {
     return paths;
 }
 
+///\brief Loads the scene and imports the model on a secondary thread
 void loadScene() {
     //Empty scene -> reset counters
     if(renderer.current_model.path.empty()) {
@@ -746,6 +763,8 @@ void loadScene() {
     }).detach();
 }
 
+///\brief First time GPU setup
+///\return true on success
 bool transferDataToGPU(void) {
     initShaders();
 
@@ -830,6 +849,8 @@ void display(void) {
 /*----------------------------------------------------------
   Denoiser
 */
+
+///\brief Computes at which samples the denoiser should run
 void setDenoiseCheckpoints() {
     renderer.denoise_checkpoints.clear();
     renderer.next_denoise_idx = 0;
@@ -844,6 +865,7 @@ void setDenoiseCheckpoints() {
         renderer.denoise_checkpoints = { n/2, n * 3/4, n};
 }
 
+///Allocates the denoised output texture at a width w and height h
 void createDenoisedTex(int w, int h) {
     if(renderer.denoised_tex)
         glDeleteTextures(1, &renderer.denoised_tex);
@@ -855,6 +877,9 @@ void createDenoisedTex(int w, int h) {
     glTextureParameteri(renderer.denoised_tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 }
 
+///\brief Reads back the accumulation texture, runs OIDN and sends the result
+/// @param checkpoint_num index of checkpoint
+/// @param total Total number of checkpoints
 void runDenoiser(int checkpoint_num, int total) {
     int w = renderer.render_w, h = renderer.render_h;
 
@@ -899,6 +924,7 @@ void clearTextures() {
     glClearTexImage(renderer.tex[1], 0, GL_RGBA, GL_FLOAT, zero);
 }
 
+///\brief Restarts progressive accumulation back to 0
 void resetAccumulation() {
     renderer.frame_id = 0;
     renderer.cur_f = 0;
@@ -917,6 +943,8 @@ void resetAccumulation() {
 /*----------------------------------------------------------
   Draw to GPU
 */
+
+///\brief Renders one full frame in the order: path trace, denoise, display, grid, UI
 void draw(void) {
     struct timespec ts_now;
     double time_now, time_elapsed = 0.0;
@@ -1090,6 +1118,7 @@ inline int current_res_idx = 0;
 const int res_w[] = {1280, 1920, 2560, 4096, 0, 0};
 const int res_h[] = {720, 1080, 1440, 2160, 0, 0};
 
+///\brief Syncs the UI to the current window size
 void syncResolutionDropdown() {
     if(is_fullscreen) {
         current_res_idx = 4;
