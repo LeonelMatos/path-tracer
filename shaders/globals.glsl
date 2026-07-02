@@ -251,6 +251,7 @@ uniform int bvh_root;
 uniform int USE_BVH_HEATMAP;
 
 ///nodes to saturate \note default 30
+///\bug When enabling heatmap, the scale doesn't apply until setting it.
 uniform int BVH_HEATMAP_SCALE;
 
 ///\}

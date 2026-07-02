@@ -42,10 +42,11 @@
 
 # directories
 /bin/*
+/build/*
+
 /model/*
 /models/*
-/build/*
-/docs/*
+/models/*
 
 # hdri
 /hdri/*
@@ -53,6 +54,9 @@
 !hdri/studio.hdr
 !hdri/abandoned_garage_2k.hdr
 !hdri/mirrored_hall_2k.hdr
+
+# Docs are generated via Github Actions
+/docs/*
 
 # scripts/notes
 *.py

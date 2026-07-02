@@ -1,1 +1,0 @@
-Include assimp, stb
