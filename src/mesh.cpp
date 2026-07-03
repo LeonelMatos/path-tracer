@@ -189,7 +189,16 @@ bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMate
             //external texture
             else {
                 filesystem::path model_dir = filesystem::path(path).parent_path();
-                cpu_mat.tex_path = (model_dir / tex_path.C_Str()).string();
+                string relative_path = tex_path.C_Str();
+                std::replace(relative_path.begin(), relative_path.end(), '\\', '/');
+
+                filesystem::path full_tex_path = model_dir / relative_path;
+
+                //stb doesn't support stupid .dds, converts to .png (hardcoded, but works)
+                if(full_tex_path.extension() == ".dds" || full_tex_path.extension() == ".DDS")
+                    full_tex_path.replace_extension(".png");
+
+                cpu_mat.tex_path = full_tex_path.string();
                 cpu_mat.has_texture = 1;
             }
         }
