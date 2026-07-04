@@ -11,6 +11,17 @@ OIDN_DIR="/opt/oidn"
 
 echo "Path Tracer - Libraries and Dependencies Setup"
 
+#check required directories
+echo "Checking project directories"
+for dir in build models hdri; do
+    if [ -d "$dir" ]; then
+        echo " $dir/ already exists, skipped"
+    else
+        mkdir -p "$dir"
+        echo " $dir/ created"
+    fi
+done
+
 #check apt dependencies before install
 echo "Checking dependencies"
 MISSING_PACKAGES=()
@@ -49,7 +60,6 @@ fi
 
 #compile
 echo "Building at ./build"
-mkdir -p build
 cd build
 cmake .. -DOIDN_ROOT="$OIDN_DIR"
 make -j$(nproc)
