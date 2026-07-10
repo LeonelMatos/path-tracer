@@ -109,7 +109,12 @@ bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMate
         //Light emission
         aiColor3D emission(0.0f, 0.0f, 0.0f);
         mat->Get(AI_MATKEY_COLOR_EMISSIVE, emission);
-        if(emission.r > 0.01f || emission.g > 0.01f || emission.b > 0.01f) {
+
+        bool has_emissive_tex = mat->GetTextureCount(aiTextureType_EMISSIVE) > 0;
+        if(has_emissive_tex) {
+            printf("\t[MODEL] Material %d has an emissive texture (unsupported)\n\tIgnoring emissive factor\n", m);
+        }
+        else if(emission.r > 0.01f || emission.g > 0.01f || emission.b > 0.01f) {
             float emissive_strength = 1.0f;
             mat->Get(AI_MATKEY_EMISSIVE_INTENSITY, emissive_strength);
             gpu_mat.emission = vec4(emission.r, emission.g, emission.b, 0.0f) * emissive_strength;
