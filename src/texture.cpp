@@ -38,8 +38,10 @@ bool loadEnvMap(const string& path, Renderer& renderer) {
 }
 
 bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>& gpu_materials, Renderer& renderer) {
-    const int TEX_SIZE = 1024;
+    ///Forces the loaded textures to be this size \todo dynamically change the tex size
+    const int TEX_SIZE = 4096;
     const int MAX_LAYERS = (int)cpu_materials.size();
+    int mip_levels = 1 + (int)floor(std::log2(TEX_SIZE));
 
     int tex_count = 0;
     for (auto& m : cpu_materials)
@@ -54,11 +56,16 @@ bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>
         glDeleteTextures(1, &renderer.tex_array);
 
     glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &renderer.tex_array);
-    glTextureStorage3D(renderer.tex_array, 1, GL_RGBA8, TEX_SIZE, TEX_SIZE, MAX_LAYERS);
-    glTextureParameteri(renderer.tex_array, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTextureStorage3D(renderer.tex_array, mip_levels, GL_RGBA8, TEX_SIZE, TEX_SIZE, MAX_LAYERS);
+    glTextureParameteri(renderer.tex_array, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTextureParameteri(renderer.tex_array, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTextureParameteri(renderer.tex_array, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTextureParameteri(renderer.tex_array, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    //Anisotropic filtering
+    GLfloat max_aniso = 0.0f;
+    glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &max_aniso);
+    glTextureParameterf(renderer.tex_array, GL_TEXTURE_MAX_ANISOTROPY, max_aniso);
 
     stbi_set_flip_vertically_on_load(false);
 
@@ -108,6 +115,8 @@ bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>
 
         printf("[TEXTURES] Loaded %d: %s (%dx%d)\n", i, cpu_mat.tex_path.c_str(), w, h);
     }
+
+    glGenerateTextureMipmap(renderer.tex_array);
 
     //Texture bind
     glBindTextureUnit(3, renderer.tex_array);
