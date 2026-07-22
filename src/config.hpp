@@ -133,6 +133,16 @@ struct Renderer {
     GLuint grid_id = 0;
     GLint grid_loc_view, grid_loc_proj, grid_loc_near, grid_loc_far, grid_loc_cam_pos;
 
+    ///Photo framing overlay (viewfinder, screen-space only)
+    ///\note 0=off, 1=thirds, 2=golden ration, 3=center cross, 4=diagonal
+    ///\see drawCompositionGuides
+    int composition_guide = 0;
+
+    ///Aspect-ratio crop preview mask on top of the render
+    ///\note index into ASPECT_RATIOS; 0=off
+    ///\see drawCompositionGuides
+    int aspect_frame = 0;
+
     GLuint triangle_ssbo;
     GLuint material_ssbo;
     ///Triangle count fixed value passed pre-calculated

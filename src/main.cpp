@@ -49,7 +49,7 @@
 #include "texture.hpp"
 #include "denoiser.hpp"
 
-#define VERSION "1.6.5"
+#define VERSION "1.6.6"
 #define VERSION_NOTE ""
 
 using namespace std;
@@ -127,6 +127,7 @@ void resetAccumulation();
 void draw(void);
 void saveScreenshot();
 void drawGrid();
+void drawCompositionGuides();
 void syncResolutionDropdown();
 void drawUI();
 
@@ -1111,6 +1112,106 @@ void drawGrid() {
     //glEnable(GL_DEPTH_TEST);
 }
 
+///\brief Aspect-ratio crop preview options
+struct AspectRatioOption { const char* name; float ratio; };
+
+const AspectRatioOption ASPECT_RATIOS[] = {
+    {"Off", 0.0f},
+    {"1:1 Square", 1.0f},
+    {"4:5 Portrait", 4.0f/5.0f},
+    {"5:4", 5.0f/4.0f},
+    {"3:2 Photo", 3.0f/2.0f},
+    {"$:3", 4.0f/3.0f},
+    {"16:9 Widescreen", 16.0f/9.0f},
+    {"1.85:1 Cinema", 1.85f},
+    {"2.35:1 Cinemascope", 2.35f}
+};
+
+const int ASPECT_RATIO_COUNT = sizeof(ASPECT_RATIOS) / sizeof(ASPECT_RATIOS[0]);
+
+const char* COMPOSITION_GUIDE_NAMES[] = {
+    "Off", "Rule of Thirds", "Golden Ratio", "Center Cross", "Diagonal"
+};
+
+const int COMPOSITION_GUIDE_COUNT = sizeof(COMPOSITION_GUIDE_NAMES) / sizeof(COMPOSITION_GUIDE_NAMES[0]);
+
+///\brief Draws photography-style framing guides and an aspect-ratio crop preview mask over the viewport
+///Doesn't touch the shader, render or camera, only a viewfinder to position the camera
+///\note Drawn on ImGui's background draw list, so it stays on top ot the render and beneath the Scene Editor window 
+void drawCompositionGuides() {
+    if (renderer.composition_guide == 0 && renderer.aspect_frame == 0) return;
+
+    ImDrawList* dl = ImGui::GetBackgroundDrawList();
+    const float W = (float)WINDOW_WIDTH, H = (float)WINDOW_HEIGHT;
+    const ImU32 line_col = IM_COL32(255, 255, 255, 200);
+    const float thickness = 5.0f;
+
+    switch(renderer.composition_guide) {
+        //Rule of thirds
+        case 1: {
+            for (int i = 1; i <= 2; i++) {
+                float x = W * i / 3.0f;
+                float y = H * i / 3.0f;
+                dl->AddLine(ImVec2(x, 0), ImVec2(x, H), line_col, thickness);
+                dl->AddLine(ImVec2(0, y), ImVec2(W, y), line_col, thickness);
+            }
+            break;
+        }
+        //Golden Ratio
+        case 2: {
+            const float inv_phi = 0.6180339887f;
+            float x0 = W * (1.0f - inv_phi), x1 = W * inv_phi;
+            float y0 = H * (1.0f - inv_phi), y1 = H * inv_phi;
+            dl->AddLine(ImVec2(x0, 0), ImVec2(x0, H), line_col, thickness);
+            dl->AddLine(ImVec2(x1, 0), ImVec2(x1, H), line_col, thickness);
+            dl->AddLine(ImVec2(0, y0), ImVec2(W, y0), line_col, thickness);
+            dl->AddLine(ImVec2(0, y1), ImVec2(W, y1), line_col, thickness);
+            break;
+        }
+        //Center Cross
+        case 3: {
+            dl->AddLine(ImVec2(W * 0.5f, 0), ImVec2(W * 0.5f, H), line_col, thickness);
+            dl->AddLine(ImVec2(0, H * 0.5f), ImVec2(W, H * 0.5f), line_col, thickness);
+            break;
+        }
+        //Diagonal
+        case 4: {
+            dl->AddLine(ImVec2(0, 0), ImVec2(W, H), line_col, thickness);
+            dl->AddLine(ImVec2(W, 0), ImVec2(0, H), line_col, thickness);
+            break;
+        }
+    }
+
+    //Aspect-ratio crop
+    if(renderer.aspect_frame > 0 && renderer.aspect_frame < ASPECT_RATIO_COUNT) {
+        float target_ratio = ASPECT_RATIOS[renderer.aspect_frame].ratio;
+        float window_ratio = W / H;
+
+        float crop_w, crop_h;
+        if(target_ratio > window_ratio) { //crop wider than window
+            crop_w = W;
+            crop_h = W / target_ratio;
+        }
+        else { //crop narrower than window
+            crop_h = H;
+            crop_w = H * target_ratio;
+        }
+        float x0 = (W - crop_w) * 0.5f;
+        float y0 = (H - crop_h) * 0.5f;
+
+        const ImU32 mask_col = IM_COL32(0, 0, 0, 240);
+        if(y0 > 0.5f) {
+            dl->AddRectFilled(ImVec2(0, 0), ImVec2(W, y0), mask_col);
+            dl->AddRectFilled(ImVec2(0, y0 + crop_h), ImVec2(W, H), mask_col);
+        }
+        if(x0 > 0.5f) {
+            dl->AddRectFilled(ImVec2(0, 0), ImVec2(x0, H), mask_col);
+            dl->AddRectFilled(ImVec2(x0 + crop_w, 0), ImVec2(W, H), mask_col);
+        }
+        dl->AddRect(ImVec2(x0, y0), ImVec2(x0 + crop_w, y0 + crop_h), IM_COL32(255, 255, 255, 180), 0.0f, 0, 1.5f);
+    }
+}
+
 /*----------------------------------------------------------
   UI Draw
 */
@@ -1143,6 +1244,8 @@ void drawUI() {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+
+    drawCompositionGuides();
 
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigWindowsMoveFromTitleBarOnly = true;
@@ -1278,6 +1381,18 @@ void drawUI() {
                     resetBtn("*##fband", config.focal_band_debug, render_defaults.focal_band_debug);
                 }
             }
+
+            //------ Composition and Aspect Ratio -----------
+            ImGui::SeparatorText("Composition");
+            ImGui::Combo("Guide", &renderer.composition_guide, COMPOSITION_GUIDE_NAMES, COMPOSITION_GUIDE_COUNT);
+            ImGui::SetItemTooltip("Viewfinder overlay to frame the shot\n(doesn't affect the render)");
+
+            const char* aspect_names[ASPECT_RATIO_COUNT];
+            for(int i = 0; i < ASPECT_RATIO_COUNT; i++)
+                aspect_names[i] = ASPECT_RATIOS[i].name;
+            ImGui::Combo("Crop Frame", &renderer.aspect_frame, aspect_names, ASPECT_RATIO_COUNT);
+            ImGui::SetItemTooltip("Preview a different aspect-ratio crop\n(doesn't affect the render)");
+
             if(changed) applyConfig();
         }
         //----- Models -------------
