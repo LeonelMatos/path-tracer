@@ -49,7 +49,7 @@
 #include "texture.hpp"
 #include "denoiser.hpp"
 
-#define VERSION "1.6.3"
+#define VERSION "1.6.4"
 #define VERSION_NOTE ""
 
 using namespace std;
@@ -1062,9 +1062,11 @@ void saveScreenshot() {
 
     vector<unsigned char> pixels(w * h * 3);
     for (int i = 0; i < w * h; i++) {
-        pixels[i*3+0] = (unsigned char)(pow(aces_approx(pixels_float[i*4+0]), 1.0f/2.2f) * 255.0f);
-        pixels[i*3+1] = (unsigned char)(pow(aces_approx(pixels_float[i*4+1]), 1.0f/2.2f) * 255.0f);
-        pixels[i*3+2] = (unsigned char)(pow(aces_approx(pixels_float[i*4+2]), 1.0f/2.2f) * 255.0f);
+        vec3 linear_color(pixels_float[i*4+0], pixels_float[i*4+1], pixels_float[i*4+2]);
+        vec3 mapped = glm::pow(toneMapCPU(linear_color, config.tone_mapping), vec3(1.0f/2.2f));
+        pixels[i*3+0] = (unsigned char)(mapped.r * 255.0f);
+        pixels[i*3+1] = (unsigned char)(mapped.g * 255.0f);
+        pixels[i*3+2] = (unsigned char)(mapped.b * 255.0f);
     }
 
     //flip y

@@ -61,6 +61,7 @@ bool intersects_cornell(const Ray ray, out Hit h) {
             h.t = ray_dist;
             h.pos = hit_p;
             h.normal = vec3(0, 0, -1);
+            h.geom_normal = h.normal;
             h.albedo = WHITE;
             h.emission = vec3(5.0);
         }
@@ -73,6 +74,7 @@ bool intersects_cornell(const Ray ray, out Hit h) {
             h.t = ray_dist;
             h.pos = hit_p;
             h.normal = vec3(0, 0, 1);
+            h.geom_normal = h.normal;
             h.albedo = WHITE;
             h.emission = vec3(0);
         }
@@ -86,6 +88,7 @@ bool intersects_cornell(const Ray ray, out Hit h) {
             h.t = ray_dist;
             h.pos = hit_p;
             h.normal = vec3(0, 0, -1);
+            h.geom_normal = h.normal;
             h.albedo = WHITE;
             h.emission = vec3(0);
         }
@@ -99,6 +102,7 @@ bool intersects_cornell(const Ray ray, out Hit h) {
             h.t = ray_dist;
             h.pos = hit_p;
             h.normal = vec3(0, -1, 0);
+            h.geom_normal = h.normal;
             h.albedo = WHITE;
             h.emission = vec3(0);
         }
@@ -112,6 +116,7 @@ bool intersects_cornell(const Ray ray, out Hit h) {
             h.t = ray_dist;
             h.pos = hit_p;
             h.normal = vec3(1, 0, 0);
+            h.geom_normal = h.normal;
             h.albedo = RED;
             h.emission = vec3(0);
         }
@@ -125,6 +130,7 @@ bool intersects_cornell(const Ray ray, out Hit h) {
             h.t = ray_dist;
             h.pos = hit_p;
             h.normal = vec3(-1, 0, 0);
+            h.geom_normal = h.normal;
             h.albedo = GREEN;
             h.emission = vec3(0);
         }
@@ -137,6 +143,7 @@ bool intersects_cornell(const Ray ray, out Hit h) {
         h.t = ray_dist;
         h.pos = ray.origin + ray_dist * ray.direction;
         h.normal = normalize(h.pos - sphere_left_center);
+        h.geom_normal = h.normal;
         h.albedo = WHITE;
         h.emission = vec3(0);
         h.material = MAT_GLASS;
@@ -150,6 +157,7 @@ bool intersects_cornell(const Ray ray, out Hit h) {
         h.t = ray_dist;
         h.pos = ray.origin + ray_dist * ray.direction;
         h.normal = box_normal;
+        h.geom_normal = h.normal;
         h.albedo = WHITE;
         h.emission = vec3(0);
         h.material = MAT_MIRROR;
@@ -163,30 +171,12 @@ bool intersects_cornell(const Ray ray, out Hit h) {
         h.t = ray_dist;
         h.pos = ray.origin + ray_dist * ray.direction;
         h.normal = normalize(h.pos - sphere_right_center);
+        h.geom_normal = h.normal;
         h.albedo = WHITE;
         h.emission = vec3(0);
         h.material = MAT_DIFFUSE;
         h.ior = 0.5;
     }
-
-    // 1 Triangle
-    /*
-    vec3 tri_normal;
-    vec3 tri_bary;
-    ray_dist = triangleT(ray, vec3(-0.8, -0.8, -0.6), vec3( 0.8, -0.8, -0.6), vec3( 0.0,  0.8, -0.4), tri_normal, tri_bary);
-    if(ray_dist < h.t) {
-        h.t = ray_dist;
-        h.pos = ray.origin + ray_dist * ray.direction;
-        h.normal = tri_normal;
-        h.albedo = 
-            vec3(1.0, 0.0, 0.0) * tri_bary.x +
-            vec3(0.0, 1.0, 0.0) * tri_bary.y +
-            vec3(0.0, 0.0, 1.0) * tri_bary.z;
-        h.emission = vec3(0);
-        h.material = MAT_TINTED_GLASS;
-        h.ior = 1;
-    }
-    */
 
 /*
     //AABB Early Rejection

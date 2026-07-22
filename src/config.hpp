@@ -216,9 +216,36 @@ struct CameraConfig {
 inline std::string screenshot_msg = "";
 inline double screenshot_msg_time = 0.0;
 
-///ACES tone map on the CPU side, an approximation of the shader ACES
-///\see saveScreenshot
-inline auto aces_approx = [](float x) -> float {
-    float a = 2.51f, b = 0.03f, c = 2.43f, d = 0.59f, e = 0.14f;
-    return glm::clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0f, 1.0f);
-};
+///\note must stay synced with TONE_MAPPING consts in globals.glsl
+const int TM_NONE = 0;
+const int TM_REINHARD = 1;
+const int TM_ACES = 2;
+
+///\brief CPU-side tone mapping, mirrors display frag's toneMap(), so screenshots match what's shown
+///in render output, and not an estimation
+///\see display.frag, saveScreenshot
+inline glm::vec3 toneMapCPU(glm::vec3 color, int tone_mapping) {
+    switch(tone_mapping) {
+        case TM_REINHARD:
+            return color / (color + glm::vec3(1.0f));
+        case TM_ACES: {
+            const glm::mat3 inputMat(
+                0.59719f, 0.07600f, 0.02840f,
+                0.35458f, 0.90834f, 0.13383f,
+                0.04823f, 0.01566f, 0.83777f
+            );
+            const glm::mat3 outputMat(
+                1.60475f, -0.10208f, -0.00327f,
+                -0.53108f,  1.10813f, -0.07276f,
+                -0.07367f, -0.00605f,  1.07602f
+            );
+            glm::vec3 v = inputMat * color;
+            glm::vec3 a = v * (v + 0.0245786f) - 0.000090537f;
+            glm::vec3 b = v * (0.983729f * v + 0.4329510f) + 0.238081f;
+            return glm::clamp(outputMat * (a / b), 0.0f, 1.0f);
+        }
+        default:
+            return glm::clamp(color, 0.0f, 1.0f);
+    }
+
+}
