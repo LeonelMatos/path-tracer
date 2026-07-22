@@ -1121,7 +1121,7 @@ const AspectRatioOption ASPECT_RATIOS[] = {
     {"4:5 Portrait", 4.0f/5.0f},
     {"5:4", 5.0f/4.0f},
     {"3:2 Photo", 3.0f/2.0f},
-    {"$:3", 4.0f/3.0f},
+    {"4:3", 4.0f/3.0f},
     {"16:9 Widescreen", 16.0f/9.0f},
     {"1.85:1 Cinema", 1.85f},
     {"2.35:1 Cinemascope", 2.35f}
@@ -1135,6 +1135,12 @@ const char* COMPOSITION_GUIDE_NAMES[] = {
 
 const int COMPOSITION_GUIDE_COUNT = sizeof(COMPOSITION_GUIDE_NAMES) / sizeof(COMPOSITION_GUIDE_NAMES[0]);
 
+///\brief Draws a line that shows clearly in dark and light backgrounds
+void addContrastLine(ImDrawList* dl, ImVec2 p1, ImVec2 p2, float thickness) {
+    dl->AddLine(p1, p2, IM_COL32(0, 0, 0, 160), thickness + 1.5f);
+    dl->AddLine(p1, p2, IM_COL32(255, 255, 255, 210), thickness);
+}
+
 ///\brief Draws photography-style framing guides and an aspect-ratio crop preview mask over the viewport
 ///Doesn't touch the shader, render or camera, only a viewfinder to position the camera
 ///\note Drawn on ImGui's background draw list, so it stays on top ot the render and beneath the Scene Editor window 
@@ -1143,7 +1149,7 @@ void drawCompositionGuides() {
 
     ImDrawList* dl = ImGui::GetBackgroundDrawList();
     const float W = (float)WINDOW_WIDTH, H = (float)WINDOW_HEIGHT;
-    const ImU32 line_col = IM_COL32(255, 255, 255, 200);
+    //const ImU32 line_col = IM_COL32(255, 255, 255, 200);
     const float thickness = 5.0f;
 
     switch(renderer.composition_guide) {
@@ -1152,8 +1158,8 @@ void drawCompositionGuides() {
             for (int i = 1; i <= 2; i++) {
                 float x = W * i / 3.0f;
                 float y = H * i / 3.0f;
-                dl->AddLine(ImVec2(x, 0), ImVec2(x, H), line_col, thickness);
-                dl->AddLine(ImVec2(0, y), ImVec2(W, y), line_col, thickness);
+                addContrastLine(dl, ImVec2(x, 0), ImVec2(x, H), thickness);
+                addContrastLine(dl, ImVec2(0, y), ImVec2(W, y), thickness);
             }
             break;
         }
@@ -1162,22 +1168,22 @@ void drawCompositionGuides() {
             const float inv_phi = 0.6180339887f;
             float x0 = W * (1.0f - inv_phi), x1 = W * inv_phi;
             float y0 = H * (1.0f - inv_phi), y1 = H * inv_phi;
-            dl->AddLine(ImVec2(x0, 0), ImVec2(x0, H), line_col, thickness);
-            dl->AddLine(ImVec2(x1, 0), ImVec2(x1, H), line_col, thickness);
-            dl->AddLine(ImVec2(0, y0), ImVec2(W, y0), line_col, thickness);
-            dl->AddLine(ImVec2(0, y1), ImVec2(W, y1), line_col, thickness);
+            addContrastLine(dl, ImVec2(x0, 0), ImVec2(x0, H), thickness);
+            addContrastLine(dl, ImVec2(x1, 0), ImVec2(x1, H), thickness);
+            addContrastLine(dl, ImVec2(0, y0), ImVec2(W, y0), thickness);
+            addContrastLine(dl, ImVec2(0, y1), ImVec2(W, y1), thickness);
             break;
         }
         //Center Cross
         case 3: {
-            dl->AddLine(ImVec2(W * 0.5f, 0), ImVec2(W * 0.5f, H), line_col, thickness);
-            dl->AddLine(ImVec2(0, H * 0.5f), ImVec2(W, H * 0.5f), line_col, thickness);
+            addContrastLine(dl, ImVec2(W * 0.5f, 0), ImVec2(W * 0.5f, H), thickness);
+            addContrastLine(dl, ImVec2(0, H * 0.5f), ImVec2(W, H * 0.5f), thickness);
             break;
         }
         //Diagonal
         case 4: {
-            dl->AddLine(ImVec2(0, 0), ImVec2(W, H), line_col, thickness);
-            dl->AddLine(ImVec2(W, 0), ImVec2(0, H), line_col, thickness);
+            addContrastLine(dl, ImVec2(0, 0), ImVec2(W, H), thickness);
+            addContrastLine(dl, ImVec2(W, 0), ImVec2(0, H), thickness);
             break;
         }
     }
