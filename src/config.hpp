@@ -52,10 +52,13 @@ struct RenderConfig {
     float focal_band_debug = 0.05;
     
     //Not part of the shader config
-    ///render resolution when moving the camera
+    ///render resolution when moving the camera and while Preview Mode is active
     int moving_resolution = 256;
     //Locks the viewport into preview pode while active
-    bool lock_preview_res = false;
+    ///Persistent preview mode, pins the renderer at moving_resolution to keep the program
+    ///responsive. Interacted via the Render button
+    ///\see setPreviewMode, setFullResolution
+    bool lock_preview_res = true;
     ///controls the progressive resolution scaling up to the original
     bool progressive_refine = true;
 

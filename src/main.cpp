@@ -49,7 +49,7 @@
 #include "texture.hpp"
 #include "denoiser.hpp"
 
-#define VERSION "1.6.4"
+#define VERSION "1.6.5"
 #define VERSION_NOTE ""
 
 using namespace std;
@@ -108,7 +108,7 @@ void toggleFullscreen();
 vec3 cameraForward();
 void setPreviewResolution();
 void setFullResolution();
-void startMoving();
+void setPreviewMode(bool enabled);
 void processMovement();
 void formatTime(double seconds, char*buf, int buf_size);
 bool initShaders();
@@ -247,15 +247,20 @@ void setFullResolution() {
     clearTextures();
 }
 
-int frames_since_moved = 9999;
-
-
-///Enters the preview render mode and restarts accumulation
-void startMoving() {
-    setPreviewResolution();
-    renderer.frame_id = 0;
-    renderer.denoiser_active = false;
-    frames_since_moved = 0;
+///\brief Toggle Preview Mode 
+///Pins the renderer at the low preview resolution and stops it from auto-upgrading to full res
+///until disabling and starting a fresh render
+void setPreviewMode(bool enabled) {
+    config.lock_preview_res = enabled;
+    if(enabled) {
+        setPreviewResolution();
+        renderer.frame_id = 0;
+        renderer.denoiser_active = false;
+    }
+    else {
+        setFullResolution();
+        resetAccumulation();
+    }
 }
 
 ///\brief Checks if the user pressed the WASD keys
@@ -283,7 +288,7 @@ void processMovement() {
             camera.yaw = glm::mix(camera.yaw, camera_default.yaw, t);
             camera.lookat = camera.position + cameraForward();
             uploadCamera();
-            startMoving();
+            setPreviewMode(true);
             
             //Reached position
             if(length(camera.position - camera_default.position) < 0.001f && abs(camera.yaw - camera_default.yaw) < 0.001f &&
@@ -323,11 +328,9 @@ void processMovement() {
         camera.lookat  = camera.position + cameraForward();
         camera.moving  = false;
         uploadCamera();
-        startMoving();
+        setPreviewMode(true);
         return;
     }
-    frames_since_moved++;
-    if (frames_since_moved == 5) setFullResolution();
 }
 
 void onWindowResize(GLFWwindow* window, int width, int height) {
@@ -727,6 +730,8 @@ void loadScene() {
         return;
     }
     renderer.is_model_loading = true;
+    //keeps the program responsive while loading models
+    setPreviewMode(true);
 
     std::thread([]{
         vector<GPUTriangle> tris; vector<GPUMaterial> mats; vector<CPUMaterial> cpu_mats;
@@ -996,8 +1001,8 @@ void draw(void) {
     int tmp = renderer.cur_f; renderer.cur_f = renderer.prev_f; renderer.prev_f = tmp;
     renderer.frame_id++;
 
-    //Denoiser phase
-    if(renderer.denoiser_enabled && renderer.next_denoise_idx < (int)renderer.denoise_checkpoints.size() &&
+    //Denoiser phase (skipped in Preview Mode)
+    if(!config.lock_preview_res && renderer.denoiser_enabled && renderer.next_denoise_idx < (int)renderer.denoise_checkpoints.size() &&
         renderer.frame_id == renderer.denoise_checkpoints[renderer.next_denoise_idx]) {
             int idx = renderer.next_denoise_idx +1;
             int total = (int)renderer.denoise_checkpoints.size();
@@ -1180,6 +1185,28 @@ void drawUI() {
                 saveScreenshot();
             if(ImGui::Button("Reset Camera[H]"))
                 camera.returning_home = true;
+
+            ImGui::Separator();
+            if(config.lock_preview_res) {
+                ImGui::TextColored(ImVec4(0.40f, 0.80f, 1.0f, 1.0f), "PREVIEW MODE");
+                ImGui::TextWrapped("Interact freely: render is in Preview Mode");
+                if(ImGui::Button("Full Render", ImVec2(-1, 0)))
+                    setPreviewMode(false);
+            }
+            else {
+                bool converged = renderer.MAX_SAMPLES > 0 && renderer.frame_id >= (int)renderer.MAX_SAMPLES;
+                if(converged)
+                    ImGui::TextColored(ImVec4(0.55f, 1.0f, 0.55f, 1.0f), "Render Complete");
+                else {
+                    ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "Rendering...");
+                    float progress = renderer.MAX_SAMPLES > 0 ? (float)renderer.frame_id / (float)renderer.MAX_SAMPLES : 0.0f;
+                    ImGui::ProgressBar(progress, ImVec2(-1, 0));
+                }
+                if(ImGui::Button("Return to Preview", ImVec2(-1, 0)))
+                    setPreviewMode(true);
+            }
+            ImGui::Separator();
+            
             if (!screenshot_msg.empty()) {
                 double time_elapsed = glfwGetTime() - screenshot_msg_time;
                 if(time_elapsed < 4.0) {
@@ -1398,8 +1425,11 @@ void drawUI() {
         //----- Preview Config -------------
         if(ImGui::CollapsingHeader("Preview", ImGuiTreeNodeFlags_DefaultOpen)) {
             int res = config.moving_resolution;
-            ImGui::Checkbox("##lock_preview", &config.lock_preview_res);
-            ImGui::SetItemTooltip("Lock preview mode");
+            bool preview_locked = config.lock_preview_res;
+            if(ImGui::Checkbox("##lock_preview", &preview_locked))
+                setPreviewMode(preview_locked);
+            ImGui::SetItemTooltip("Lock preview mode (same as Full Render/Return to Preview Mode)");
+            
             ImGui::SameLine();
             if(ImGui::SliderInt("Preview Res", &res, 32, 512)) {
                 res = (res / 16) * 16;
