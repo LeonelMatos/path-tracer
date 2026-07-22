@@ -320,11 +320,18 @@ vec4 pathTrace(vec2 uv, int spp_index, uvec2 px) {
 
         vec3 r = rand3(b, spp_index, px);
 
+        //Used by MAT_DIFFUSE when the bounce cap is reached
+        //\note break inside the switch only exits the switch, not the for-loop,
+        //the end_path flag is used to terminate the path instead of leaving to re-hit the same point
+        bool end_path = false;
+
         switch(h.material) {
             //Diffuse Materials
             case MAT_DIFFUSE: {
                 //Reduces diffuse bounces without losing quality because of NEE
-                if(diffuse_bounces++ >= 2 && USE_NEE == 1) break;
+                if(diffuse_bounces++ >= 2 && USE_NEE == 1) {
+                    end_path = true;
+                }
 
                 //Cosine-weighted hemisphere
                 float cosT = sqrt(r.x);
@@ -399,6 +406,8 @@ vec4 pathTrace(vec2 uv, int spp_index, uvec2 px) {
                 return vec4(color, alpha);
             }
         }
+
+        if (end_path) break;
 
         // Russian Roulette
         if (RR_MIN_BOUNCES > 0 && b >= RR_MIN_BOUNCES) {
