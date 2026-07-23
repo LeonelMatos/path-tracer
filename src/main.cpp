@@ -478,6 +478,8 @@ int main(void) {
         if (renderer.MAX_SAMPLES > 0 && renderer.frame_id >= renderer.MAX_SAMPLES && !is_moving) {
             clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
+            glfwSwapInterval(1);
+
             glfwWaitEvents(); //Gets input events and avoids program freezing
             processMovement();
 
@@ -491,6 +493,7 @@ int main(void) {
             metrics.last_frame_time = (ts_end.tv_sec - ts_start.tv_sec) + (ts_end.tv_nsec - ts_start.tv_nsec) * 1e-9;
             continue;
         }
+        glfwSwapInterval(renderer.v_sync);
         draw();
     }
     cleanDataFromGPU();
