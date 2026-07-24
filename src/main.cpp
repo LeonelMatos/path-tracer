@@ -49,7 +49,7 @@
 #include "texture.hpp"
 #include "denoiser.hpp"
 
-#define VERSION "1.6.7"
+#define VERSION "1.6.8"
 #define VERSION_NOTE ""
 
 using namespace std;
@@ -1083,12 +1083,33 @@ void saveScreenshot() {
     glGetTextureImage(src_tex, 0, GL_RGBA, GL_FLOAT, pixels_float.size() * sizeof(float), pixels_float.data());
 
     vector<unsigned char> pixels(w * h * 3);
+    float exposure_mult = glm::exp2(config.exposure_ev);
+    vec3 bg(1.0f);
+
     for (int i = 0; i < w * h; i++) {
+        int x = i % w;
+        int y = i / w;
+        vec2 uv = (vec2((float)x, (float)y) + 0.5f) / vec2((float)w, (float)h);
+
         vec3 linear_color(pixels_float[i*4+0], pixels_float[i*4+1], pixels_float[i*4+2]);
+        float alpha = pixels_float[i*4+3];
+
+        linear_color *= exposure_mult;
+
         vec3 mapped = glm::pow(toneMapCPU(linear_color, config.tone_mapping), vec3(1.0f/2.2f));
-        pixels[i*3+0] = (unsigned char)(mapped.r * 255.0f);
-        pixels[i*3+1] = (unsigned char)(mapped.g * 255.0f);
-        pixels[i*3+2] = (unsigned char)(mapped.b * 255.0f);
+        
+        //vignette (duplicated like display.frag)
+        if(config.vignette_strength > 0.0f) {
+            vec2 centered = uv - 0.5f;
+            float dist = glm::length(centered) * 1.4142135f;
+            float vignette = 1.0f - config.vignette_strength * dist * dist;
+            mapped *= glm::clamp(vignette, 0.0f, 1.0f);
+        }
+        vec3 composited = glm::mix(bg, mapped, alpha);
+        pixels[i*3+0] = (unsigned char)(composited.r * 255.0f);
+        pixels[i*3+1] = (unsigned char)(composited.g * 255.0f);
+        pixels[i*3+2] = (unsigned char)(composited.b * 255.0f);
+
     }
 
     //flip y
