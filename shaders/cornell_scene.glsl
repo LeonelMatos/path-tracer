@@ -185,7 +185,7 @@ bool intersects_cornell(const Ray ray, out Hit h) {
     vec3 aabb_center = (mesh_aabb_min + mesh_aabb_max) * 0.5;
     vec3 aabb_half_size = (mesh_aabb_max - mesh_aabb_min) * 0.5;
     vec3 aabb_normal;
-    float aabb_t = boxT(ray, aabb_center, aabb_half_size, 0.0, 0.0, aabb_normal);
+    float aabb_t = boxTAxisAligned(ray, aabb_center, aabb_half_size, aabb_normal);
     
     if (aabb_t < h.t) {
         //Draw Triangle loop for all triangles in buffer

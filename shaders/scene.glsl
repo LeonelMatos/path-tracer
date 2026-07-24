@@ -11,7 +11,7 @@ void intersects_mesh(const Ray ray, inout Hit h) {
     vec3 aabb_center = (mesh_aabb_min + mesh_aabb_max) * 0.5;
     vec3 aabb_half_size = (mesh_aabb_max - mesh_aabb_min) * 0.5;
     vec3 aabb_normal;
-    float aabb_t = boxT(ray, aabb_center, aabb_half_size, 0.0, 0.0, aabb_normal);
+    float aabb_t = boxTAxisAligned(ray, aabb_center, aabb_half_size, aabb_normal);
 
     if(aabb_t >= h.t) return;
 
@@ -29,7 +29,7 @@ void intersects_mesh(const Ray ray, inout Hit h) {
         vec3 node_center = (node.aabb_min + node.aabb_max) * 0.5;
         vec3 node_half_size = (node.aabb_max - node.aabb_min) * 0.5;
         vec3 node_normal;
-        float node_t = boxT(ray, node_center, node_half_size, 0.0, 0.0, node_normal); //remove local axis orientation with pitch+yaw for optimization
+        float node_t = boxTAxisAligned(ray, node_center, node_half_size, node_normal);
 
         if (node_t >= h.t) continue;
 
@@ -83,8 +83,8 @@ void intersects_mesh(const Ray ray, inout Hit h) {
             vec3 rh = (right_node.aabb_max - right_node.aabb_min) * 0.5;
             vec3 nn;
 
-            float t_left = boxT(ray, lc, lh, 0.0, 0.0, nn);
-            float t_right = boxT(ray, rc, rh, 0.0, 0.0, nn);
+            float t_left = boxTAxisAligned(ray, lc, lh, nn);
+            float t_right = boxTAxisAligned(ray, rc, rh, nn);
 
             bool hit_left = t_left < h.t;
             bool hit_right = t_right < h.t;

@@ -82,6 +82,7 @@ float sphereT(Ray ray, vec3 center, float radius) {
    Also based on knightcrawler25's GLSL-PATHTRACER.
    But applied OBB for rotation.
    Rotation is calculated from pitch and yaw for simplification
+\note Don't use boxT for BVH, since rotation will be unused computation
 */
 float boxT(Ray ray, vec3 center, vec3 half_size, float pitch, float yaw, out vec3 out_normal) {
 
@@ -134,6 +135,42 @@ float boxT(Ray ray, vec3 center, vec3 half_size, float pitch, float yaw, out vec
       out_normal = normalize(local_normal.x * axis_x + local_normal.y * axis_y + local_normal.z * axis_z);
 
       return t;
+}
+
+/**\brief Fast axis-aligned box intersect, same result as boxT, but skips unused math
+Skips OBB rotation match, used for BVH traversal, which never rotates
+\note Keeping boxT() only for rotated boxes
+\see boxT
+*/
+float boxTAxisAligned(Ray ray, vec3 center, vec3 half_size, out vec3 out_normal) {
+   vec3 local_origin = ray.origin - center;
+   vec3 inv_dir = 1.0 / ray.direction;
+
+   vec3 t_min = (-half_size - local_origin) * inv_dir;
+   vec3 t_max = (half_size - local_origin) * inv_dir;
+
+   vec3 t_near = min(t_min, t_max);
+   vec3 t_far = max(t_min, t_max);
+
+   float t0 = max(t_near.x, max(t_near.y, t_near.z));
+   float t1 = min(t_far.x, min(t_far.y, t_far.z));
+
+   if (t1 < t0 || t1 < EPS) return INF;
+   float t = max(t0, 0.0);
+
+   //normal already in world space
+   //(one component is ±1, the others 0), so no normalize() needed either
+   vec3 hit_local = local_origin + t * ray.direction;
+   vec3 abs_hit = abs(hit_local) / half_size;
+
+   if (abs_hit.x > abs_hit.y && abs_hit.x > abs_hit.z)
+      out_normal = vec3(sign(hit_local.x), 0, 0);
+   else if (abs_hit.y > abs_hit.z)
+      out_normal = vec3(0, sign(hit_local.y), 0);
+   else
+      out_normal = vec3(0, 0, sign(hit_local.z));
+
+   return t;
 }
 
 /**Möller-Trumbore ray-triangle intersect.
