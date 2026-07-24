@@ -49,7 +49,7 @@
 #include "texture.hpp"
 #include "denoiser.hpp"
 
-#define VERSION "1.6.6"
+#define VERSION "1.6.7"
 #define VERSION_NOTE ""
 
 using namespace std;
@@ -581,6 +581,9 @@ void initUniforms() {
     renderer.loc_display_render_res = glGetUniformLocation(renderer.display_id, "render_resolution");
     renderer.loc_display_res = glGetUniformLocation(renderer.display_id, "display_resolution");
     
+    renderer.loc_display_tone_map = glGetUniformLocation(renderer.display_id, "TONE_MAPPING");
+    renderer.loc_vignette = glGetUniformLocation(renderer.display_id, "VIGNETTE_STRENGTH");
+
     renderer.loc_use_nee = glGetUniformLocation(active, "USE_NEE");
 
     renderer.loc_firefly_clamp = glGetUniformLocation(active, "FIREFLY_CLAMP");
@@ -852,7 +855,9 @@ void display(void) {
 
     glUniform2f(renderer.loc_display_render_res, (float)renderer.render_w, (float)renderer.render_h);
     glUniform2f(renderer.loc_display_res, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT);
-    
+    glUniform1i(renderer.loc_display_tone_map, config.tone_mapping);
+    glUniform1f(renderer.loc_vignette, config.vignette_strength);
+
     GLuint tex_to_show = (renderer.denoiser_active && renderer.denoised_tex && renderer.frame_id > 10) ? renderer.denoised_tex : renderer.tex[renderer.cur_f];
 
     glBindTextureUnit(0, tex_to_show);
@@ -1672,6 +1677,11 @@ void drawUI() {
                 const char* tm_names[] = {"None", "Reinhard", "ACES"};
                 changed |= ImGui::Combo("Tone Map", &config.tone_mapping, tm_names, 3);
                 
+                //Vignette (display-only)
+                ImGui::SliderFloat("Vignette", &config.vignette_strength, 0.0f, 1.0f, "%.2f");
+                ImGui::SetItemTooltip("Darkens the corners of the frame");
+                resetBtn("*##vignette", config.vignette_strength, 0.0f);
+
                 if(changed) applyConfig();
 
                 /// Environment Map HDRI

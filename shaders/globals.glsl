@@ -71,6 +71,10 @@ const int TM_REINHARD = 1;
 const int TM_ACES = 2;
 
 uniform int TONE_MAPPING;
+
+///Vignette strength for display shader
+///\note 0.0 = 0ff (default)
+uniform float VIGNETTE_STRENGTH;
 ///\}
 
 

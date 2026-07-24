@@ -39,6 +39,10 @@ struct RenderConfig {
     
     int tone_mapping = 2;
 
+    ///Vignette strength for display shader
+    ///\note 0 = off (default)
+    float vignette_strength = 0.0f;
+
     bool use_ground_plane = false;
     float ground_elevation = -1.0f;
     float ground_albedo = 0.8f;
@@ -128,6 +132,13 @@ struct Renderer {
     
     GLint loc_display_render_res;
     GLint loc_display_res;
+
+    ///TONE_MAPPING is declared separately here because it must be uploaded to
+    ///renderer.display_id specifically, toneMap() only runs in display.frag
+    ///Uploading it to the path-trace program (as loc_tone_map) has no effect on what is shown,
+    ///since the program never calls toneMap().
+    GLint loc_display_tone_map;
+    GLint loc_vignette;
     
     bool show_grid = false;
     GLuint grid_id = 0;

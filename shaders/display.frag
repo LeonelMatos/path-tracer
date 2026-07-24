@@ -52,6 +52,15 @@ void main() {
     vec3 linear = texture(tex, uv).rgb;
     float alpha = texture(tex, uv).a;
     vec3 tone_map = pow(toneMap(linear), vec3(1.0/2.2));
+
+    //Vignette
+    if(VIGNETTE_STRENGTH > 0.0) {
+        vec2 centered = vUV - 0.5;
+        float dist = length(centered) * 1.4142135; //normalized for the corners
+        float vignette = 1.0 - VIGNETTE_STRENGTH * dist * dist;
+        tone_map *= clamp(vignette, 0.0, 1.0);
+    }
+
     vec3 bg = vec3(1.0);
     vec3 composited = mix(bg, tone_map, alpha);
     frag_color = vec4(composited, 1.0);
