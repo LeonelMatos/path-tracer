@@ -43,6 +43,10 @@ struct RenderConfig {
     ///\note 0 = off (default)
     float vignette_strength = 0.0f;
 
+    ///Exposure in stops (EV), converted to a linear mult
+    ///\note 0 = no change
+    float exposure_ev = 0.0f;
+
     bool use_ground_plane = false;
     float ground_elevation = -1.0f;
     float ground_albedo = 0.8f;
@@ -139,6 +143,7 @@ struct Renderer {
     ///since the program never calls toneMap().
     GLint loc_display_tone_map;
     GLint loc_vignette;
+    GLint loc_exposure;
     
     bool show_grid = false;
     GLuint grid_id = 0;

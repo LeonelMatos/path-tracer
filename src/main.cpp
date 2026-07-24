@@ -583,6 +583,7 @@ void initUniforms() {
     
     renderer.loc_display_tone_map = glGetUniformLocation(renderer.display_id, "TONE_MAPPING");
     renderer.loc_vignette = glGetUniformLocation(renderer.display_id, "VIGNETTE_STRENGTH");
+    renderer.loc_exposure = glGetUniformLocation(renderer.display_id, "EXPOSURE");
 
     renderer.loc_use_nee = glGetUniformLocation(active, "USE_NEE");
 
@@ -857,6 +858,7 @@ void display(void) {
     glUniform2f(renderer.loc_display_res, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT);
     glUniform1i(renderer.loc_display_tone_map, config.tone_mapping);
     glUniform1f(renderer.loc_vignette, config.vignette_strength);
+    glUniform1f(renderer.loc_exposure, glm::exp2(config.exposure_ev));
 
     GLuint tex_to_show = (renderer.denoiser_active && renderer.denoised_tex && renderer.frame_id > 10) ? renderer.denoised_tex : renderer.tex[renderer.cur_f];
 
@@ -1672,6 +1674,11 @@ void drawUI() {
                 //Simple Background
                 const char* bg_names[] = {"Black", "White"};
                 changed |= ImGui::Combo("Background", &config.background, bg_names, 2);
+
+                //Exposure (display-only, in stops)
+                ImGui::SliderFloat("Exposure", &config.exposure_ev, -5.0f, 5.0f, "%.2f EV");
+                ImGui::SetItemTooltip("Brightness in stops.\nApplied before tone mapping.\n+1 EV doubles brightness, -1 EV halves it.");
+                resetBtn("*##exposure", config.exposure_ev, 0.0f);
 
                 //Tone Mapping
                 const char* tm_names[] = {"None", "Reinhard", "ACES"};

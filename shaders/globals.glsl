@@ -75,6 +75,10 @@ uniform int TONE_MAPPING;
 ///Vignette strength for display shader
 ///\note 0.0 = 0ff (default)
 uniform float VIGNETTE_STRENGTH;
+
+///Exposure as linear multiplier applied before tone map.
+///converted from Stops (exp2(EV)), so 0 EV is 1.0
+uniform float EXPOSURE;
 ///\}
 
 

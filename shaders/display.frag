@@ -49,7 +49,7 @@ vec3 toneMap(vec3 color) {
 
 void main() {
     vec2 uv = vUV * (render_resolution / display_resolution);
-    vec3 linear = texture(tex, uv).rgb;
+    vec3 linear = texture(tex, uv).rgb * EXPOSURE;
     float alpha = texture(tex, uv).a;
     vec3 tone_map = pow(toneMap(linear), vec3(1.0/2.2));
 
