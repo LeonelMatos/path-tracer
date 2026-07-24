@@ -11,6 +11,24 @@
 #include <atomic>
 #include <vector>
 
+///\brief Stages of the async model load in order
+//\see ModelLoader::stage, loadScene
+enum LoadStage {
+    STAGE_PARSING = 0,  //reading paths
+    STAGE_BVH,          //building BVH
+    STAGE_UPLOAD_MESH,  //uploading geometry/BVH/lights SSBOs
+    STAGE_UPLOAD_TEXTURES   //decoding, uploading textures (might be the slowest right now)
+};
+
+///\brief Display text per LoadStage
+///\see LoadStage
+inline const char* LOAD_STAGE_TEXT[] = {
+    "Loading Model...",
+    "Building BVH...",
+    "Uploading Geometry...",
+    "Loading Textures"
+};
+
 struct ModelLoader {
     std::vector<GPUTriangle> pending_tris;
     std::vector<GPUMaterial> pending_mats;
@@ -19,6 +37,7 @@ struct ModelLoader {
     MeshBounds pending_bounds;
     std::atomic<bool> upload_pending = false;
     std::atomic<bool> is_loading = false;
+    std::atomic<int> stage = STAGE_PARSING;
 };
 
 inline ModelLoader loader;

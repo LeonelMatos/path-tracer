@@ -451,6 +451,7 @@ int main(void) {
             checkGL("before useProgram");
             glUseProgram(renderer.active_id);
             checkGL("useProgram");
+            loader.stage = STAGE_UPLOAD_MESH;
             uploadMesh(loader.pending_tris, loader.pending_mats, renderer.triangle_ssbo, renderer.material_ssbo);
             uploadBVH(loader.pending_bvh, renderer.bvh_ssbo);
 
@@ -466,12 +467,14 @@ int main(void) {
             glUniform3f(renderer.loc_aabb_max, b.max_bound.x, b.max_bound.y, b.max_bound.z);
             checkGL("uniforms");
 
+            loader.stage = STAGE_UPLOAD_TEXTURES;
             uploadTexture(loader.pending_cpu_mats, loader.pending_mats, renderer);
             checkGL("uploadTextures");
 
             glNamedBufferData(renderer.material_ssbo, loader.pending_mats.size() * sizeof(GPUMaterial), loader.pending_mats.data(), GL_STATIC_DRAW);
 
             loader.upload_pending = false;
+            renderer.is_model_loading = false;
             resetAccumulation();
         }
         //Suspend the rendering after completion to avoid useless GPU processing
@@ -734,6 +737,7 @@ void loadScene() {
         return;
     }
     renderer.is_model_loading = true;
+    loader.stage = STAGE_PARSING;
     //keeps the program responsive while loading models
     setPreviewMode(true);
 
@@ -756,6 +760,7 @@ void loadScene() {
             return;
         }
         
+        loader.stage = STAGE_BVH;
         vector<BVHNode> bvh_nodes;
         buildBVH(tris, bvh_nodes);
         
@@ -768,7 +773,8 @@ void loadScene() {
         loader.pending_bvh  = bvh_nodes;
         loader.pending_bounds = bounds;
         loader.upload_pending = true;
-        renderer.is_model_loading = false;
+        //is_model_loading stays true after ending this thread
+        //the main thread ends it
     }).detach();
 }
 
@@ -1748,9 +1754,10 @@ void drawUI() {
         ImGui::Begin("##loading", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove);
 
         ImGui::SetWindowFontScale(1.5f);
-        float text_w = ImGui::CalcTextSize("Loading Scene...").x;
+        const char* stage_text = LOAD_STAGE_TEXT[loader.stage.load()];
+        float text_w = ImGui::CalcTextSize(stage_text).x;
         ImGui::SetCursorPosX((400 - text_w) * 0.5f);
-        ImGui::Text("Loading Scene...");
+        ImGui::Text("%s", stage_text);
 
         ImGui::SetWindowFontScale(1.0f);
         string model_name = filesystem::path(renderer.current_model.path).string();
