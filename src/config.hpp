@@ -276,5 +276,29 @@ inline glm::vec3 toneMapCPU(glm::vec3 color, int tone_mapping) {
         default:
             return glm::clamp(color, 0.0f, 1.0f);
     }
-
 }
+
+///\brief Aspect-ratio crop preview/screenshot options
+struct AspectRatioOption { const char* name; float ratio; };
+
+const AspectRatioOption ASPECT_RATIOS[] = {
+    {"Off", 0.0f},
+    {"1:1 Square", 1.0f},
+    {"4:5 Portrait", 4.0f/5.0f},
+    {"5:4", 5.0f/4.0f},
+    {"3:2 Photo", 3.0f/2.0f},
+    {"4:3", 4.0f/3.0f},
+    {"16:9 Widescreen", 16.0f/9.0f},
+    {"1.85:1 Cinema", 1.85f},
+    {"2.35:1 Cinemascope", 2.35f}
+};
+
+const int ASPECT_RATIO_COUNT = sizeof(ASPECT_RATIOS) / sizeof(ASPECT_RATIOS[0]);
+
+///Names for the compositions dropdown, indexed by renderer.composition_guide
+///\see drawCompositionGuides
+inline const char* COMPOSITION_GUIDE_NAMES[] = {
+    "Off", "Rule of Thirds", "Golden Ratio", "Center Cross", "Diagonal"
+};
+
+const int COMPOSITION_GUIDE_COUNT = sizeof(COMPOSITION_GUIDE_NAMES) / sizeof(COMPOSITION_GUIDE_NAMES[0]);

@@ -1064,6 +1064,48 @@ void draw(void) {
   Render Extras
 */
 
+///\brief Mirror of display.frag's per-pixel pipeline
+///exposure → tone map + gamma → vignette → composite
+///\param linear_color raw HDR color sampled from render texture
+///\param alpha render texture's alpha channel
+///\param uv pixel-center position in the frame[0,1]
+///\return vec3 pixel with all pipeline applied
+///\see toneMapCPU, computeAspectCropRect, saveScreenshot, display.frag
+inline glm::vec3 displayPixelCPU(glm::vec3 linear_color, float alpha, glm::vec2 uv, float exposure_ev,
+int tone_mapping, float vignette_strength) {
+    linear_color *= glm::exp2(exposure_ev);
+    glm::vec3 mapped = glm::pow(toneMapCPU(linear_color, tone_mapping), glm::vec3(1.0f/2.2f));
+    
+    if(vignette_strength > 0.0f) {
+        glm::vec2 centered = uv - 0.5f;
+        float dist = glm::length(centered) * 1.4142135f;
+        float vignette = 1.0f - vignette_strength * dist * dist;
+        mapped *= glm::clamp(vignette, 0.0f, 1.0f);
+    }
+    glm::vec3 bg(1.0f);
+    return glm::mix(bg, mapped, alpha);
+}
+
+inline void computeAspectCropRect(int frame_w, int frame_h, int aspect_frame,
+int& out_x0, int& out_y0, int& out_w, int& out_h) {
+    out_x0 = 0; out_y0 = 0; out_w = frame_w; out_h = frame_h;
+    if(aspect_frame <= 0 || aspect_frame >= ASPECT_RATIO_COUNT) return;
+
+    float target_ratio = ASPECT_RATIOS[aspect_frame].ratio;
+    float frame_ratio = (float)frame_w / (float)frame_h;
+
+    if (target_ratio > frame_ratio) {
+        out_w = frame_w;
+        out_h = (int)(frame_w / target_ratio);
+    }
+    else {
+        out_h = frame_h;
+        out_w = (int)(frame_h * target_ratio);
+    }
+    out_x0 = (frame_w - out_w) / 2;
+    out_y0 = (frame_h - out_h) / 2;
+}
+
 ///\brief Takes a screenshot of the render
 void saveScreenshot() {
     time_t now = time(nullptr);
@@ -1082,44 +1124,40 @@ void saveScreenshot() {
     vector<float> pixels_float(w * h * 4);
     glGetTextureImage(src_tex, 0, GL_RGBA, GL_FLOAT, pixels_float.size() * sizeof(float), pixels_float.data());
 
-    vector<unsigned char> pixels(w * h * 3);
-    float exposure_mult = glm::exp2(config.exposure_ev);
-    vec3 bg(1.0f);
+    int crop_x0, crop_y0, crop_w, crop_h;
+    computeAspectCropRect(w, h, renderer.aspect_frame, crop_x0, crop_y0, crop_w, crop_h);
 
-    for (int i = 0; i < w * h; i++) {
-        int x = i % w;
-        int y = i / w;
-        vec2 uv = (vec2((float)x, (float)y) + 0.5f) / vec2((float)w, (float)h);
+    vector<unsigned char> pixels(crop_w * crop_h * 3);
 
-        vec3 linear_color(pixels_float[i*4+0], pixels_float[i*4+1], pixels_float[i*4+2]);
-        float alpha = pixels_float[i*4+3];
+    for (int cy = 0; cy < crop_h; cy++) {
+        for (int cx = 0; cx < crop_w; cx++) {
+            int x = crop_x0 + cx;
+            int y = crop_y0 + cy;
+            int i = y * w + x;
 
-        linear_color *= exposure_mult;
+            vec2 uv = (vec2((float)x, (float)y) + 0.5f) / vec2((float)w, (float)h);
 
-        vec3 mapped = glm::pow(toneMapCPU(linear_color, config.tone_mapping), vec3(1.0f/2.2f));
-        
-        //vignette (duplicated like display.frag)
-        if(config.vignette_strength > 0.0f) {
-            vec2 centered = uv - 0.5f;
-            float dist = glm::length(centered) * 1.4142135f;
-            float vignette = 1.0f - config.vignette_strength * dist * dist;
-            mapped *= glm::clamp(vignette, 0.0f, 1.0f);
+            vec3 linear_color(pixels_float[i*4+0], pixels_float[i*4+1], pixels_float[i*4+2]);
+            float alpha = pixels_float[i*4+3];
+
+            vec3 composited = displayPixelCPU(linear_color, alpha, uv,
+                config.exposure_ev, config.tone_mapping, config.vignette_strength);
+            
+            int out_i = cy * crop_w + cx;
+            pixels[out_i*3+0] = (unsigned char)(composited.r * 255.0f);
+            pixels[out_i*3+1] = (unsigned char)(composited.g * 255.0f);
+            pixels[out_i*3+2] = (unsigned char)(composited.b * 255.0f);
         }
-        vec3 composited = glm::mix(bg, mapped, alpha);
-        pixels[i*3+0] = (unsigned char)(composited.r * 255.0f);
-        pixels[i*3+1] = (unsigned char)(composited.g * 255.0f);
-        pixels[i*3+2] = (unsigned char)(composited.b * 255.0f);
-
     }
 
     //flip y
-    for (int y = 0; y < h / 2; y++) {
-        int y2 = h - 1 - y;
-        for (int x = 0; x < w * 3; x++)
-            swap(pixels[y * w * 3 + x], pixels[y2 * w * 3 + x]);
+    for (int y = 0; y < crop_h / 2; y++) {
+        int y2 = crop_h - 1 - y;
+        for (int x = 0; x < crop_w * 3; x++)
+            swap(pixels[y * crop_w * 3 + x], pixels[y2 * crop_w * 3 + x]);
     }
 
-    stbi_write_png(filename, w, h, 3, pixels.data(), w * 3);
+    stbi_write_png(filename, crop_w, crop_h, 3, pixels.data(), crop_w * 3);
     screenshot_msg = string("Saved ") + filename;
     screenshot_msg_time = glfwGetTime();
     printf("\n[SCREENSHOT] Saved %s\n", filename);
@@ -1148,29 +1186,6 @@ void drawGrid() {
     glDisable(GL_BLEND);
     //glEnable(GL_DEPTH_TEST);
 }
-
-///\brief Aspect-ratio crop preview options
-struct AspectRatioOption { const char* name; float ratio; };
-
-const AspectRatioOption ASPECT_RATIOS[] = {
-    {"Off", 0.0f},
-    {"1:1 Square", 1.0f},
-    {"4:5 Portrait", 4.0f/5.0f},
-    {"5:4", 5.0f/4.0f},
-    {"3:2 Photo", 3.0f/2.0f},
-    {"4:3", 4.0f/3.0f},
-    {"16:9 Widescreen", 16.0f/9.0f},
-    {"1.85:1 Cinema", 1.85f},
-    {"2.35:1 Cinemascope", 2.35f}
-};
-
-const int ASPECT_RATIO_COUNT = sizeof(ASPECT_RATIOS) / sizeof(ASPECT_RATIOS[0]);
-
-const char* COMPOSITION_GUIDE_NAMES[] = {
-    "Off", "Rule of Thirds", "Golden Ratio", "Center Cross", "Diagonal"
-};
-
-const int COMPOSITION_GUIDE_COUNT = sizeof(COMPOSITION_GUIDE_NAMES) / sizeof(COMPOSITION_GUIDE_NAMES[0]);
 
 ///\brief Draws a line that shows clearly in dark and light backgrounds
 void addContrastLine(ImDrawList* dl, ImVec2 p1, ImVec2 p2, float thickness) {
