@@ -59,6 +59,12 @@ struct RenderConfig {
     bool focal_debug = false;
     float focal_band_debug = 0.05;
     
+    ///Lens chromatic strength, 0 = off
+    float cam_chromatic_aberration = 0.0f;
+
+    ///Glass dispersion strength (prism effect). Perturbs the IOR of MAT_GLASS
+    float glass_dispersion = 0.0f;
+
     //Not part of the shader config
     ///render resolution when moving the camera and while Preview Mode is active
     int moving_resolution = 256;
@@ -136,6 +142,9 @@ struct Renderer {
     
     GLint loc_display_render_res;
     GLint loc_display_res;
+
+    GLint loc_chromatic_aberration;
+    GLint loc_glass_dispersion;
 
     ///TONE_MAPPING is declared separately here because it must be uploaded to
     ///renderer.display_id specifically, toneMap() only runs in display.frag

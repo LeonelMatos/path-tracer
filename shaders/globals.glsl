@@ -34,6 +34,14 @@ uniform vec3 camera_lookat;
 ///Camera's up vector
 uniform vec3 camera_up;
 
+/**Lens chromatic aberration strength.
+Perturbs the effective focal length and focal distance per color channel
+Consequence of the camera model, not screen-space post-processing.
+\see cameraRayDOFChannel;
+\note `0.0` = off (default)
+*/
+uniform float CAM_CHROMATIC_ABERRATION;
+
 ///\}
 
 
@@ -140,6 +148,11 @@ const int MAT_SHADOW_CATCHER = 4;
 ///Forces one material from the gui
 ///\note -1 = disabled
 uniform int FORCE_MATERIAL;
+
+///Glass dispersion strength (prism effect)
+//It perturbs the IOR of glass material.
+///\see pathTrace, DISPERSION_COEFF
+uniform float GLASS_DISPERSION;
 ///\}
 
 

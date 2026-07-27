@@ -49,7 +49,7 @@
 #include "texture.hpp"
 #include "denoiser.hpp"
 
-#define VERSION "1.6.8"
+#define VERSION "1.6.9"
 #define VERSION_NOTE ""
 
 using namespace std;
@@ -574,6 +574,9 @@ void initUniforms() {
     renderer.loc_background = glGetUniformLocation(active, "BACKGROUND");
     renderer.loc_tone_map   = glGetUniformLocation(active, "TONE_MAPPING");
 
+    renderer.loc_chromatic_aberration = glGetUniformLocation(active, "CAM_CHROMATIC_ABERRATION");
+    renderer.loc_glass_dispersion = glGetUniformLocation(active, "GLASS_DISPERSION");
+
     renderer.loc_cam_pos    = glGetUniformLocation(active, "camera_position");
     renderer.loc_cam_lookat = glGetUniformLocation(active, "camera_lookat");
     renderer.loc_cam_up = glGetUniformLocation(active, "camera_up");
@@ -628,6 +631,8 @@ void uploadConfig() {
     glUniform1f(renderer.loc_focal_band, config.focal_band_debug);
     glUniform1i(renderer.loc_background, config.background);
     glUniform1i(renderer.loc_tone_map, config.tone_mapping);
+    glUniform1f(renderer.loc_chromatic_aberration, config.cam_chromatic_aberration);
+    glUniform1f(renderer.loc_glass_dispersion, config.glass_dispersion);
     glUniform1i(renderer.loc_use_nee, config.use_nee ? 1 : 0);
     glUniform1i(renderer.loc_scene_preset, config.scene_preset);
     glUniform1f(renderer.loc_firefly_clamp, config.firefly_clamp);
@@ -1438,6 +1443,34 @@ void drawUI() {
                     changed |= ImGui::SliderFloat("Draw Size", &config.focal_band_debug, 0.01f, 0.5f, "%.2f");
                     resetBtn("*##fband", config.focal_band_debug, render_defaults.focal_band_debug);
                 }
+            }
+
+            ImGui::SeparatorText("Chromatic Aberration");
+            bool ca_enabled = (config.cam_chromatic_aberration > 0.0f);
+
+            if(ImGui::Checkbox("Enable", &ca_enabled)) {
+                config.cam_chromatic_aberration = ca_enabled ? 0.01f : 0.0f;
+                changed = true;
+            }
+            ImGui::SetItemTooltip("Traces one full path per color channel (3x render cost)");
+
+            if(ca_enabled) {
+                changed |= ImGui::SliderFloat("CA Strength", &config.cam_chromatic_aberration, 0.001f, 0.05f, "%.3f");
+                resetBtn("*##ca", config.cam_chromatic_aberration, 0.01f);
+                ImGui::SetItemTooltip("Higher gives more color fringing");
+            }
+            
+            bool dispersion_enabled = (config.glass_dispersion > 0.0f);
+            if(ImGui::Checkbox("Enabled Glass Dispersion", &dispersion_enabled)) {
+                config.glass_dispersion = dispersion_enabled ? 0.02f : 0.0f;
+                changed = true;
+            }
+            ImGui::SetItemTooltip("Prism effect. White lights splits into color when refracting through glass\nTraces one path per color channel (3x render cost)\nShares the trace with Chromatic Aberration, so uses the same traces when both are on");
+
+            if(dispersion_enabled) {
+                changed |= ImGui::SliderFloat("Disp. Strength", &config.glass_dispersion, 0.001f, 0.1f, "%.3f");
+                resetBtn("*##dispersion", config.glass_dispersion, 0.02f);
+                ImGui::SetItemTooltip("Higher gives more visible color separation through glass");
             }
 
             //------ Composition and Aspect Ratio -----------
