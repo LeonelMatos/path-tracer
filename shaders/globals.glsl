@@ -42,6 +42,13 @@ Consequence of the camera model, not screen-space post-processing.
 */
 uniform float CAM_CHROMATIC_ABERRATION;
 
+///Simple 3-point dispersion approx.
+const float DISPERSION_COEFF[3] = float[3](-1.0, 0.0, 1.0); //R, G, B
+
+///How wide a range each channel's per-sample jitter covers its DISPERSION_COEFF
+///\note 1.3 gives a bit of overlap, so there's no visible seam between channels.
+const float DISPERSION_JITTER_WIDTH = 1.3;
+
 ///\}
 
 

@@ -9,9 +9,6 @@
 //----------------------------------------------------------
 //Camera Functions
 
-///Simple 3-point dispersion approx.
-const float DISPERSION_COEFF[3] = float[3](-1.0, 0.0, 1.0); //R, G, B
-
 ///\brief Calculates the base of the camera in world-space
 ///\param vec3 All camera axes
 void camera_axes(out vec3 cam_x, out vec3 cam_y, out vec3 cam_z) {
@@ -40,11 +37,11 @@ since DISPERSION_COEFF[1] = 0
 \return Ray with origin at the lens directed to the channel's focal point
 \see cameraRayDOF, CAM_CHROMATIC_ABERRATION
 */
-Ray cameraRayDOFChannel(vec2 uv, int spp_index, uvec2 px, int channel) {
+Ray cameraRayDOFChannel(vec2 uv, int spp_index, uvec2 px, float disp_coeff) {
     vec3 cam_x, cam_y, cam_z;
     camera_axes(cam_x, cam_y, cam_z);
 
-    float disp = CAM_CHROMATIC_ABERRATION * DISPERSION_COEFF[channel];
+    float disp = CAM_CHROMATIC_ABERRATION * disp_coeff;
     float f_len = (1.0 / tan(0.5 * CAM_FOV)) * (1.0 + disp);
     float focal_distance = CAM_FOCAL_DISTANCE * (1.0 + disp);
 
@@ -74,7 +71,7 @@ Ray cameraRayDOFChannel(vec2 uv, int spp_index, uvec2 px, int channel) {
 \see CAM_APERTURE, CAM_FOCAL_DISTANCE
 */
 Ray cameraRayDOF(vec2 uv, int spp_index, uvec2 px) {
-    return cameraRayDOFChannel(uv, spp_index, px, 1);
+    return cameraRayDOFChannel(uv, spp_index, px, 0.0);
 }
 
 //----------------------------------------------------------
@@ -273,7 +270,7 @@ Extracted from pathTrace() so the exact same bounce logic can be called per colo
 and Fresnel+Snell for glass materials
 \see pathTrace, BACKGROUND, FOCAL_DEBUG, RR_MAX_SURVIVAL
 */
-vec4 pathTraceFromRay(Ray ray, int spp_index, uvec2 px, int channel) {
+vec4 pathTraceFromRay(Ray ray, int spp_index, uvec2 px, float disp_coeff) {
     vec3 color = vec3(0);
     vec3 throughput = vec3(1);
     float alpha = 1.0;
@@ -386,7 +383,7 @@ vec4 pathTraceFromRay(Ray ray, int spp_index, uvec2 px, int channel) {
                 //Dispersion. This trace is dedicated to a channel's wavelength
                 //so every refraction it does uses the respective channel's IOR, same idea as cameraRayDOFChannel(),
                 //but applied to glass mat.
-                float ior = h.ior * (1.0 + GLASS_DISPERSION * DISPERSION_COEFF[channel]);
+                float ior = h.ior * (1.0 + GLASS_DISPERSION * disp_coeff);
                 float eta = h_entering ? (1.0 / ior) : ior;
 
                 float cos_theta = abs(dot(-ray.direction, normal));
@@ -475,16 +472,26 @@ vec4 pathTraceFromRay(Ray ray, int spp_index, uvec2 px, int channel) {
 vec4 pathTrace(vec2 uv, int spp_index, uvec2 px) {
     if(CAM_CHROMATIC_ABERRATION <= 0.0 && GLASS_DISPERSION <= 0.0) {
         Ray ray = cameraRayDOF(uv, spp_index, px);
-        return pathTraceFromRay(ray, spp_index, px, 1);
+        return pathTraceFromRay(ray, spp_index, px, 0.0);
     }
 
-    vec3 final_color = vec3(0);
+    vec3 traces[3];
     float final_alpha = 0.0;
     for(int c = 0; c < 3; c++) {
-        Ray ray = cameraRayDOFChannel(uv, spp_index, px, c);
-        vec4 result = pathTraceFromRay(ray, spp_index, px, c);
-        final_color[c] = result[c];
+        float jitter = (rand3(-10 - c, spp_index, px).x - 0.5) * DISPERSION_JITTER_WIDTH;
+        float disp_coeff = DISPERSION_COEFF[c] + jitter;
+
+        Ray ray = cameraRayDOFChannel(uv, spp_index, px, disp_coeff);
+        vec4 result = pathTraceFromRay(ray, spp_index, px, disp_coeff);
+        traces[c] = result.rgb;
         final_alpha += result.a;
     }
+
+    vec3 rc = traces[0], gc = traces[1], bc = traces[2];
+    vec3 final_color;
+    final_color.r = 0.70 * rc.r + 0.25 * gc.r + 0.05 * bc.r;
+    final_color.g = 0.15 * rc.g + 0.70 * gc.g + 0.16 * bc.g;
+    final_color.b = 0.05 * rc.b + 0.25 * gc.b + 0.70 * bc.b;
+
     return vec4(final_color, final_alpha / 3.0);
 }
