@@ -108,6 +108,7 @@ struct RenderConfig {
     float sun_azimuth = 180.0f;
     float sun_intensity = 2.5f;
     glm::vec3 sun_color = glm::vec3(1.0f, 0.95f, 0.8f);
+    float sun_angular_radius = 2.0f;
 
     glm::vec3 sunDirection() {
         float el = glm::radians(sun_elevation);

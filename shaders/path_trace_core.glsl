@@ -280,10 +280,22 @@ vec4 pathTraceFromRay(Ray ray, int spp_index, uvec2 px, int channel) {
 
     int diffuse_bounces = 0;
 
+    ///Tracks if NEE actually ran at the vertex this ray originated.
+    ///MIRROR/GLASS should not be treated as "already counted by NEE"
+    bool prev_vertex_used_nee = false;
+
     //foreach ray bounce
     for (int b = 0; b < DEPTH; b++) {
         Hit h;
         if (!intersects(ray, h)) {
+            for (int li = 0; li < analytic_light_count; li++) {
+                GPULight light = analytic_lights[li];
+                if(light.type != LIGHT_DIRECTIONAL) continue;
+                float cos_angle = dot(ray.direction, -light.direction.xyz);
+                if(cos_angle > cos(light.radius))
+                    color += throughput * light.emission.rgb;
+            }
+
             //Environment Mapping
             if(USE_ENV_MAP == 1)
                 color += throughput * sampleEnvMap(ray.direction);
@@ -313,7 +325,7 @@ vec4 pathTraceFromRay(Ray ray, int spp_index, uvec2 px, int channel) {
 
         //Avoids double counting with NEE for emission
         if (dot(h.emission, h.emission) > 0.0) {
-            if(b == 0 || USE_NEE == 0) 
+            if(b == 0 || !prev_vertex_used_nee) 
                 color += throughput * h.emission;
             break;
         }
@@ -334,6 +346,8 @@ vec4 pathTraceFromRay(Ray ray, int spp_index, uvec2 px, int channel) {
         if (USE_NEE == 1 && h.material == MAT_DIFFUSE && USE_ENV_MAP == 1 && b < 2) {
             color += throughput * sampleEnvLight(h, b, spp_index, px);
         }
+        
+        prev_vertex_used_nee = (USE_NEE == 1 && h.material == MAT_DIFFUSE);
 
         vec3 r = rand3(b, spp_index, px);
 

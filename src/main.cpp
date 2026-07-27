@@ -49,7 +49,7 @@
 #include "texture.hpp"
 #include "denoiser.hpp"
 
-#define VERSION "1.6.9"
+#define VERSION "1.7.0"
 #define VERSION_NOTE ""
 
 using namespace std;
@@ -670,6 +670,7 @@ void uploadSun() {
         sun.emission = vec4(config.sun_color * config.sun_intensity, 0.0f);
         sun.direction = vec4(-config.sunDirection(), 0.0f);
         sun.type = LIGHT_DIRECTIONAL;
+        sun.radius = glm::radians(config.sun_angular_radius);
 
         sun_light_index = (int)analytic_lights.size();
         analytic_lights.push_back(sun);
@@ -1819,6 +1820,8 @@ void drawUI() {
             sun_changed |= ImGui::SliderFloat("Elevation##sun", &config.sun_elevation, 0.0f, 90.0f, "%.1f°");
             sun_changed |= ImGui::SliderFloat("Horizontal##sun", &config.sun_azimuth, 0.0f, 360.0f, "%.1f°");
             sun_changed |= ImGui::SliderFloat("Intensity##sun", &config.sun_intensity, 0.0f, 20.0f, "%.1f");
+            sun_changed |= ImGui::SliderFloat("Angular Size##sun", &config.sun_angular_radius, 0.1f, 10.0f, "%.2fº");
+            ImGui::SetItemTooltip("Sets how visible the sun is in mirror/glass reflections\nReal sun is ~0.27º");
             sun_changed |= ImGui::ColorEdit3("Color##sun", value_ptr(config.sun_color));
 
             if(sun_changed) {
