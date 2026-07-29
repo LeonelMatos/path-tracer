@@ -46,7 +46,6 @@
 
 /model/*
 /models/*
-/models/*
 
 # hdri
 /hdri/*
@@ -54,6 +53,11 @@
 !hdri/studio.hdr
 !hdri/abandoned_garage_2k.hdr
 !hdri/mirrored_hall_2k.hdr
+!hdri/autumn_field_puresky_4k.hdr
+
+!models/prism/
+!models/prism/prism.obj
+!models/prism/prism.mtl
 
 # Docs are generated via Github Actions
 /docs/*

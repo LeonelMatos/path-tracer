@@ -49,7 +49,7 @@
 #include "texture.hpp"
 #include "denoiser.hpp"
 
-#define VERSION "1.7.0"
+#define VERSION "1.7.1"
 #define VERSION_NOTE ""
 
 using namespace std;
@@ -113,9 +113,12 @@ void processMovement();
 void formatTime(double seconds, char*buf, int buf_size);
 bool initShaders();
 void loadScene();
+void resetModel();
 void uploadConfig();
 void applyConfig();
 void uploadCamera();
+void uploadCornellTopLight();
+void uploadPrismDemoLight();
 void uploadSun();
 bool transferDataToGPU(void);
 void cleanDataFromGPU();
@@ -457,6 +460,8 @@ int main(void) {
 
             int light_count = uploadLights(loader.pending_tris, loader.pending_mats, renderer.light_ssbo);
             analytic_lights.clear();
+            uploadCornellTopLight();
+            uploadPrismDemoLight();
             uploadSun();
 
             MeshBounds& b = loader.pending_bounds;
@@ -694,6 +699,20 @@ void uploadCornellTopLight() {
     }
 }
 
+void uploadPrismDemoLight() {
+    if(config.scene_preset != 3) return;
+    analytic_lights.clear();
+
+    GPULight prism_light{};
+    prism_light.position = vec4(5.0f, 0.0f, 2.0f, 0.0f);
+    prism_light.direction = vec4(normalize(vec3(-3.475f, 0.0f, -2.0125f)), 0.0f);
+    prism_light.emission = vec4(150.0f, 150.0f, 150.0f, 0.0f);
+    prism_light.type = LIGHT_SPOT;
+    prism_light.spot_inner = cos(radians(25.0f));
+    prism_light.spot_outer = cos(radians(35.0f));
+    analytic_lights.push_back(prism_light);
+}
+
 ///\brief Recursively lists supported model files under the /models directory
 ///\param models_dir Directory to scan
 ///\return Sorted list of file paths
@@ -786,6 +805,15 @@ void loadScene() {
         //is_model_loading stays true after ending this thread
         //the main thread ends it
     }).detach();
+}
+
+void resetModel() {
+    renderer.current_model.path = "";
+    renderer.current_model.position = vec3(0.0f);
+    renderer.current_model.rotation = vec3(0.0f);
+    renderer.current_model.scale = vec3(1.0f);
+    loadScene();
+    resetAccumulation();
 }
 
 ///\brief First time GPU setup
@@ -1506,12 +1534,7 @@ void drawUI() {
             ImGui::SameLine();
             //Reset Scene
             if(ImGui::SmallButton("*")) {
-                renderer.current_model.path = "";
-                renderer.current_model.position = vec3(0.0f);
-                renderer.current_model.rotation = vec3(0.0f);
-                renderer.current_model.scale = vec3(1.0f);
-                loadScene();
-                resetAccumulation();
+                resetModel();
             }
             ImGui::Separator();
 
@@ -1609,11 +1632,29 @@ void drawUI() {
     //----- Render Settings -------------
     if(ImGui::Begin("Render Inspector")) {
         //----- Scene Presets --------------
-        const char* preset_names[] = {"Mesh Only", "Cornell Box + Mesh", "Cornell Box"};
-        if(ImGui::Combo("Scene Preset", &config.scene_preset, preset_names, 3)) {
+        const char* preset_names[] = {"Mesh Only", "Cornell Box + Mesh", "Cornell Box", "Prism Demo"};
+        if(ImGui::Combo("Scene Preset", &config.scene_preset, preset_names, 4)) {
             glUseProgram(renderer.active_id);
             glUniform1i(renderer.loc_scene_preset, config.scene_preset);
+            
+            //Revert every setting when changing presets
+            RenderConfig defaults;
+            config.use_ground_plane = defaults.use_ground_plane;
+            config.ground_elevation = defaults.ground_elevation;
+            config.ground_radius = defaults.ground_radius;
+            config.background = defaults.background;
+            config.force_material = defaults.force_material;
+            config.glass_dispersion = defaults.glass_dispersion;
+            config.cam_fov = defaults.cam_fov;
+            glUniform1i(renderer.loc_force_material, config.force_material);
+            if(renderer.use_env_map) {
+                renderer.use_env_map = false;
+                glUniform1i(renderer.loc_use_env_map, 0);
+            }
+            resetModel();
+
             if(config.scene_preset == 2) {
+                renderer.MAX_SAMPLES = 100;
                 camera.position = vec3(0.0f, -5.0f, 0.0f);
                 camera.yaw = glm::radians(90.0f);
                 camera.pitch = 0.0f;
@@ -1622,10 +1663,54 @@ void drawUI() {
                 uploadConfig();
                 uploadCamera();
             }
+            else if(config.scene_preset == 3) {
+                const string prism_path = "../models/prism/prism.obj";
+                const string hdri_path = "../hdri/autumn_field_puresky_4k.hdr";
+                bool model_found = filesystem::exists(prism_path);
+                bool hdri_found = filesystem::exists(hdri_path);
+                
+                if (!model_found)
+                    printf("\n[PRESET] Prism Demo: model not found as %s\n", prism_path.c_str());
+                if (!hdri_found)
+                    printf("\n[PRESET] Prism Demo: HDRI not found as %s\nFallback to a black background.\n", hdri_path.c_str());
+
+                
+                if(model_found) {
+                    renderer.current_model.path = prism_path;
+                    renderer.current_model.position = vec3(0.0f);
+                    renderer.current_model.rotation = vec3(0.0f, 90.0f, 0.0f);
+                    renderer.current_model.scale = vec3(2.5f);
+                    loadScene();
+                }
+                renderer.MAX_SAMPLES = 100;
+
+                config.use_ground_plane = true;
+                config.ground_elevation = -1.0f;
+                config.ground_radius = 8.0f;
+                config.background = 0;
+
+                config.force_material = 2;
+                config.glass_dispersion = 0.04f;
+                glUniform1i(renderer.loc_force_material, config.force_material);
+
+                config.sun_enabled = false;
+                camera.position = vec3(-3.0f, -6.0f, 1.5f);
+                camera.yaw = glm::radians(60.0f);
+                camera.pitch = glm::radians(-15.0f);
+                camera.lookat = camera.position + cameraForward();
+                config.cam_fov = 80.0f;
+                uploadCamera();
+
+                if(hdri_found) {
+                    loadEnvMap("../hdri/autumn_field_puresky_4k.hdr", renderer);
+                }
+            }
             else {
                 config.cam_fov = 80.0f;
             }
+            uploadConfig();
             uploadCornellTopLight();
+            uploadPrismDemoLight();
             uploadSun();
             resetAccumulation();
         }

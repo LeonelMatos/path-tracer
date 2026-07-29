@@ -139,7 +139,7 @@ bool intersects(const Ray ray, out Hit h) {
 
     if(SCENE_PRESET == 1 || SCENE_PRESET == 2)
         intersects_cornell(ray, h);
-    if(SCENE_PRESET == 0 || SCENE_PRESET == 1)
+    if(SCENE_PRESET == 0 || SCENE_PRESET == 1 || SCENE_PRESET == 3)
         intersects_mesh(ray, h);
 
     if(USE_GROUND_PLANE == 1) {
