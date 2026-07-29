@@ -127,6 +127,11 @@ struct Renderer {
     SceneModel current_model;
 
     bool is_model_loading = false;
+
+    ///Loaded model's world-space bounds, used for zoom-to-fit.
+    ///Defines a small box around the origin fitting the model.
+    glm::vec3 current_bounds_min = glm::vec3(-1.0f);
+    glm::vec3 current_bounds_max = glm::vec3(1.0f);
     
     GLuint display_id, pathtr_frag_id, pathtr_comp_id;
     GLuint active_id;

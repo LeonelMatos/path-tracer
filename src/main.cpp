@@ -106,6 +106,7 @@ void onMouseScroll(GLFWwindow* w, double xoffset, double yoffset);
 void onWindowResize(GLFWwindow* w, int width, int height);
 void toggleFullscreen();
 vec3 cameraForward();
+void zoomToFit();
 void setPreviewResolution();
 void setFullResolution();
 void setPreviewMode(bool enabled);
@@ -158,6 +159,12 @@ void onKeyPress(GLFWwindow* window, int key, int scancode, int action, int mods)
         case GLFW_KEY_H:
         case GLFW_KEY_0:
             camera.returning_home = true;
+        break;
+        case GLFW_KEY_F:
+            zoomToFit();
+        break;
+        case GLFW_KEY_SPACE:
+            setPreviewMode(false);
         break;
     }
 }
@@ -212,6 +219,34 @@ void onMouseScroll(GLFWwindow* w, double xoffset, double yoffset) {
 ///\return vec3 camera forward vector from pitch and yaw 
 vec3 cameraForward() {
     return normalize(vec3(cos(camera.pitch) * cos(camera.yaw), cos(camera.pitch) * sin(camera.yaw), sin(camera.pitch)));
+}
+
+///\brief Repositions the camera to frame the model on scene
+///\note Uses renderer.current_bounds
+///\see current_bounds_min, current_bounds_max
+void zoomToFit() {
+    vec3 center = (renderer.current_bounds_min + renderer.current_bounds_max) * 0.5f;
+    float radius = length(renderer.current_bounds_max - renderer.current_bounds_min) * 0.5f;
+    radius = glm::max(radius, 0.01f);
+
+    float half_fov = glm::radians(config.cam_fov) * 0.5f;
+    float distance = (radius / sinf(half_fov)) * 1.1f; //1.1 margin separating the model form edges
+
+    vec3 forward_horizontal = cameraForward();
+    forward_horizontal.z = 0.0f;
+    if(length(forward_horizontal) < 0.001f) forward_horizontal = vec3(1.0f, 0.0f, 0.0f);
+    forward_horizontal = normalize(forward_horizontal);
+
+    camera.position = center - forward_horizontal * distance;
+    camera.position.z += radius * 0.4f;
+
+    vec3 look_dir = normalize(center - camera.position);
+    camera.yaw = atan2(look_dir.y, look_dir.x);
+    camera.pitch = asin(glm::clamp(look_dir.z, -1.0f, 1.0f));
+
+    camera.lookat = camera.position + cameraForward();
+    uploadCamera();
+    resetAccumulation();
 }
 
 void applyResolution(int w, int h) {
@@ -470,6 +505,8 @@ int main(void) {
             glUniform1i(renderer.loc_bvh_root, 0);
             glUniform3f(renderer.loc_aabb_min, b.min_bound.x, b.min_bound.y, b.min_bound.z);
             glUniform3f(renderer.loc_aabb_max, b.max_bound.x, b.max_bound.y, b.max_bound.z);
+            renderer.current_bounds_min = b.min_bound;
+            renderer.current_bounds_max = b.max_bound;
             checkGL("uniforms");
 
             loader.stage = STAGE_UPLOAD_TEXTURES;
@@ -1385,7 +1422,7 @@ void drawUI() {
             if(config.lock_preview_res) {
                 ImGui::TextColored(ImVec4(0.40f, 0.80f, 1.0f, 1.0f), "PREVIEW MODE");
                 ImGui::TextWrapped("Interact freely: render is in Preview Mode");
-                if(ImGui::Button("Full Render", ImVec2(-1, 0)))
+                if(ImGui::Button("Full Render [SPACE]", ImVec2(-1, 0)))
                     setPreviewMode(false);
             }
             else {
