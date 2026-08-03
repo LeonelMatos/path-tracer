@@ -47,6 +47,13 @@ struct RenderConfig {
     ///\note 0 = no change
     float exposure_ev = 0.0f;
 
+    ///Runs updateAutoExposure() periodically while true
+    bool auto_exposure_enabled = false;
+
+    ///Speed of the exposure adjustement
+    ///\note 0 = frozen, 1 = instant, 0-1 = moves gradually
+    float auto_exposure_speed = 0.2f;
+
     bool use_ground_plane = false;
     float ground_elevation = -1.0f;
     float ground_albedo = 0.8f;

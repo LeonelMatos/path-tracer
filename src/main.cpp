@@ -130,6 +130,8 @@ void createDenoisedTex(int w, int h);
 void resetAccumulation();
 void draw(void);
 void saveScreenshot();
+float computeTargetExposureEV();
+void updateAutoExposure(float speed);
 void drawGrid();
 void drawCompositionGuides();
 void syncResolutionDropdown();
@@ -527,6 +529,19 @@ int main(void) {
 
             glfwWaitEvents(); //Gets input events and avoids program freezing
             processMovement();
+
+            //Auto Exposure still active while suspended in Preview Mode
+            //Without touching the compute dispatch (resulting texture is already there)
+            //So we're touching an already-static image, old work.
+            //What this is doing is reading this static image every 0.5s while in Preview, toggle on.
+            static double last_auto_exposure_time = 0.0;
+            if(config.auto_exposure_enabled && config.lock_preview_res) {
+                double now = glfwGetTime();
+                if (now - last_auto_exposure_time > 0.5) {
+                    updateAutoExposure(config.auto_exposure_speed);
+                    last_auto_exposure_time = now;
+                }
+            }
 
             display();
             drawGrid();
@@ -1037,7 +1052,7 @@ void resetAccumulation() {
   Draw to GPU
 */
 
-///\brief Renders one full frame in the order: path trace, denoise, display, grid, UI
+///\brief Renders one full frame in the order: path trace, denoise, autoEV, display, grid, UI
 void draw(void) {
     struct timespec ts_now;
     double time_now, time_elapsed = 0.0;
@@ -1097,6 +1112,11 @@ void draw(void) {
             runDenoiser(idx, total);
             renderer.next_denoise_idx++;
         }
+
+    //Auto Exposure: periodic, not every frame, runs in preview too
+    if(config.auto_exposure_enabled && renderer.frame_id > 0 && 
+        (config.lock_preview_res || renderer.frame_id % 8 == 0))
+        updateAutoExposure(config.auto_exposure_speed);
 
     if(renderer.frame_id == (int)renderer.MAX_SAMPLES)
         printf("\n%s\n|Render complete| %d samples in %.01fs\n", txt_sep, renderer.frame_id, time_elapsed);
@@ -1232,6 +1252,67 @@ void saveScreenshot() {
     screenshot_msg = string("Saved ") + filename;
     screenshot_msg_time = glfwGetTime();
     printf("\n[SCREENSHOT] Saved %s\n", filename);
+}
+
+float computeTargetExposureEV() {
+    GLuint src_tex = (renderer.denoiser_active && renderer.denoised_tex && renderer.frame_id > 10) ?
+        renderer.denoised_tex : renderer.tex[renderer.cur_f];
+
+    const int w = renderer.render_w;
+    const int h = renderer.render_h;
+
+    vector<float> pixels_float(w * h * 4);
+    glGetTextureImage(src_tex, 0, GL_RGBA, GL_FLOAT, pixels_float.size() * sizeof(float), pixels_float.data());
+
+    double log_sum = 0.0;
+    double log_sum_sq = 0.0;
+    int counted = 0;
+
+    const int target_samples = 4096;
+    ///subsampling area, defines an estimate average for performance
+    ///Not a fixed number because different resolutions might not apply well
+    ///So adaptive stride looks for a constant sample regardless of resolution or Render Mode
+    const int stride = glm::max(1, (int)glm::sqrt((double)(w * h) / target_samples));
+
+    ///pixels below this are excluded
+    const float min_lum = 1e-3f;
+
+    for (int y = 0; y < h; y+= stride) {
+        for (int x = 0; x < w; x += stride) {
+            int i = (y * w + x) * 4;
+            float lum = 0.2126f * pixels_float[i+0] + 0.7152f * pixels_float[i+1] + 0.0722f * pixels_float[i+2];
+            if(glm::isnan(lum) || glm::isinf(lum) || lum <= min_lum) continue;
+            double log_lum = glm::log(double(lum));
+            log_sum += log_lum;
+            log_sum_sq += log_lum * log_lum;
+            counted++;
+        }
+    }
+
+    if (counted == 0) return config.exposure_ev;
+
+    double mean_log = log_sum / counted;
+
+    //Fixing Flat-scene guard for nearly uniform sampled luminance
+    double variance = (log_sum_sq / counted) - (mean_log * mean_log);
+    const double min_variance = 0.03;
+    if(variance < min_variance || glm::isnan(variance) || glm::isinf(variance)) return config.exposure_ev;
+
+    double log_avg = glm::exp(mean_log);
+    ///standart photographic middle-gray target, 18%
+    const double target_luminance = 0.18;
+
+    float target_ev = (float)glm::log2(target_luminance / glm::max(log_avg, 1e-4));
+    target_ev = glm::clamp(target_ev, -8.0f, 8.0f);
+    return (glm::isnan(target_ev) || glm::isinf(target_ev)) ? config.exposure_ev : target_ev;
+}
+
+///Handler for computeTargetExposureEV, gradually changes EV value based on speed
+/// @param speed How quick the EV change applies, 0 = frozen, 1 = instant, 0-1 = gradual
+void updateAutoExposure(float speed) {
+    float target = computeTargetExposureEV();
+    if(glm::isnan(target) || glm::isinf(target)) return;
+    config.exposure_ev = glm::mix(config.exposure_ev, target, glm::clamp(speed, 0.0f, 1.0f));
 }
 
 /// @brief Renders the world view grid
@@ -1869,8 +1950,23 @@ void drawUI() {
 
                 //Exposure (display-only, in stops)
                 ImGui::SliderFloat("Exposure", &config.exposure_ev, -5.0f, 5.0f, "%.2f EV");
-                ImGui::SetItemTooltip("Brightness in stops.\nApplied before tone mapping.\n+1 EV doubles brightness, -1 EV halves it.");
+                ImGui::SetItemTooltip("Brightness in stops. \
+                    \nApplied before tone mapping.\n+1 EV doubles brightness, -1 EV halves it.");
                 resetBtn("*##exposure", config.exposure_ev, 0.0f);
+
+                if(ImGui::Checkbox("Auto Exposure", &config.auto_exposure_enabled))
+                    resetAccumulation();
+                ImGui::SetItemTooltip("Automatically adapts Exposure toward middle-gray in real time. \
+                    \nBehaves gradually, like a camera's metering");
+                if(config.auto_exposure_enabled) {
+                    ImGui::SliderFloat("Speed##autoexp", &config.auto_exposure_speed, 0.02f, 1.0f, "%.2f");
+                    ImGui::SetItemTooltip("How quick the Exposure updates");
+                    resetBtn("*##autoexpspeed", config.auto_exposure_speed, 0.2f);
+                }
+                if(ImGui::Button("Snap Now")) {
+                    updateAutoExposure(1.0f);
+                }
+                ImGui::SetItemTooltip("Instantly sets Exposure to the current target");
 
                 //Tone Mapping
                 const char* tm_names[] = {"None", "Reinhard", "ACES"};
