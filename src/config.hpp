@@ -271,6 +271,7 @@ inline double screenshot_msg_time = 0.0;
 const int TM_NONE = 0;
 const int TM_REINHARD = 1;
 const int TM_ACES = 2;
+const int TM_FILMIC = 3;
 
 ///\brief CPU-side tone mapping, mirrors display frag's toneMap(), so screenshots match what's shown
 ///in render output, and not an estimation
@@ -294,6 +295,17 @@ inline glm::vec3 toneMapCPU(glm::vec3 color, int tone_mapping) {
             glm::vec3 a = v * (v + 0.0245786f) - 0.000090537f;
             glm::vec3 b = v * (0.983729f * v + 0.4329510f) + 0.238081f;
             return glm::clamp(outputMat * (a / b), 0.0f, 1.0f);
+        }
+        case TM_FILMIC: {
+            //Matches display.frag's uncharted2ToneMapPartial,uncharted2Filmic
+            const float A = 0.15f, B = 0.50f, C = 0.10f, D = 0.20f, E = 0.02f, F = 0.30f;
+            auto partial = [&](glm::vec3 x) -> glm::vec3 {
+                return ((x*(A*x+C*B)+D*E)/(x*(A*x+B)+D*F)) - glm::vec3(E/F);
+            };
+            const float exposure_bias = 2.0f;
+            glm::vec3 curr = partial(color * exposure_bias);
+            glm::vec3 white_scale = glm::vec3(1.0f) / partial(glm::vec3(11.2f));
+            return glm::clamp(curr * white_scale, 0.0f, 1.0f);
         }
         default:
             return glm::clamp(color, 0.0f, 1.0f);

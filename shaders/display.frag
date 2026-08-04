@@ -17,6 +17,28 @@ uniform sampler2D tex;
 uniform vec2 render_resolution;
 uniform vec2 display_resolution;
 
+/*----------------------------------------------------------
+  Filmic Tone Map Aux Functions
+*/
+///Filmic is the Hable/Uncharted2 curves (John Hable, GDC 2010)
+vec3 uncharted2TonemapPartial(vec3 x) {
+    const float A = 0.15;
+    const float B = 0.50;
+    const float C = 0.10;
+    const float D = 0.20;
+    const float E = 0.02;
+    const float F = 0.30;
+    return ((x*(A*x+C*B)+D*E)/(x*(A*x+B)+D*F))-E/F;
+}
+
+vec3 uncharted2Filmic(vec3 color) {
+    const float exposure_bias = 2.0;
+    vec3 curr = uncharted2TonemapPartial(color * exposure_bias);
+    const vec3 W = vec3(11.2);
+    vec3 white_scale = vec3(1.0) / uncharted2TonemapPartial(W);
+    return curr * white_scale;
+}
+
 /**
 \note Aces adapted from https://github.com/TheRealMJP/BakingLab/blob/master/BakingLab/ACES.hlsl
 */
@@ -41,6 +63,9 @@ vec3 toneMap(vec3 color) {
             vec3 b = v * (vec3(0.983729) * v + vec3(0.4329510)) + vec3(0.238081);
             
             return clamp(outputMat * (a/b), 0.0, 1.0);
+        }
+        case TM_FILMIC: {
+            return clamp(uncharted2Filmic(color), 0.0, 1.0);
         }
         default:
             return clamp(color, 0.0, 1.0);

@@ -84,6 +84,7 @@ uniform float GROUND_SHADOW_OPACITY;
 const int TM_NONE = 0;
 const int TM_REINHARD = 1;
 const int TM_ACES = 2;
+const int TM_FILMIC = 3;
 
 uniform int TONE_MAPPING;
 

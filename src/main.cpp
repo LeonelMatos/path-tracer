@@ -49,7 +49,7 @@
 #include "texture.hpp"
 #include "denoiser.hpp"
 
-#define VERSION "1.7.1"
+#define VERSION "1.7.2"
 #define VERSION_NOTE ""
 
 using namespace std;
@@ -1969,8 +1969,8 @@ void drawUI() {
                 ImGui::SetItemTooltip("Instantly sets Exposure to the current target");
 
                 //Tone Mapping
-                const char* tm_names[] = {"None", "Reinhard", "ACES"};
-                changed |= ImGui::Combo("Tone Map", &config.tone_mapping, tm_names, 3);
+                const char* tm_names[] = {"None", "Reinhard", "ACES", "Filmic"};
+                changed |= ImGui::Combo("Tone Map", &config.tone_mapping, tm_names, 4);
                 
                 //Vignette (display-only)
                 ImGui::SliderFloat("Vignette", &config.vignette_strength, 0.0f, 1.0f, "%.2f");
