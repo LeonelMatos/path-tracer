@@ -594,7 +594,7 @@ bool initShaders() {
         { GL_FRAGMENT_SHADER, "shaders/grid.frag" }
     });
     if(!renderer.display_id || !renderer.pathtr_frag_id || !renderer.pathtr_comp_id || !renderer.grid_id) {
-        glfwTerminate(); return false;
+        return false;
     }
     return true;
 }
@@ -871,7 +871,11 @@ void resetModel() {
 ///\brief First time GPU setup
 ///\return true on success
 bool transferDataToGPU(void) {
-    initShaders();
+    if(!initShaders()) {
+        glfwTerminate();
+        fprintf(stderr, "[FATAL] Shader compilation failed\n");
+        return false;
+    }
 
     //Select shader
     renderer.active_id = USE_COMPUTE_SH ? renderer.pathtr_comp_id : renderer.pathtr_frag_id;
@@ -1118,8 +1122,12 @@ void draw(void) {
         (config.lock_preview_res || renderer.frame_id % 8 == 0))
         updateAutoExposure(config.auto_exposure_speed);
 
-    if(renderer.frame_id == (int)renderer.MAX_SAMPLES)
-        printf("\n%s\n|Render complete| %d samples in %.01fs\n", txt_sep, renderer.frame_id, time_elapsed);
+    if(renderer.frame_id == (int)renderer.MAX_SAMPLES) {
+        clock_gettime(CLOCK_MONOTONIC, &ts_now);
+        time_now = ts_now.tv_sec + ts_now.tv_nsec * 1e-9;
+        time_elapsed = time_now - metrics.render_start_time;
+        printf("\n%s\n|Render complete| %d samples in %.01fs\n%s\n", txt_sep, renderer.frame_id, time_elapsed, txt_sep);
+    }
     
     //Step 2 Display: accumulated texture to screen
     display();
@@ -1440,6 +1448,7 @@ const int res_h[] = {720, 1080, 1440, 2160, 0, 0};
 void syncResolutionDropdown() {
     if(is_fullscreen) {
         current_res_idx = 4;
+        return;
     }
     current_res_idx = 5;
     for(int i = 0; i < 4; i++) {
@@ -1466,11 +1475,9 @@ void drawUI() {
 
     auto resetBtn = [&](const char* id, auto& field, auto default_val) -> bool {
                 ImGui::SameLine();
-                ImGui::PushItemWidth(-1);
-                bool r = ImGui::SmallButton(id);
+                bool button = ImGui::SmallButton(id);
                 ImGui::SetItemTooltip("Reset to default");
-                if(r && field != default_val) { field = default_val; return true; }
-                ImGui::PopItemWidth();
+                if(button && field != default_val) { field = default_val; return true; }
                 return false;
             };
 

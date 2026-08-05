@@ -37,7 +37,7 @@ struct Denoiser {
         filter.commit();
 
         initialized = true;
-        printf("\n[DENOISER] Initialized %dx%d\n", w, h);
+        printf("\n[DENOISER] Initialized %dx%d", w, h);
     }
 
     void resize(int w, int h) {
