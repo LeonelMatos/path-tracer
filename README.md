@@ -1,6 +1,9 @@
 
 # Path Tracing in Games and Virtual Environments 
 
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Build](https://github.com/LeonelMatos/path-tracer/actions/workflows/build.yml/badge.svg)
+
 A GPU-accelerated path tracer written in OpenGL 4.6. Built as a final year project at the Universidade da Beira Interior.
 
 Renders physically-based global illumination interactively using an OpenGL compute shader.
@@ -21,19 +24,24 @@ Renders physically-based global illumination interactively using an OpenGL compu
 - Intel OIDN 2.5.0 denoiser
 - Model loader using ASSIMP
 
----
+## Known Limitations
+
+- No Multiple Importance Sampling (MIS) between NEE and BSDF sampling
+- A continuous GGX/Disney BSDF material type not implemented
+- BVH uses median-split, not SAH
+- No normal map support
 
 ## Requirements
 
 ### Hardware
 
-A GPU with OpenGL 4.6
+Any GPU with OpenGL 4.6
 
-Tested on an RTX 3060 (12GB) and an AMD Ryzen 7 Radeon iGPU (512MB). It is reccomended to enable Tile Dispatch on low-VRAM/integrated GPUs to avoid driver timeouts.
+Tested on an RTX 3060 (12GB) and an AMD Ryzen 7 5700U Radeon iGPU (512MB). It is recommended to enable Tile Dispatch on low-VRAM/integrated GPUs to avoid driver timeouts.
 
 ## Software
 
-The program runs on Linux.
+The program runs on Linux. Tested on Ubuntu 26.04 LTS x86_64.
 
 System packages installed via `apt`:
 
@@ -105,14 +113,13 @@ In the program, open **Render Inspector → Environment → Select Texture**, pi
 | `Left Shift` (held)       | Move faster                              |
 | Left click + drag         | Look around (FPS-style)                  |
 | `Shift` + mouse scroll    | Increase / decrease camera speed         |
+| `F`                       | Zoom to fit object on screen             |
 | `H` or `0`                | Return camera to the home position       |
 | `R`                       | Reset accumulation                       |
 | `E`                       | Toggle background (black / white)        |
 | `F11`                     | Toggle fullscreen                        |
 | `F12`                     | Save a screenshot                        |
 | `Esc`                     | Quit                                     |
-
-The full interface (render settings, materials, lighting, denoiser, presets) is documented in **[docs/USAGE.md](docs/USAGE.md)**.
 
 ## Screenshots
 
@@ -149,6 +156,12 @@ Output is written to `docs/html`; open with
     open docs/html/index.html
 ```
 
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+
+Third-party assets (HDRIs, 3D models) user for testing are **not** covered by this license. All HDRI texture files are from Poly Haven and they use a CC0 license.
+
 ## Gallery
 
 ![img1](https://image-forwarder.notaku.so/aHR0cHM6Ly9maWxlLm5vdGlvbi5zby9mL2YvMDY1M2RkNTctMzE3Yy00ZjVjLWIwYzUtZDRjZmRlMmUxNmYxL2NjMzVlZmRiLTM3NjItNGU2Ni05NmY5LTIxMGY4MWZlNDFlNy9XaGF0c0FwcF9JbWFnZV8yMDI2LTA2LTI4X2F0XzE5LjE1LjAwKDEpLmpwZWc_dGFibGU9YmxvY2smaWQ9MzhlM2IyMDYtODZlYy04MDE1LTkyYmYtZGI4YjNiOTMwZjAyJnNwYWNlSWQ9MDY1M2RkNTctMzE3Yy00ZjVjLWIwYzUtZDRjZmRlMmUxNmYxJmV4cGlyYXRpb25UaW1lc3RhbXA9MTc4Mjc3MDQwMDAwMCZzaWduYXR1cmU9S1JacFUtUlZzdzh4NWdPbmVGZW1BbVpGQW5DbEdFMHhxenlyNlFwOFBtUQ==.jpeg?workspaceId=0653dd57-317c-4f5c-b0c5-d4cfde2e16f1)
@@ -168,3 +181,9 @@ Output is written to `docs/html`; open with
 - [Leonel Oliveira Matos](https://github.com/LeonelMatos)
 - Prof. Doutor Abel J.P. Gomes
 
+## Acknowledgments
+
+- Path tracing structure based on Prof. Dr. Thorsten Thormählen's *Image Synthesis* course (Uni Marburg)
+- ACES tone mapping curve fit by Stephen Hill / Krzysztof Narkowicz
+- Filmic tone mapping: John Hable's Uncharted 2 curve (GDC 2010)
+- PCG hash for RNG: Jarzynski & Olano, 2020
