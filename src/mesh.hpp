@@ -12,6 +12,10 @@ using namespace glm;
 
 extern Renderer renderer;
 
+/*----------------------------------------------------------
+  Triangles/Material structs
+*/
+
 struct GPUVertex {
     glm::vec3 position;
     float _pad0;
@@ -63,6 +67,9 @@ struct MeshBounds {
     vec3 max_bound;
 };
 
+/*----------------------------------------------------------
+  Light Structure, Types Definitions
+*/
 /**
 \note vec4 used for padding on the ssbo (w-value not used)
  */
@@ -79,6 +86,22 @@ struct GPULight {
 #define LIGHT_POINT 0
 #define LIGHT_DIRECTIONAL 1
 #define LIGHT_SPOT  2
+
+/*----------------------------------------------------------
+ Header Functions
+*/
+
+///\brief Recreates/Creates a GPU buffer, freeing any previous held handle first.
+///Prevents leaking the old buffer when called repeatedly
+///\param ssbo Buffer handle; deleted if exists, then recreates
+///\param size_bytes Byte size of the data to upload
+///\param data Pointer to source data (can be nullptr to just allocate space)
+///\param usage GL usage hint (STATIC_DRAW, DYNAMIC_DRAW...)
+inline void recreateBuffer(GLuint& ssbo, GLsizeiptr size_bytes, const void* data, GLenum usage) {
+    if(ssbo) glDeleteBuffers(1, &ssbo);
+    glCreateBuffers(1, &ssbo);
+    glNamedBufferData(ssbo, size_bytes, data, usage);
+}
 
 int uploadLights(const vector<GPUTriangle>& triangles, const vector<GPUMaterial>& materials, GLuint& light_ssbo);
 
@@ -100,6 +123,7 @@ bool uploadMesh(const vector<GPUTriangle>& triangles, const vector<GPUMaterial>&
 void clearMesh();
 
 vector<GPUTriangle> makeTestMesh();
+
 
 /*----------------------------------------------------------
   Debux Aux
