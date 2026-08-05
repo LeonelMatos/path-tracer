@@ -3,6 +3,7 @@
 #include "stb_image.h"
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include "stb_image_resize2.h"
+#include <algorithm>
 
 using namespace std;
 
@@ -37,26 +38,60 @@ bool loadEnvMap(const string& path, Renderer& renderer) {
     return true;
 }
 
-bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>& gpu_materials, Renderer& renderer) {
-    ///Forces the loaded textures to be this size \todo dynamically change the tex size
-    const int TEX_SIZE = 4096;
-    const int MAX_LAYERS = (int)cpu_materials.size();
-    int mip_levels = 1 + (int)floor(std::log2(TEX_SIZE));
+static bool getTextureDimensions(const CPUMaterial& mat, int& out_w, int& out_h) {
+    if(!mat.embedded_data.empty()) {
+        out_w = mat.embedded_width;
+        out_h = mat.embedded_height;
+        return true;
+    }
+    int channels;
+    if(!stbi_info(mat.tex_path.c_str(), &out_w, &out_h, &channels)) {
+        printf("\n[TEXTURES] Failed to read dimensions of %s\n", mat.tex_path.c_str());
+        return false;
+    }
+    return true;
+}
 
+bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>& gpu_materials, Renderer& renderer) {
+    //Only allocate array layers for materials that actually have a texture
+    vector<int> mat_to_layer(cpu_materials.size(), -1);
     int tex_count = 0;
-    for (auto& m : cpu_materials)
-        if(m.has_texture) tex_count++;
+    for (int i = 0; i < (int)cpu_materials.size(); i++) {
+        if(cpu_materials[i].has_texture)
+            mat_to_layer[i] = tex_count++;
+    }
 
     if (tex_count == 0) {
         printf("\n[TEXTURES] Model has no textures to upload\n");
         return false;
     }
 
+    //Size the array to the largest texture present
+    int max_dim = MIN_TEX_SIZE;
+    for(auto& m : cpu_materials) {
+        if(!m.has_texture) continue;
+        int w, h;
+        if(!getTextureDimensions(m, w, h)) continue;
+        max_dim = std::max({max_dim, w, h});
+    }
+    max_dim = std::min(max_dim, MAX_TEX_SIZE);
+
+    int tex_size = MIN_TEX_SIZE;
+    while(tex_size < max_dim) tex_size <<= 1;
+
+    const int MAX_LAYERS = tex_count;
+    int mip_levels = 1 + (int)floor(std::log2(tex_size));
+
     if(renderer.tex_array)
         glDeleteTextures(1, &renderer.tex_array);
 
+    size_t est_bytes_per_layer = (size_t)tex_size * tex_size * 4;
+    size_t est_total = (size_t)(est_bytes_per_layer * (4.0/3.0)) * MAX_LAYERS;
+    printf("[TEXTURES] Estimated array VRAM: %.1f MB (%dx%d, %d layers)\n", est_total / 1e6, tex_size,
+        tex_size, MAX_LAYERS);
+
     glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &renderer.tex_array);
-    glTextureStorage3D(renderer.tex_array, mip_levels, GL_RGBA8, TEX_SIZE, TEX_SIZE, MAX_LAYERS);
+    glTextureStorage3D(renderer.tex_array, mip_levels, GL_SRGB8_ALPHA8, tex_size, tex_size, MAX_LAYERS);
     glTextureParameteri(renderer.tex_array, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTextureParameteri(renderer.tex_array, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTextureParameteri(renderer.tex_array, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -71,7 +106,8 @@ bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>
 
     for (int i = 0; i < (int)cpu_materials.size(); i++) {
         const CPUMaterial& cpu_mat = cpu_materials[i];
-        if (!cpu_mat.has_texture) continue;
+        int layer = mat_to_layer[i];
+        if (layer < 0) continue;
 
         int w, h;
         unsigned char* data = nullptr;
@@ -98,22 +134,22 @@ bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>
         unsigned char* upload_data = data;
         unsigned char* resized = nullptr;
 
-        if (w != TEX_SIZE || h != TEX_SIZE) {
-            resized = (unsigned char*)malloc(TEX_SIZE * TEX_SIZE * 4);
-            stbir_resize_uint8_linear(data, w, h, 0, resized, TEX_SIZE, TEX_SIZE, 0, STBIR_RGBA);
+        if (w != tex_size || h != tex_size) {
+            resized = (unsigned char*)malloc(tex_size * tex_size * 4);
+            stbir_resize_uint8_srgb(data, w, h, 0, resized, tex_size, tex_size, 0, STBIR_RGBA);
             upload_data = resized;
         }
 
         //Load to array to layer i
-        glTextureSubImage3D(renderer.tex_array, 0, 0, 0, i, TEX_SIZE, TEX_SIZE, 1, GL_RGBA, GL_UNSIGNED_BYTE, upload_data);
+        glTextureSubImage3D(renderer.tex_array, 0, 0, 0, layer, tex_size, tex_size, 1, GL_RGBA, GL_UNSIGNED_BYTE, upload_data);
 
         //connects mat index to layer
-        gpu_materials[i].tex_index = i;
+        gpu_materials[i].tex_index = layer;
 
         if(to_free) stbi_image_free(to_free);
         if(resized) free(resized);
 
-        printf("[TEXTURES] Loaded %d: %s (%dx%d)\n", i, cpu_mat.tex_path.c_str(), w, h);
+        printf("[TEXTURES] Loaded %d → layer %d: %s (%dx%d)\n", i, layer, cpu_mat.tex_path.c_str(), w, h);
     }
 
     glGenerateTextureMipmap(renderer.tex_array);
@@ -123,7 +159,7 @@ bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>
     glUseProgram(renderer.active_id);
     glUniform1i(renderer.loc_tex_array, 3);
 
-    printf("[TEXTURES] Uploaded %d textures to array (%dx%d)\n", tex_count, TEX_SIZE, TEX_SIZE);
+    printf("[TEXTURES] Uploaded %d textures to array (%dx%d, %d layers)\n", tex_count, tex_size, tex_size, MAX_LAYERS);
     return true;
 }
 

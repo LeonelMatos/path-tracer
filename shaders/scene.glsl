@@ -64,8 +64,7 @@ void intersects_mesh(const Ray ray, inout Hit h) {
 
                     //Texture sample
                     if(USE_TEXTURES == 1 && gpu_materials[m_id].tex_index >= 0) {
-                        vec3 tex_color = texture(tex_albedo, vec3(uv, float(gpu_materials[m_id].tex_index))).rgb;
-                        h.albedo = pow(tex_color, vec3(2.2)); //Simple gamma correction
+                        h.albedo = texture(tex_albedo, vec3(uv, float(gpu_materials[m_id].tex_index))).rgb;
                     }
                     else {
                         h.albedo = gpu_materials[m_id].albedo.rgb;
