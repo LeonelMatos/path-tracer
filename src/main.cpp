@@ -49,7 +49,7 @@
 #include "texture.hpp"
 #include "denoiser.hpp"
 
-#define VERSION "1.7.2"
+#define VERSION "1.7.3"
 #define VERSION_NOTE ""
 
 using namespace std;
@@ -113,6 +113,8 @@ void setPreviewMode(bool enabled);
 void processMovement();
 void formatTime(double seconds, char*buf, int buf_size);
 bool initShaders();
+void reloadShaders();
+void initUniforms();
 void loadScene();
 void resetModel();
 void uploadConfig();
@@ -150,6 +152,9 @@ void onKeyPress(GLFWwindow* /*w*/, int key, int /*scancode*/, int action, int /*
         break;
         case GLFW_KEY_F11:
             toggleFullscreen();
+        break;
+        case GLFW_KEY_F5:
+            reloadShaders();
         break;
         case GLFW_KEY_R:
             resetAccumulation();
@@ -469,7 +474,8 @@ int main(void) {
     
     printf("%s\n%s v%s\nResolution: %dx%d", txt_sep, WINDOW_TITLE, VERSION, WINDOW_WIDTH, WINDOW_HEIGHT);
     printf("\tUsing %s shader", USE_COMPUTE_SH ? "Compute" : "Fragment");
-    printf("\n\tESC   quit\n\tF12   screenshot render\n\tH/0   center camera\n\tR     reset accumulation\n%s\n", txt_sep);
+    printf("\n\tESC   Quit\n\tF12   Screenshot render\n\tF5    Recompile shaders\n\tH/0   Center camera\n\
+        R     Reset accumulation\n\tF     Zoom to fit object\n\tE     Toggle background\n%s\n", txt_sep);
 
     //Check GPU's SSBO size limite
     GLint max_ssbo;
@@ -579,25 +585,40 @@ void formatTime(double seconds, char*buf, int buf_size) {
 ///Compiles and links all shaders 
 ///\return true on success
 bool initShaders() {
-    renderer.display_id = LoadShaders({
+    bool ok = true;
+
+    ok &= renderer.display_id.load({
         { GL_VERTEX_SHADER,   "shaders/common.vert"    },
         { GL_FRAGMENT_SHADER, "shaders/display.frag" },
     });
-    renderer.pathtr_frag_id = LoadShaders({
+    ok &= renderer.pathtr_frag_id.load({
         { GL_VERTEX_SHADER,   "shaders/common.vert"       },
         { GL_FRAGMENT_SHADER, "shaders/path_trace.frag" },
     });
-    renderer.pathtr_comp_id = LoadShaders({
+    ok &= renderer.pathtr_comp_id.load({
         { GL_COMPUTE_SHADER, "shaders/path_trace.comp" }
     });
-    renderer.grid_id = LoadShaders({
+    ok &= renderer.grid_id.load({
         { GL_VERTEX_SHADER, "shaders/grid.vert" },
         { GL_FRAGMENT_SHADER, "shaders/grid.frag" }
     });
-    if(!renderer.display_id || !renderer.pathtr_frag_id || !renderer.pathtr_comp_id || !renderer.grid_id) {
-        return false;
-    }
-    return true;
+    return ok;
+}
+
+void reloadShaders() {
+    printf("\n[SHADERS] Reloading shaders...\n");
+    bool ok = initShaders();
+
+    renderer.active_id = USE_COMPUTE_SH ? renderer.pathtr_comp_id.id() : renderer.pathtr_frag_id.id();
+    initUniforms();
+
+    uploadConfig();
+    uploadCamera();
+    uploadSun();
+    resetAccumulation();
+
+    printf(ok ? "[SHADERS] Reload OK\n" : "[SHADERS] Reload FAILED for one or more programs.\n\
+        Kept the previous working version\n");
 }
 
 ///\brief Caches every uniform location of the active shader into Renderer
@@ -618,7 +639,7 @@ void initUniforms() {
     renderer.loc_analytic_light_count = glGetUniformLocation(active, "analytic_light_count");
 
     if(!USE_COMPUTE_SH) {
-        renderer.loc_prev = glGetUniformLocation(renderer.pathtr_frag_id, "prev_frame");
+        renderer.loc_prev = glGetUniformLocation(renderer.pathtr_frag_id.id(), "prev_frame");
     }
     renderer.loc_depth  = glGetUniformLocation(active, "DEPTH");
     renderer.loc_spp    = glGetUniformLocation(active, "SAMPLES_PER_PIXEL");
@@ -639,22 +660,22 @@ void initUniforms() {
     renderer.loc_cam_lookat = glGetUniformLocation(active, "camera_lookat");
     renderer.loc_cam_up = glGetUniformLocation(active, "camera_up");
 
-    renderer.loc_display_render_res = glGetUniformLocation(renderer.display_id, "render_resolution");
-    renderer.loc_display_res = glGetUniformLocation(renderer.display_id, "display_resolution");
+    renderer.loc_display_render_res = glGetUniformLocation(renderer.display_id.id(), "render_resolution");
+    renderer.loc_display_res = glGetUniformLocation(renderer.display_id.id(), "display_resolution");
     
-    renderer.loc_display_tone_map = glGetUniformLocation(renderer.display_id, "TONE_MAPPING");
-    renderer.loc_vignette = glGetUniformLocation(renderer.display_id, "VIGNETTE_STRENGTH");
-    renderer.loc_exposure = glGetUniformLocation(renderer.display_id, "EXPOSURE");
+    renderer.loc_display_tone_map = glGetUniformLocation(renderer.display_id.id(), "TONE_MAPPING");
+    renderer.loc_vignette = glGetUniformLocation(renderer.display_id.id(), "VIGNETTE_STRENGTH");
+    renderer.loc_exposure = glGetUniformLocation(renderer.display_id.id(), "EXPOSURE");
 
     renderer.loc_use_nee = glGetUniformLocation(active, "USE_NEE");
 
     renderer.loc_firefly_clamp = glGetUniformLocation(active, "FIREFLY_CLAMP");
 
-    renderer.grid_loc_view = glGetUniformLocation(renderer.grid_id, "view");
-    renderer.grid_loc_proj = glGetUniformLocation(renderer.grid_id, "projection");
-    renderer.grid_loc_near = glGetUniformLocation(renderer.grid_id, "near_plane");
-    renderer.grid_loc_far = glGetUniformLocation(renderer.grid_id, "far_plane");
-    renderer.grid_loc_cam_pos = glGetUniformLocation(renderer.grid_id, "camera_pos");
+    renderer.grid_loc_view = glGetUniformLocation(renderer.grid_id.id(), "view");
+    renderer.grid_loc_proj = glGetUniformLocation(renderer.grid_id.id(), "projection");
+    renderer.grid_loc_near = glGetUniformLocation(renderer.grid_id.id(), "near_plane");
+    renderer.grid_loc_far = glGetUniformLocation(renderer.grid_id.id(), "far_plane");
+    renderer.grid_loc_cam_pos = glGetUniformLocation(renderer.grid_id.id(), "camera_pos");
 
     renderer.loc_scene_preset = glGetUniformLocation(renderer.active_id, "SCENE_PRESET");
 
@@ -875,13 +896,12 @@ void resetModel() {
 ///\return true on success
 bool transferDataToGPU(void) {
     if(!initShaders()) {
-        glfwTerminate();
-        fprintf(stderr, "[FATAL] Shader compilation failed\n");
+        fprintf(stderr, "[FATAL] Shader compilation failed: see log above\n");
         return false;
     }
 
     //Select shader
-    renderer.active_id = USE_COMPUTE_SH ? renderer.pathtr_comp_id : renderer.pathtr_frag_id;
+    renderer.active_id = USE_COMPUTE_SH ? renderer.pathtr_comp_id.id() : renderer.pathtr_frag_id.id();
     
     initUniforms();
 
@@ -926,10 +946,6 @@ void cleanDataFromGPU() {
     glDeleteFramebuffers(2, renderer.fbo);
     if(renderer.denoised_tex)
         glDeleteTextures(1, &renderer.denoised_tex);
-    
-    glDeleteProgram(renderer.pathtr_comp_id);
-    glDeleteProgram(renderer.pathtr_frag_id);
-    glDeleteProgram(renderer.display_id);
 
     glDeleteBuffers(1, &renderer.triangle_ssbo);
     glDeleteBuffers(1, &renderer.light_ssbo);
@@ -945,7 +961,7 @@ void cleanDataFromGPU() {
 void display(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
-    glUseProgram(renderer.display_id);
+    renderer.display_id.use();
 
     glUniform2f(renderer.loc_display_render_res, (float)renderer.render_w, (float)renderer.render_h);
     glUniform2f(renderer.loc_display_res, (float)WINDOW_WIDTH, (float)WINDOW_HEIGHT);
@@ -1338,7 +1354,7 @@ void drawGrid() {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_DEPTH_TEST);
 
-    glUseProgram(renderer.grid_id);
+    renderer.grid_id.use();
     glUniformMatrix4fv(renderer.grid_loc_view, 1, GL_FALSE, value_ptr(view));
     glUniformMatrix4fv(renderer.grid_loc_proj, 1, GL_FALSE, value_ptr(proj));
     glUniform1f(renderer.grid_loc_near, 0.01f);

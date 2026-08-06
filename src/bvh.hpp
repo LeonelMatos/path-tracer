@@ -11,6 +11,7 @@
 #pragma once
 
 #include <vector>
+#include <cstddef>
 #include <GL/glew.h>
 #include <glm/glm.hpp>
 #include "mesh.hpp"
@@ -38,6 +39,10 @@ struct BVHNode {
     int first_tri;
     int tri_count;
 };
+static_assert(sizeof(BVHNode) == 48, "BVHNode must match the std430 layout in globals.glsl");
+static_assert(offsetof(BVHNode, aabb_max) == 16, "BVHNode.aabb_max offset must match globals.glsl");
+static_assert(offsetof(BVHNode, left_child) == 32, "BVHNode.left_child offset must match globals.glsl");
+
 /**
  *\brief Builds the BVH using a triangle list.
  Recursively splits each triangle node at median along the longest axis of its AABB,

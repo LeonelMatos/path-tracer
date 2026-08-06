@@ -25,11 +25,15 @@ struct GPUVertex {
     glm::vec2 _pad2;
 };
 
+static_assert(sizeof(GPUVertex) == 48, "GPUVertex must match the std430 layout in globals.glsl");
+
 struct GPUTriangle {
     GPUVertex v0, v1, v2;
     int material_id;
     float _pad[3];
 };
+
+static_assert(sizeof(GPUTriangle) == 160, "GPUTriangle must match the std430 layout in globals.glsl");
 
 ///\note vec4, alpha value used only as padding for std430
 struct GPUMaterial {
@@ -82,6 +86,8 @@ struct GPULight {
     float spot_inner;
     float spot_outer;
 };
+
+static_assert(sizeof(GPULight) == 64, "GPULight must match the std430 layout in globals.glsl");
 
 #define LIGHT_POINT 0
 #define LIGHT_DIRECTIONAL 1

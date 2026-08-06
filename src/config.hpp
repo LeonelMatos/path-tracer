@@ -1,4 +1,5 @@
 #pragma once
+#include "gl/program.hpp"
 #include <string>
 #include <vector>
 #include <filesystem>
@@ -140,7 +141,7 @@ struct Renderer {
     glm::vec3 current_bounds_min = glm::vec3(-1.0f);
     glm::vec3 current_bounds_max = glm::vec3(1.0f);
     
-    GLuint display_id, pathtr_frag_id, pathtr_comp_id;
+    GLProgram display_id, pathtr_frag_id, pathtr_comp_id;
     GLuint active_id;
     GLuint tex[2], fbo[2], vao;
     GLint loc_res, loc_frame, loc_prev, loc_tex;
@@ -168,7 +169,7 @@ struct Renderer {
     GLint loc_exposure;
     
     bool show_grid = false;
-    GLuint grid_id = 0;
+    GLProgram grid_id;
     GLint grid_loc_view, grid_loc_proj, grid_loc_near, grid_loc_far, grid_loc_cam_pos;
 
     ///Photo framing overlay (viewfinder, screen-space only)
