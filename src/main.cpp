@@ -653,7 +653,17 @@ void initUniforms() {
     renderer.loc_background = glGetUniformLocation(active, "BACKGROUND");
     renderer.loc_tone_map   = glGetUniformLocation(active, "TONE_MAPPING");
 
-    renderer.loc_chromatic_aberration = glGetUniformLocation(active, "CAM_CHROMATIC_ABERRATION");
+    renderer.loc_lateral_ca = glGetUniformLocation(active, "CAM_LATERAL_CA");
+    renderer.loc_axial_ca = glGetUniformLocation(active, "CAM_AXIAL_CA");
+    renderer.loc_aperture_blades = glGetUniformLocation(active, "CAM_APERTURE_BLADES");
+    renderer.loc_blade_rotation = glGetUniformLocation(active, "CAM_BLADE_ROTATION");
+    renderer.loc_anamorphic_squeeze = glGetUniformLocation(active, "CAM_ANAMORPHIC_SQUEEZE");
+    renderer.loc_cateye_strength = glGetUniformLocation(active, "CAM_CATEYE_STRENGTH");
+    renderer.loc_distortion_k1 = glGetUniformLocation(active, "CAM_DISTORTION_K1");
+    renderer.loc_distortion_k2 = glGetUniformLocation(active, "CAM_DISTORTION_K2");
+    renderer.loc_projection_mode = glGetUniformLocation(active, "CAM_PROJECTION_MODE");
+    renderer.loc_cam_tilt = glGetUniformLocation(active, "CAM_TILT");
+
     renderer.loc_glass_dispersion = glGetUniformLocation(active, "GLASS_DISPERSION");
 
     renderer.loc_cam_pos    = glGetUniformLocation(active, "camera_position");
@@ -662,6 +672,7 @@ void initUniforms() {
 
     renderer.loc_display_render_res = glGetUniformLocation(renderer.display_id.id(), "render_resolution");
     renderer.loc_display_res = glGetUniformLocation(renderer.display_id.id(), "display_resolution");
+    renderer.loc_display_cam_fov = glGetUniformLocation(renderer.display_id.id(), "CAM_FOV");
     
     renderer.loc_display_tone_map = glGetUniformLocation(renderer.display_id.id(), "TONE_MAPPING");
     renderer.loc_vignette = glGetUniformLocation(renderer.display_id.id(), "VIGNETTE_STRENGTH");
@@ -710,7 +721,16 @@ void uploadConfig() {
     glUniform1f(renderer.loc_focal_band, config.focal_band_debug);
     glUniform1i(renderer.loc_background, config.background);
     glUniform1i(renderer.loc_tone_map, config.tone_mapping);
-    glUniform1f(renderer.loc_chromatic_aberration, config.cam_chromatic_aberration);
+    glUniform1f(renderer.loc_lateral_ca, config.cam_lateral_ca);
+    glUniform1f(renderer.loc_axial_ca, config.cam_axial_ca);
+    glUniform1i(renderer.loc_aperture_blades, config.cam_aperture_blades);
+    glUniform1f(renderer.loc_blade_rotation, glm::radians(config.cam_blade_rotation));
+    glUniform1f(renderer.loc_anamorphic_squeeze, config.cam_anamorphic_squeeze);
+    glUniform1f(renderer.loc_cateye_strength, config.cam_cateye_strength);
+    glUniform1f(renderer.loc_distortion_k1, config.cam_distortion_k1);
+    glUniform1f(renderer.loc_distortion_k2, config.cam_distortion_k2);
+    glUniform1i(renderer.loc_projection_mode, config.cam_projection_mode);
+    glUniform1f(renderer.loc_cam_tilt, glm::radians(config.cam_tilt));
     glUniform1f(renderer.loc_glass_dispersion, config.glass_dispersion);
     glUniform1i(renderer.loc_use_nee, config.use_nee ? 1 : 0);
     glUniform1i(renderer.loc_scene_preset, config.scene_preset);
@@ -968,6 +988,7 @@ void display(void) {
     glUniform1i(renderer.loc_display_tone_map, config.tone_mapping);
     glUniform1f(renderer.loc_vignette, config.vignette_strength);
     glUniform1f(renderer.loc_exposure, glm::exp2(config.exposure_ev));
+    glUniform1f(renderer.loc_display_cam_fov, glm::radians(config.cam_fov));
 
     GLuint tex_to_show = (renderer.denoiser_active && renderer.denoised_tex && renderer.frame_id > 10) ? renderer.denoised_tex : renderer.tex[renderer.cur_f];
 
@@ -1458,6 +1479,7 @@ static bool model_list_loaded = false;
 static vector<string> hdri_list;
 static bool hdri_list_loaded = false;
 static bool show_hdri_selector = false;
+static bool show_lens_studio = false;
 
 inline int current_res_idx = 0;
 const int res_w[] = {1280, 1920, 2560, 4096, 0, 0};
@@ -1618,33 +1640,11 @@ void drawUI() {
                 }
             }
 
-            ImGui::SeparatorText("Chromatic Aberration");
-            bool ca_enabled = (config.cam_chromatic_aberration > 0.0f);
-
-            if(ImGui::Checkbox("Enable", &ca_enabled)) {
-                config.cam_chromatic_aberration = ca_enabled ? 0.01f : 0.0f;
-                changed = true;
+            ImGui::Spacing();
+            if(ImGui::Button("Lens Studio", ImVec2(-1, 0))) {
+                show_lens_studio = true;
             }
-            ImGui::SetItemTooltip("Traces one full path per color channel (3x render cost)");
-
-            if(ca_enabled) {
-                changed |= ImGui::SliderFloat("CA Strength", &config.cam_chromatic_aberration, 0.001f, 0.05f, "%.3f");
-                resetBtn("*##ca", config.cam_chromatic_aberration, 0.01f);
-                ImGui::SetItemTooltip("Higher gives more color fringing");
-            }
-            
-            bool dispersion_enabled = (config.glass_dispersion > 0.0f);
-            if(ImGui::Checkbox("Enabled Glass Dispersion", &dispersion_enabled)) {
-                config.glass_dispersion = dispersion_enabled ? 0.02f : 0.0f;
-                changed = true;
-            }
-            ImGui::SetItemTooltip("Prism effect. White lights splits into color when refracting through glass\nTraces one path per color channel (3x render cost)\nShares the trace with Chromatic Aberration, so uses the same traces when both are on");
-
-            if(dispersion_enabled) {
-                changed |= ImGui::SliderFloat("Disp. Strength", &config.glass_dispersion, 0.001f, 0.1f, "%.3f");
-                resetBtn("*##dispersion", config.glass_dispersion, 0.02f);
-                ImGui::SetItemTooltip("Higher gives more visible color separation through glass");
-            }
+            ImGui::SetItemTooltip("Lens shape, Chromatic Aberration, Distortion, Fisheye, Tilt-Shift");
 
             //------ Composition and Aspect Ratio -----------
             ImGui::SeparatorText("Composition");
@@ -1767,6 +1767,102 @@ void drawUI() {
         }
     }
     ImGui::End();
+
+    //-----------------------------
+    //-- Lens Studio Window -------
+    if(show_lens_studio) {
+        ImGui::SetNextWindowPos(ImVec2(WINDOW_WIDTH * 0.5f, WINDOW_HEIGHT * 0.5f), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(380, 560), ImGuiCond_Appearing);
+
+        if(ImGui::Begin("Lens Studio", &show_lens_studio)) {
+            bool dof_enabled = (config.cam_aperture > 0.0f);
+
+            ImGui::SeparatorText("Bokeh Shape");
+            if(!dof_enabled) ImGui::TextDisabled("Needs Depth of Field enabled (Camera panel)");
+
+            ImGui::BeginDisabled(!dof_enabled);
+            changed |= ImGui::SliderInt("Aperture Blades", &config.cam_aperture_blades, 0, 12);
+            resetBtn("*##blades", config.cam_aperture_blades, 0);
+            ImGui::SetItemTooltip("Shape of the aperture disk.\n0-2 = perfectly circular (default), 5-9 = typical lens polygon bokeh");
+
+            if(config.cam_aperture_blades >= 3) {
+                changed |= ImGui::SliderFloat("Blade Rotation", &config.cam_blade_rotation, 0.0f, 60.0f, "%.1f°");
+                resetBtn("*##bladerot", config.cam_blade_rotation, 0.0f);
+            }
+
+            changed |= ImGui::SliderFloat("Anamorphic Squeeze", &config.cam_anamorphic_squeeze, 1.0f, 2.5f, "%.2fx");
+            resetBtn("*##squeeze", config.cam_anamorphic_squeeze, 1.0f);
+            ImGui::SetItemTooltip("Stretches the bokeh horizontally.\n1.0 = off/circular, ~1.3-2.0 for an anamorphic look");
+
+            changed |= ImGui::SliderFloat("Cat's-Eye", &config.cam_cateye_strength, 0.0f, 1.0f, "%.2f");
+            resetBtn("*##cateye", config.cam_cateye_strength, 0.0f);
+            ImGui::SetItemTooltip("Mechanical vignetting: clips bokeh shapes near the frame edges,\nlike a lens barrel occluding part of the aperture");
+            ImGui::EndDisabled();
+
+            ImGui::SeparatorText("Tilt-Shift");
+            ImGui::BeginDisabled(!dof_enabled);
+            changed |= ImGui::SliderFloat("Tilt", &config.cam_tilt, -15.0f, 15.0f, "%.1f°");
+            resetBtn("*##tilt", config.cam_tilt, 0.0f);
+            ImGui::SetItemTooltip("Pivots the focal plane around the horizontal axis (Scheimpflug).\n'Miniature' look at strong angles");
+            ImGui::EndDisabled();
+
+            ImGui::SeparatorText("Chromatic Aberration");
+            bool lateral_ca_enabled = (config.cam_lateral_ca > 0.0f);
+            if(ImGui::Checkbox("Enable##lateralca", &lateral_ca_enabled)) {
+                config.cam_lateral_ca = lateral_ca_enabled ? 0.01f : 0.0f;
+                changed = true;
+            }
+            ImGui::SetItemTooltip("Traces one full path per color channel (3x render cost)\nShares the trace with Axial CA and Glass Dispersion");
+
+            if(lateral_ca_enabled) {
+                changed |= ImGui::SliderFloat("Lateral CA", &config.cam_lateral_ca, 0.001f, 0.05f, "%.3f");
+                resetBtn("*##lateralca", config.cam_lateral_ca, 0.01f);
+                ImGui::SetItemTooltip("Per-channel magnification shift.\nZero at frame center, worse toward the corners - the classic red/cyan edge fringing");
+            }
+
+            bool axial_ca_enabled = (config.cam_axial_ca > 0.0f);
+            if(ImGui::Checkbox("Enable##axialca", &axial_ca_enabled)) {
+                config.cam_axial_ca = axial_ca_enabled ? 0.01f : 0.0f;
+                changed = true;
+            }
+            ImGui::SetItemTooltip("Traces one full path per color channel (3x render cost)\nShares the trace with Lateral CA and Glass Dispersion");
+
+            if(axial_ca_enabled) {
+                changed |= ImGui::SliderFloat("Axial CA", &config.cam_axial_ca, 0.001f, 0.05f, "%.3f");
+                resetBtn("*##axialca", config.cam_axial_ca, 0.01f);
+                ImGui::SetItemTooltip("Per-channel focus shift (bokeh color fringing).\nOnly visible with Depth of Field enabled, same as a real lens");
+            }
+
+            bool dispersion_enabled = (config.glass_dispersion > 0.0f);
+            if(ImGui::Checkbox("Enabled Glass Dispersion", &dispersion_enabled)) {
+                config.glass_dispersion = dispersion_enabled ? 0.02f : 0.0f;
+                changed = true;
+            }
+            ImGui::SetItemTooltip("Prism effect. White lights splits into color when refracting through glass\nTraces one path per color channel (3x render cost)\nShares the trace with Chromatic Aberration, so uses the same traces when both are on");
+
+            if(dispersion_enabled) {
+                changed |= ImGui::SliderFloat("Disp. Strength", &config.glass_dispersion, 0.001f, 0.1f, "%.3f");
+                resetBtn("*##dispersion", config.glass_dispersion, 0.02f);
+                ImGui::SetItemTooltip("Higher gives more visible color separation through glass");
+            }
+
+            ImGui::SeparatorText("Distortion & Projection");
+            changed |= ImGui::Combo("Projection", &config.cam_projection_mode, CAM_PROJECTION_NAMES, CAM_PROJECTION_COUNT);
+            resetBtn("*##projmode", config.cam_projection_mode, 0);
+            ImGui::SetItemTooltip("Rectilinear = normal lens (straight lines stay straight)\nFisheye modes cover a much wider FOV with curved lines");
+
+            changed |= ImGui::SliderFloat("Distortion K1", &config.cam_distortion_k1, -0.5f, 0.5f, "%.3f");
+            resetBtn("*##distk1", config.cam_distortion_k1, 0.0f);
+            ImGui::SetItemTooltip("Negative = barrel (wide-angle look)\nPositive = pincushion (tele/zoom look)");
+
+            changed |= ImGui::SliderFloat("Distortion K2", &config.cam_distortion_k2, -0.5f, 0.5f, "%.3f");
+            resetBtn("*##distk2", config.cam_distortion_k2, 0.0f);
+            ImGui::SetItemTooltip("Higher-order term.\nOpposite sign from K1 gives 'mustache' distortion");
+
+            if(changed) applyConfig();
+        }
+        ImGui::End();
+    }
 
     //-----------------------------
     //-- Right Window -------------

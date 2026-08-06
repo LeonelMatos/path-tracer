@@ -20,43 +20,127 @@ void camera_axes(out vec3 cam_x, out vec3 cam_y, out vec3 cam_z) {
 /**Calculates the direction of a ray for a pixel
 \param uv Pixel coordinates
 \param vec3 All camera axes
-\param f_len Explicit focal length, co callers can perturb it per color channel
+\param fov_scale Multiplier on CAM_FOV, so callers can perturb it per color/colour channel
 \return Normalized direction of ray in worldspace
+\see CAM_DISTORTION_K1, CAM_PROJECTION_MODE
 */
-vec3 cameraRay(vec2 uv, vec3 cam_x, vec3 cam_y, vec3 cam_z, float f_len) {
+vec3 cameraRay(vec2 uv, vec3 cam_x, vec3 cam_y, vec3 cam_z, float fov_scale) {
     float aspect = resolution.x / resolution.y;
-    vec2 p = 2.0 * uv - 1.0;
-    vec3 ray_cam = vec3(p.x * aspect, p.y, -f_len);
-    return normalize(cam_x * ray_cam.x + cam_y * ray_cam.y + cam_z * ray_cam.z);
+    vec2 p = (2.0 * uv - 1.0) * vec2(aspect, 1.0);
+
+    //Radial lens distortion, applied in aspect-corrected space
+    if(CAM_DISTORTION_K1 != 0.0 || CAM_DISTORTION_K2 != 0.0) {
+        float r2 = dot(p, p);
+        p *= 1.0 + CAM_DISTORTION_K1 * r2 + CAM_DISTORTION_K2 * r2 * r2;
+    }
+
+    float half_fov = 0.5 * CAM_FOV * fov_scale;
+
+    if(CAM_PROJECTION_MODE == PROJ_RECTILINEAR) {
+        float f_len = 1.0 / tan(half_fov);
+        vec3 ray_cam = vec3(p.x, p.y, -f_len);
+        return normalize(cam_x * ray_cam.x + cam_y * ray_cam.y + cam_z * ray_cam.z);
+    }
+
+    //Fisheye projection map image-plane
+    float r = length(p);
+    if(r < EPS) return -cam_z;
+
+    float theta;
+    if(CAM_PROJECTION_MODE == PROJ_FISHEYE_EQUIDISTANT) {
+        theta = r * half_fov;
+    }
+    else if (CAM_PROJECTION_MODE == PROJ_FISHEYE_STEREOGRAPHIC) {
+        theta = 2.0 * atan(r * tan(half_fov * 0.5));
+    }
+    else { //PROJ_FISHEYE_EQUISOLID
+        theta = 2.0 * asin(clamp(r * sin(half_fov * 0.5), -1.0, 1.0));
+    }
+
+    vec2 dir2d = p / r;
+    vec3 local_dir = vec3(dir2d * sin(theta), -cos(theta));
+
+    return normalize(cam_x * local_dir.x + cam_y * local_dir.y + cam_z * local_dir.z);
+}
+
+/**\brief Max radius of a regular N-gon at a given angle
+\param blades number of aperture blades, <3 returns 1.0 (circular)
+\note Standart "polygon bokeh": r(θ) = cos(π/n) / cos(θ' - π/n), where θ' is θ measured relative to the nearest edge's midpoint.
+*/
+float polygonAperture(float angle, int blades) {
+    if(blades < 3) return 1.0;
+    float corner = TWO_PI / float(blades);
+    float a = mod(angle, corner) - corner * 0.5;
+    return cos(corner * 0.5) / cos(a);
+}
+
+/**\brief Samples a point on the camera's aperture (lens disk)
+Shaped by CAM_APERTURE_BLADES/CAM_BLADE_ROTATION/CAM_ANAMORPHIC_SQEEZE, and
+is biased towards the frame edges (behaviour like mechanical vignette) by CAM_CATEYE_STRENGTH
+\param uv pixel coordinates [0,1], used only for cat's-eye
+\param angle random angle around the lens
+\param radius_rand random [0,1[ for the radius, distributed in uniform disk density using the sqrt
+\return world-space offset from camera_position, on the lens plane
+*/
+vec3 sampleAperture(vec3 cam_x, vec3 cam_y, vec2 uv, float angle, float radius_rand) {
+    float shape = polygonAperture(angle + CAM_BLADE_ROTATION, CAM_APERTURE_BLADES);
+    float radius = sqrt(radius_rand) * CAM_APERTURE * shape;
+
+    vec2 disk = vec2(cos(angle), sin(angle)) * radius;
+    disk.x *= CAM_ANAMORPHIC_SQUEEZE;
+
+    //Cat's-eye: biases the sample towards the center, proportional to how far off-axis the pixel is.
+    //This method is an approximation, not a real occlusion test, but it's cheap and doesn't add noise
+    if(CAM_CATEYE_STRENGTH > 0.0) {
+        vec2 frame_offset = (uv - 0.5) * 2.0;
+        disk -= frame_offset * length(frame_offset) * CAM_CATEYE_STRENGTH * CAM_APERTURE;
+    }
+
+    return cam_x * disk.x + cam_y * disk.y;
+}
+
+/**\brief Point on the (maybe tilted) focal plane that a given ray focuses on
+\note CAM_TILT==0 keeps the original sphere-approx behaviour
+\see CAM_TILT
+*/
+vec3 focalPlanePoint(vec3 cam_x, vec3 cam_y, vec3 cam_z, vec3 ray_dir, float focal_distance) {
+    if(CAM_TILT == 0.0) {
+        return camera_position + ray_dir * focal_distance;
+    }
+
+    vec3 plane_point = camera_position + cam_z * focal_distance;
+    vec3 plane_normal = cam_z * cos(CAM_TILT) + cam_y * sin(CAM_TILT);
+
+    float denom = dot(ray_dir, plane_normal);
+    if(abs(denom) < EPS)
+        return camera_position + ray_dir * focal_distance;
+    
+    float t = dot(plane_point - camera_position, plane_normal) / denom;
+    return camera_position + ray_dir * t;
 }
 
 /**\brief Creates a ray with depth of field, using one channel's lens parameters
-\param channel 0=R, 1=G, 2=B
-\note channel=1 (G) reproduces the exact original unperturbed ray regardless of CAM_CHROMATIC_ABERRATION,
-since DISPERSION_COEFF[1] = 0
-\return Ray with origin at the lens directed to the channel's focal point
-\see cameraRayDOF, CAM_CHROMATIC_ABERRATION
+\return Ray with origin at the lens directed to the disp_coefficient's directed focal point
+\see cameraRayDOF, CAM_LATERAL_CA, CAM_AXIAL_CA
 */
 Ray cameraRayDOFChannel(vec2 uv, int spp_index, uvec2 px, float disp_coeff) {
     vec3 cam_x, cam_y, cam_z;
     camera_axes(cam_x, cam_y, cam_z);
 
-    float disp = CAM_CHROMATIC_ABERRATION * disp_coeff;
-    float f_len = (1.0 / tan(0.5 * CAM_FOV)) * (1.0 + disp);
-    float focal_distance = CAM_FOCAL_DISTANCE * (1.0 + disp);
+    float fov_scale = 1.0 + CAM_LATERAL_CA * disp_coeff;
+    float focal_distance = CAM_FOCAL_DISTANCE * (1.0 + CAM_AXIAL_CA * disp_coeff);
 
     vec3 rj = rand3(-2, spp_index, px);
     vec2 jitter = (rj.xz - 0.5) / resolution;
 
     //Focal point definition
-    vec3 base_dir = cameraRay(uv + jitter, cam_x, cam_y, cam_z, f_len);
-    vec3 focal_point = camera_position + base_dir * focal_distance;
+    vec3 base_dir = cameraRay(uv + jitter, cam_x, cam_y, cam_z, fov_scale);
+    vec3 focal_point = focalPlanePoint(cam_x, cam_y, cam_z, base_dir, focal_distance);
 
     //Lens disk
     float angle = rj.x * TWO_PI;
     vec3 rDOF = rand3(-3, spp_index, px); //needs different random seed
-    float radius = sqrt(rDOF.x) * CAM_APERTURE;
-    vec3 lens_offset = (cos(angle) * cam_x + sin(angle) * cam_y) * radius;
+    vec3 lens_offset = sampleAperture(cam_x, cam_y, uv, angle, rDOF.x);
 
     vec3 origin = camera_position + lens_offset;
     return Ray(origin, normalize(focal_point - origin));
@@ -470,7 +554,7 @@ vec4 pathTraceFromRay(Ray ray, int spp_index, uvec2 px, float disp_coeff) {
 }
 
 vec4 pathTrace(vec2 uv, int spp_index, uvec2 px) {
-    if(CAM_CHROMATIC_ABERRATION <= 0.0 && GLASS_DISPERSION <= 0.0) {
+    if(CAM_LATERAL_CA <= 0.0 && CAM_AXIAL_CA <= 0.0 && GLASS_DISPERSION <= 0.0) {
         Ray ray = cameraRayDOF(uv, spp_index, px);
         return pathTraceFromRay(ray, spp_index, px, 0.0);
     }

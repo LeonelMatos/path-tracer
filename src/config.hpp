@@ -66,9 +66,36 @@ struct RenderConfig {
     
     bool focal_debug = false;
     float focal_band_debug = 0.05;
+
+    ///Aperture blade count for bokeh shape
+    ///\note <3 = perfect circular (default)
+    int cam_aperture_blades = 0;
+
+    ///Rotates the polygon aperture shape, in degrees
+    float cam_blade_rotation = 0.0f;
+
+    ///Anamorphic sqeeze ratio for oval bokeh
+    float cam_anamorphic_squeeze = 1.0f;
+
+    ///Mechanical vignette on the bokeh shape near frame edges, like cat's-eye
+    float cam_cateye_strength = 0.0f;
+
+    ///Radial lens distortion. Negative K1 = barrel, Positive K1 = pincushion
+    float cam_distortion_k1 = 0.0f;
+    float cam_distortion_k2 = 0.0f;
+
+    ///Camera projection
+    ///0=rectilinear, 1=equidistant fisheye, 2=stereographic fisheye, 3=equisolid fisheye
+    int cam_projection_mode = 0;
+
+    ///Tilt-shift, tilts the focal plane around the camera's local x-axis, in degrees
+    float cam_tilt = 0.0f;
     
-    ///Lens chromatic strength, 0 = off
-    float cam_chromatic_aberration = 0.0f;
+    ///Lateral (transverse) Chromatic Aberration strength, per-channel shift
+    float cam_lateral_ca = 0.0f;
+
+    //Axial (longitudinal) Chromatic Aberration, per-channel focus shift
+    float cam_axial_ca = 0.0f;
 
     ///Glass dispersion strength (prism effect). Perturbs the IOR of MAT_GLASS
     float glass_dispersion = 0.0f;
@@ -157,7 +184,15 @@ struct Renderer {
     GLint loc_display_render_res;
     GLint loc_display_res;
 
-    GLint loc_chromatic_aberration;
+    GLint loc_lateral_ca, loc_axial_ca;
+    GLint loc_aperture_blades, loc_blade_rotation;
+    GLint loc_anamorphic_squeeze;
+    GLint loc_cateye_strength;
+    GLint loc_distortion_k1, loc_distortion_k2;
+    GLint loc_projection_mode;
+    GLint loc_cam_tilt;
+    GLint loc_display_cam_fov;
+    
     GLint loc_glass_dispersion;
 
     ///TONE_MAPPING is declared separately here because it must be uploaded to
@@ -337,3 +372,11 @@ inline const char* COMPOSITION_GUIDE_NAMES[] = {
 };
 
 const int COMPOSITION_GUIDE_COUNT = sizeof(COMPOSITION_GUIDE_NAMES) / sizeof(COMPOSITION_GUIDE_NAMES[0]);
+
+///Names for the lens projection dropdown, indexed by config.cam_projection_mode
+///\note must stay synced with PROJ_* constants in globals.glsl
+inline const char* CAM_PROJECTION_NAMES[] = {
+    "Rectilinear", "Fisheye (Equidistant)", "Fisheye (Stereographic)", "Fisheye (Equisolid)"
+};
+
+const int CAM_PROJECTION_COUNT = sizeof(CAM_PROJECTION_NAMES) / sizeof(CAM_PROJECTION_NAMES[0]);

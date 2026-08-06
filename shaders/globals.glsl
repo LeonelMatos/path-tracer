@@ -34,20 +34,74 @@ uniform vec3 camera_lookat;
 ///Camera's up vector
 uniform vec3 camera_up;
 
-/**Lens chromatic aberration strength.
-Perturbs the effective focal length and focal distance per color channel
-Consequence of the camera model, not screen-space post-processing.
-\see cameraRayDOFChannel;
+/**Lateral (transverse) chromatic aberration strength.
+Perturbs the effective FOV per color channel, differing by wavelength.
+Zero at the frame center, and increasing toward the edges
+\see cameraRay, cameraRayDOFChannel
 \note `0.0` = off (default)
 */
-uniform float CAM_CHROMATIC_ABERRATION;
+uniform float CAM_LATERAL_CA;
 
-///Simple 3-point dispersion approx.
-const float DISPERSION_COEFF[3] = float[3](-1.0, 0.0, 1.0); //R, G, B
+/**Axial (longitudinal) chromatic aberration strength.
+Perturbs the focal distance per color channel, wavelengths focus at different depths.
+\see cameraRayDOFChannel
+\note Needs CAM_APERTURE > 0 to actually be visible
+\note `0.0` = off (default)
+*/
+uniform float CAM_AXIAL_CA;
 
-///How wide a range each channel's per-sample jitter covers its DISPERSION_COEFF
-///\note 1.3 gives a bit of overlap, so there's no visible seam between channels.
-const float DISPERSION_JITTER_WIDTH = 1.3;
+/**Hero-wavelength dispersion approx. for RGB
+Asymmetric on purpose, as real optical glass disperses blue twice as much as red relative to green.
+Cauchy's equation, grows toward short wavelengths
+n(λ) = A + B/λ^2
+\see CAM_LATERAL_CA, CAM_AXIAL_CA, GLASS_DISPERSION
+*/
+const float DISPERSION_COEFF[3] = float[3](-0.7, 0.0, 1.4); //R, G, B
+
+/**How wide a range each channel's per-sample jitter covers its DISPERSION_COEFF
+\note 1.3 gives a bit of overlap, so there's no visible seam between channels.
+\note 1.6 widens to keep the R-G and G-B ranges overlapping
+*/
+const float DISPERSION_JITTER_WIDTH = 1.6;
+
+///Aperture blade count for bokeh shape.
+///\note <3 = perfectly circular (default)
+uniform int CAM_APERTURE_BLADES;
+
+///Rotates the polygon aperture shape (in radians)
+uniform float CAM_BLADE_ROTATION;
+
+/**Anamorphic squeeze ratio, stretches the aperture (and bokeh) along the camera's
+local x-axis.
+\note `1.0` = off,circular, ~1.3-2.0 for an anamorphic look
+*/
+uniform float CAM_ANAMORPHIC_SQUEEZE;
+
+/**Mechanical "cat's-eye" vignette. Biases the aperture sample toward the frame center
+Like lens barrel
+\note `0.0` = off (default)
+*/
+uniform float CAM_CATEYE_STRENGTH;
+
+///Radial lens distortion coefficients (r², r⁴). 
+///Negative k1 = barrel look
+///Positive k1 = pincushion, tele/zoom look
+uniform float CAM_DISTORTION_K1;
+uniform float CAM_DISTORTION_K2;
+
+//Projection modes
+const int PROJ_RECTILINEAR = 0;
+const int PROJ_FISHEYE_EQUIDISTANT = 1;
+const int PROJ_FISHEYE_STEREOGRAPHIC = 2;
+const int PROJ_FISHEYE_EQUISOLID = 3;
+
+///Camera projection model, see PROJ_* constants
+uniform int CAM_PROJECTION_MODE;
+
+/**Tilt shift, pivots the focal plane around the camera's local x-axis, in radians
+\note `0.0` = off, plane stays perpendicular to the view direction
+*/
+uniform float CAM_TILT;
 
 ///\}
 

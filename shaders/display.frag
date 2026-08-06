@@ -80,10 +80,12 @@ void main() {
 
     //Vignette
     if(VIGNETTE_STRENGTH > 0.0) {
-        vec2 centered = vUV - 0.5;
-        float dist = length(centered) * 1.4142135; //normalized for the corners
-        float vignette = 1.0 - VIGNETTE_STRENGTH * dist * dist;
-        tone_map *= clamp(vignette, 0.0, 1.0);
+        float aspect = display_resolution.x / display_resolution.y;
+        vec2 p = (vUV - 0.5) * 2.0 * vec2(aspect, 1.0);
+        float f_len = 1.0 / tan(0.5 * CAM_FOV);
+        float theta = atan(length(p) / f_len);
+        float natural_vignette = pow(cos(theta), 4.0);
+        tone_map *= mix(1.0, natural_vignette, VIGNETTE_STRENGTH);
     }
 
     vec3 bg = vec3(1.0);
