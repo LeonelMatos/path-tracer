@@ -7,7 +7,7 @@
 
 using namespace std;
 
-bool loadEnvMap(const string& path, Renderer& renderer) {
+bool loadEnvMap(const string& path, Renderer& r) {
     stbi_set_flip_vertically_on_load(false);
     int width, height;
     float* data = stbi_loadf(path.c_str(), &width, &height, nullptr, 3);
@@ -16,28 +16,35 @@ bool loadEnvMap(const string& path, Renderer& renderer) {
         return false;
     }
 
-    if(renderer.env_map_tex) glDeleteTextures(1, &renderer.env_map_tex);
+    if(r.env_map_tex) glDeleteTextures(1, &r.env_map_tex);
 
-    glCreateTextures(GL_TEXTURE_2D, 1, &renderer.env_map_tex);
-    glTextureStorage2D(renderer.env_map_tex, 1, GL_RGBA16F, width, height);
-    glTextureSubImage2D(renderer.env_map_tex, 0, 0, 0, width, height, GL_RGB, GL_FLOAT, data);
-    glTextureParameteri(renderer.env_map_tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTextureParameteri(renderer.env_map_tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTextureParameteri(renderer.env_map_tex, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTextureParameteri(renderer.env_map_tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glCreateTextures(GL_TEXTURE_2D, 1, &r.env_map_tex);
+    glTextureStorage2D(r.env_map_tex, 1, GL_RGBA16F, width, height);
+    glTextureSubImage2D(r.env_map_tex, 0, 0, 0, width, height, GL_RGB, GL_FLOAT, data);
+    glTextureParameteri(r.env_map_tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTextureParameteri(r.env_map_tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTextureParameteri(r.env_map_tex, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTextureParameteri(r.env_map_tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
     stbi_image_free(data);
 
-    glUseProgram(renderer.active_id);
-    glBindTextureUnit(2, renderer.env_map_tex);
-    glUniform1i(renderer.loc_env_map, 2);
-    glUniform1i(renderer.loc_use_env_map, 1);
-    renderer.use_env_map = true;
+    glUseProgram(r.active_id);
+    glBindTextureUnit(2, r.env_map_tex);
+    glUniform1i(r.loc_env_map, 2);
+    glUniform1i(r.loc_use_env_map, 1);
+    r.use_env_map = true;
 
     printf("\n[ENVMAP] %s  (%dx%d)\n", path.c_str(), width, height);
     return true;
 }
 
+/**
+ *\brief Reads width/height of a texture without decoding it (fast path for on-disk files)
+ *Embedded textures are already decoded in CPUMaterial, so it's readed directly
+ *\param out_w Width output
+ *\param out_h Height output
+ *\return true File dimensions read successfully
+ */
 static bool getTextureDimensions(const CPUMaterial& mat, int& out_w, int& out_h) {
     if(!mat.embedded_data.empty()) {
         out_w = mat.embedded_width;
@@ -52,7 +59,7 @@ static bool getTextureDimensions(const CPUMaterial& mat, int& out_w, int& out_h)
     return true;
 }
 
-bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>& gpu_materials, Renderer& renderer) {
+bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>& gpu_materials, Renderer& r) {
     //Only allocate array layers for materials that actually have a texture
     vector<int> mat_to_layer(cpu_materials.size(), -1);
     int tex_count = 0;
@@ -82,25 +89,25 @@ bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>
     const int MAX_LAYERS = tex_count;
     int mip_levels = 1 + (int)floor(std::log2(tex_size));
 
-    if(renderer.tex_array)
-        glDeleteTextures(1, &renderer.tex_array);
+    if(r.tex_array)
+        glDeleteTextures(1, &r.tex_array);
 
     size_t est_bytes_per_layer = (size_t)tex_size * tex_size * 4;
     size_t est_total = (size_t)(est_bytes_per_layer * (4.0/3.0)) * MAX_LAYERS;
     printf("[TEXTURES] Estimated array VRAM: %.1f MB (%dx%d, %d layers)\n", est_total / 1e6, tex_size,
         tex_size, MAX_LAYERS);
 
-    glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &renderer.tex_array);
-    glTextureStorage3D(renderer.tex_array, mip_levels, GL_SRGB8_ALPHA8, tex_size, tex_size, MAX_LAYERS);
-    glTextureParameteri(renderer.tex_array, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTextureParameteri(renderer.tex_array, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTextureParameteri(renderer.tex_array, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTextureParameteri(renderer.tex_array, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &r.tex_array);
+    glTextureStorage3D(r.tex_array, mip_levels, GL_SRGB8_ALPHA8, tex_size, tex_size, MAX_LAYERS);
+    glTextureParameteri(r.tex_array, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTextureParameteri(r.tex_array, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTextureParameteri(r.tex_array, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTextureParameteri(r.tex_array, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
     //Anisotropic filtering
     GLfloat max_aniso = 0.0f;
     glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &max_aniso);
-    glTextureParameterf(renderer.tex_array, GL_TEXTURE_MAX_ANISOTROPY, max_aniso);
+    glTextureParameterf(r.tex_array, GL_TEXTURE_MAX_ANISOTROPY, max_aniso);
 
     stbi_set_flip_vertically_on_load(false);
 
@@ -141,7 +148,7 @@ bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>
         }
 
         //Load to array to layer i
-        glTextureSubImage3D(renderer.tex_array, 0, 0, 0, layer, tex_size, tex_size, 1, GL_RGBA, GL_UNSIGNED_BYTE, upload_data);
+        glTextureSubImage3D(r.tex_array, 0, 0, 0, layer, tex_size, tex_size, 1, GL_RGBA, GL_UNSIGNED_BYTE, upload_data);
 
         //connects mat index to layer
         gpu_materials[i].tex_index = layer;
@@ -152,12 +159,12 @@ bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>
         printf("[TEXTURES] Loaded %d → layer %d: %s (%dx%d)\n", i, layer, cpu_mat.tex_path.c_str(), w, h);
     }
 
-    glGenerateTextureMipmap(renderer.tex_array);
+    glGenerateTextureMipmap(r.tex_array);
 
     //Texture bind
-    glBindTextureUnit(3, renderer.tex_array);
-    glUseProgram(renderer.active_id);
-    glUniform1i(renderer.loc_tex_array, 3);
+    glBindTextureUnit(3, r.tex_array);
+    glUseProgram(r.active_id);
+    glUniform1i(r.loc_tex_array, 3);
 
     printf("[TEXTURES] Uploaded %d textures to array (%dx%d, %d layers)\n", tex_count, tex_size, tex_size, MAX_LAYERS);
     return true;

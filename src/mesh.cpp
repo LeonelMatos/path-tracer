@@ -85,8 +85,6 @@ bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMate
     }
     printf("\n[MODEL] Loading %s : %d meshes, %d materials\n", path.c_str(), scene->mNumMeshes, scene->mNumMaterials);
 
-    mat3 normal_mat = transpose(inverse(mat3(transform)));
-
     //Load materials
     materials.clear();
     for (unsigned int m = 0; m < scene->mNumMaterials; m++) {

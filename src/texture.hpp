@@ -24,19 +24,10 @@ static const int MIN_TEX_SIZE = 64;
 /**
  *\brief Loads an HDRI map and uploads it as a GPU texture.
  * @param path Path to the HDRI file (.hdr, .exr)
- * @param renderer Renderer to pass env map
+ * @param r Renderer to pass env map
  * @return true if the image was loaded
  */
-bool loadEnvMap(const std::string& path, Renderer& renderer);
-
-/**
- *\brief Reads width/height of a texture without decoding it (fast path for on-disk files)
- *Embedded textures are already decoded in CPUMaterial, so it's readed directly
- *\param out_w Width output
- *\param out_h Height output
- *\return true File dimensions read successfully
- */
-static bool getTextureDimensions(const CPUMaterial& mat, int& out_w, int& out_h);
+bool loadEnvMap(const std::string& path, Renderer& r);
 
 /**
  * \brief Builds the material texture array from the loaded materials.
@@ -49,4 +40,4 @@ static bool getTextureDimensions(const CPUMaterial& mat, int& out_w, int& out_h)
  *\return true on success
  *\see CPUMaterial, GPUMaterials
  */
-bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>& gpu_materials, Renderer& renderer);
+bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>& gpu_materials, Renderer& r);

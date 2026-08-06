@@ -99,11 +99,11 @@ int sun_light_index = -1;
 /*----------------------------------------------------------
   Function Declarations
 */
-void onKeyPress(GLFWwindow* window, int key, int scancode, int action, int mods);
-void onMouseMove(GLFWwindow* w, double x, double y);
-void onMouseButton(GLFWwindow* w, int button, int action, int mods);
-void onMouseScroll(GLFWwindow* w, double xoffset, double yoffset);
-void onWindowResize(GLFWwindow* w, int width, int height);
+void onKeyPress(GLFWwindow* /*w*/, int key, int /*scancode*/, int action, int /*mods*/);
+void onMouseMove(GLFWwindow* /*w*/, double x, double y);
+void onMouseButton(GLFWwindow* w, int button, int action, int /*mods*/);
+void onMouseScroll(GLFWwindow* w, double /*xoffset*/, double yoffset);
+void onWindowResize(GLFWwindow* /*w*/, int width, int height);
 void toggleFullscreen();
 vec3 cameraForward();
 void zoomToFit();
@@ -140,7 +140,7 @@ void drawUI();
 /*----------------------------------------------------------
   Input handle
 */
-void onKeyPress(GLFWwindow* window, int key, int scancode, int action, int mods) {
+void onKeyPress(GLFWwindow* /*w*/, int key, int /*scancode*/, int action, int /*mods*/) {
     if (ImGui::GetIO().WantCaptureKeyboard) return;
     if (action != GLFW_PRESS) return;
 
@@ -171,7 +171,7 @@ void onKeyPress(GLFWwindow* window, int key, int scancode, int action, int mods)
     }
 }
 
-void onMouseMove(GLFWwindow* w, double x, double y) {
+void onMouseMove(GLFWwindow* /*w*/, double x, double y) {
     if (ImGui::GetIO().WantCaptureMouse) return;
     if (!mouse_captured) return;
 
@@ -195,7 +195,7 @@ void onMouseMove(GLFWwindow* w, double x, double y) {
     camera.moving = true;
 }
 
-void onMouseButton(GLFWwindow* w, int button, int action, int mods) {
+void onMouseButton(GLFWwindow* w, int button, int action, int /*mods*/) {
     if (ImGui::GetIO().WantCaptureMouse) return; 
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
         if (action == GLFW_PRESS) {
@@ -212,7 +212,7 @@ void onMouseButton(GLFWwindow* w, int button, int action, int mods) {
 
 ///Simulate Unity's camera control speed multiplier
 ///Use SHIFT + Mouse Scroll to change camera speed
-void onMouseScroll(GLFWwindow* w, double xoffset, double yoffset) {
+void onMouseScroll(GLFWwindow* w, double /*xoffset*/, double yoffset) {
     if(glfwGetKey(w, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS)
     camera.move_speed *= (yoffset > 0) ? 1.2f : 0.8f;
     camera.move_speed = std::clamp(camera.move_speed, 0.001f, 10.0f);
@@ -374,7 +374,7 @@ void processMovement() {
     }
 }
 
-void onWindowResize(GLFWwindow* window, int width, int height) {
+void onWindowResize(GLFWwindow* /*w*/, int width, int height) {
     //minimized
     if (width == 0 || height == 0) return;
 
@@ -394,18 +394,19 @@ void onWindowResize(GLFWwindow* window, int width, int height) {
     }
 
     glCreateFramebuffers(2, renderer.fbo);
-    for(int i = 0; i < 2; i++)
+    for(int i = 0; i < 2; i++) {
         glNamedFramebufferTexture(renderer.fbo[i], GL_COLOR_ATTACHMENT0, renderer.tex[i], 0);
+    }
 
-        renderer.render_w = width;
-        renderer.render_h = height;
-        
     createDenoisedTex(width, height);
     syncResolutionDropdown();
 
-    glUseProgram(renderer.active_id);
-    glUniform2f(renderer.loc_res, (float)width, (float)height);
-
+    if(config.lock_preview_res) {
+        setPreviewResolution();
+    }
+    else {
+        applyResolution(width, height);
+    }
     resetAccumulation();
 }
 
@@ -522,7 +523,7 @@ int main(void) {
             resetAccumulation();
         }
         //Suspend the rendering after completion to avoid useless GPU processing
-        if (renderer.MAX_SAMPLES > 0 && renderer.frame_id >= renderer.MAX_SAMPLES && !is_moving) {
+        if (renderer.MAX_SAMPLES > 0 && renderer.frame_id >= (int)renderer.MAX_SAMPLES && !is_moving) {
             clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
             glfwSwapInterval(1);
@@ -901,10 +902,10 @@ bool transferDataToGPU(void) {
     glCreateFramebuffers(2, renderer.fbo);
     for (int i = 0; i < 2; i++) {
         glNamedFramebufferTexture(renderer.fbo[i], GL_COLOR_ATTACHMENT0, renderer.tex[i], 0);
-    }
-    if (glCheckNamedFramebufferStatus(renderer.fbo[i], GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        fprintf(stderr, "FBO %d incomplete. Check FBO DSA implementation.\n", i);
-        return false;
+        if (glCheckNamedFramebufferStatus(renderer.fbo[i], GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+            fprintf(stderr, "FBO %d incomplete. Check FBO DSA implementation.\n", i);
+            return false;
+        }
     }
 
     glCreateVertexArrays(1, &renderer.vao);
