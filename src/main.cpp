@@ -814,6 +814,8 @@ void loadScene() {
         glUniform1i(renderer.loc_tri_count, 0);
         glUniform1i(renderer.loc_light_count, 0);
         glUniform1i(renderer.loc_bvh_root, 0);
+        glUniform3f(renderer.loc_aabb_min, 0.0f, 0.0f, 0.0f);
+        glUniform3f(renderer.loc_aabb_max, 0.0f, 0.0f, 0.0f);
         resetAccumulation();
         return;
     }
@@ -899,10 +901,10 @@ bool transferDataToGPU(void) {
     glCreateFramebuffers(2, renderer.fbo);
     for (int i = 0; i < 2; i++) {
         glNamedFramebufferTexture(renderer.fbo[i], GL_COLOR_ATTACHMENT0, renderer.tex[i], 0);
-        if (glCheckNamedFramebufferStatus(renderer.fbo[i], GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-            fprintf(stderr, "FBO %d incomplete. Check FBO DSA implementation.\n", i);
-            return false;
-        }
+    }
+    if (glCheckNamedFramebufferStatus(renderer.fbo[i], GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        fprintf(stderr, "FBO %d incomplete. Check FBO DSA implementation.\n", i);
+        return false;
     }
 
     glCreateVertexArrays(1, &renderer.vao);

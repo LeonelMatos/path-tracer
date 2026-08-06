@@ -5,6 +5,8 @@
 uniform int SCENE_PRESET;
 
 void intersects_mesh(const Ray ray, inout Hit h) {
+    if(triangle_count == 0) return;
+
     //AABB Early Rejection
     //Converts uniform min/max corners to center/half_size for boxT
     //Avoids O(triangle_count) tests for most rays

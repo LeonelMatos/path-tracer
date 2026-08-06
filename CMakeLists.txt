@@ -1,11 +1,17 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.16)
 project(PathTracer)
+
+#Defaults to an optimized build if nothing was specified
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "" FORCE)
+endif()
 
 # Corrige o aviso CMP0072 e força as libs GLVND modernas
 cmake_policy(SET CMP0072 NEW)
 set(OpenGL_GL_PREFERENCE GLVND)
 
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Check OpenGL
 find_package(OpenGL REQUIRED)
@@ -23,13 +29,13 @@ if (NOT glfw3_FOUND)
 endif()
 
 # Check GLM
-find_package(glm REQUIRED)
+find_package(glm)
 if (NOT glm_FOUND)
     message(FATAL_ERROR "GLFW not found. Install with:\nsudo apt install libglm-dev")
 endif()
 
 # Check ASSIMP
-find_package(assimp REQUIRED)
+find_package(assimp)
 if (NOT glm_FOUND)
     message(FATAL_ERROR "ASSIMP not found. Install with:\nsudo apt install libassimp-dev")
 endif()
@@ -47,25 +53,34 @@ execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink
     ${CMAKE_BINARY_DIR}/shaders
 )
 
-find_package(PkgConfig REQUIRED)
+find_package(PkgConfig)
 
-add_executable(pathtracer 
-    src/main.cpp
-    src/mesh.cpp
-    src/bvh.cpp
-    src/texture.cpp
-    common/shader.cpp
+add_library(imgui STATIC
     include/imgui/imgui.cpp
     include/imgui/imgui_draw.cpp
     include/imgui/imgui_tables.cpp
     include/imgui/imgui_widgets.cpp
     include/imgui/imgui_impl_glfw.cpp
     include/imgui/imgui_impl_opengl3.cpp)
+target_include_directories(imgui SYSTEM PUBLIC include)
+target_link_libraries(imgui PUBLIC glfw)
 
-target_include_directories(pathtracer PRIVATE . include src)
+add_executable(pathtracer 
+    src/main.cpp
+    src/mesh.cpp
+    src/bvh.cpp
+    src/texture.cpp
+    common/shader.cpp)
+
+target_include_directories(pathtracer PRIVATE . src)
+target_include_directories(pathtracer SYSTEM PRIVATE include)
+
+target_compile_options(pathtracer PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic -Wshadow>)
 
 target_link_libraries(pathtracer
-    GL
+    imgui
+    OpenGL::GL
     GLEW::GLEW
     glfw
     m
