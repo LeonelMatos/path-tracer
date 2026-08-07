@@ -1,5 +1,6 @@
 #pragma once
 #include "gl/program.hpp"
+#include "debug.hpp"
 #include <string>
 #include <vector>
 #include <filesystem>
@@ -373,6 +374,15 @@ inline const char* COMPOSITION_GUIDE_NAMES[] = {
 
 const int COMPOSITION_GUIDE_COUNT = sizeof(COMPOSITION_GUIDE_NAMES) / sizeof(COMPOSITION_GUIDE_NAMES[0]);
 
+/*----------------------------------------------------------
+  Camera Projection
+*/
+///\note must stay synced with PROJ_* consts in globals.glsl
+const int PROJ_RECTILINEAR = 0;
+const int PROJ_FISHEYE_EQUIDISTANT = 1;
+const int PROJ_FISHEYE_STEREOGRAPHIC = 2;
+const int PROJ_FISHEYE_EQUISOLID = 3;
+
 ///Names for the lens projection dropdown, indexed by config.cam_projection_mode
 ///\note must stay synced with PROJ_* constants in globals.glsl
 inline const char* CAM_PROJECTION_NAMES[] = {
@@ -380,3 +390,110 @@ inline const char* CAM_PROJECTION_NAMES[] = {
 };
 
 const int CAM_PROJECTION_COUNT = sizeof(CAM_PROJECTION_NAMES) / sizeof(CAM_PROJECTION_NAMES[0]);
+
+/*----------------------------------------------------------
+  Camera Lens Presets
+*/
+
+struct LensPreset {
+    const char* name;
+    const char* description; ///Shown as a tooltip
+    float fov;
+    float aperture;
+    int aperture_blades;
+    float blade_rotation;
+    float anamorphic_squeeze;
+    float cateye_strength;
+    float distortion_k1;
+    float distortion_k2;
+    int projection_mode;
+    float tilt;
+    float lateral_ca;
+    float axial_ca;
+};
+
+///\note Applies fov/aperture too, so every preset is visible immediately
+///without having to separately enable DoF or widen the FOV by hand.
+const LensPreset LENS_PRESETS[] = {
+    {"Reset / Off",
+     "Rectilinear pinhole, no lens character",
+     80.0f, 0.00f, 0, 0.0f, 1.0f, 0.00f, 0.00f, 0.00f, PROJ_RECTILINEAR, 0.0f, 0.000f, 0.000f},
+
+    {"Nifty Fifty (50mm f/1.8)",
+     "Classic budget prime: 7-blade slightly-polygonal bokeh, a little barrel distortion and purple fringing wide open",
+     40.0f, 0.08f, 7, 0.0f, 1.0f, 0.30f, -0.02f, 0.00f, PROJ_RECTILINEAR, 0.0f, 0.008f, 0.012f},
+
+    {"Vintage Swirl (Helios-style)",
+     "Octagonal bokeh with strong cat's-eye toward the edges and visible fringing - approximates the classic Soviet 58mm look. Not true optical swirl (needs field curvature, not modeled)",
+     35.0f, 0.18f, 8, 0.0f, 1.0f, 0.90f, 0.00f, 0.00f, PROJ_RECTILINEAR, 0.0f, 0.020f, 0.030f},
+
+    {"Modern Prime (Clinical)",
+     "Well-corrected high-end look: perfectly circular bokeh, no distortion, negligible CA - contrast this against the vintage presets",
+     45.0f, 0.10f, 0, 0.0f, 1.0f, 0.00f, 0.00f, 0.00f, PROJ_RECTILINEAR, 0.0f, 0.000f, 0.000f},
+
+    {"Cinema Anamorphic 2x",
+     "Oval horizontally-stretched bokeh, the classic widescreen cinema look",
+     50.0f, 0.15f, 0, 0.0f, 1.8f, 0.00f, 0.00f, 0.00f, PROJ_RECTILINEAR, 0.0f, 0.010f, 0.010f},
+
+    {"Fisheye - Circular",
+     "Equidistant projection, ~175 degree FOV - full circular fisheye look",
+     175.0f, 0.00f, 0, 0.0f, 1.0f, 0.00f, 0.00f, 0.00f, PROJ_FISHEYE_EQUIDISTANT, 0.0f, 0.000f, 0.000f},
+
+    {"Fisheye - Action Cam",
+     "Equisolid projection, ~150 degree FOV - GoPro/action-cam style wide angle",
+     150.0f, 0.00f, 0, 0.0f, 1.0f, 0.00f, 0.00f, 0.00f, PROJ_FISHEYE_EQUISOLID, 0.0f, 0.000f, 0.000f},
+
+    {"Toy Lens (Lo-Fi)",
+     "Cheap plastic meniscus lens look: heavy barrel distortion and poorly-corrected color fringing",
+     55.0f, 0.05f, 0, 0.0f, 1.0f, 0.00f, -0.35f, 0.10f, PROJ_RECTILINEAR, 0.0f, 0.030f, 0.020f},
+
+    {"Tilt-Shift Miniature",
+     "Strong tilt + big aperture - the toy-model look",
+     70.0f, 0.30f, 0, 0.0f, 1.0f, 0.00f, 0.00f, 0.00f, PROJ_RECTILINEAR, 8.0f, 0.000f, 0.000f},
+};
+
+const int LENS_PRESET_COUNT = sizeof(LENS_PRESETS) / sizeof(LENS_PRESETS[0]);
+
+#if LENS_TEST_PRESETS_DEBUG
+///Isolated single-feature tests, dev-only. Each isolates exactly one
+///parameter so its effect is easy to read in isolation - hidden from end users.
+const LensPreset LENS_TEST_PRESETS[] = {
+    {"Test: Lateral CA",
+     "Pinhole so only lateral CA shows - fringing at the corners, clean at center",
+     80.0f, 0.00f, 0, 0.0f, 1.0f, 0.00f, 0.00f, 0.00f, PROJ_RECTILINEAR, 0.0f, 0.030f, 0.000f},
+
+    {"Test: Axial CA (Bokeh Fringe)",
+     "DOF on, only axial CA - color fringing on out-of-focus highlights",
+     60.0f, 0.15f, 0, 0.0f, 1.0f, 0.00f, 0.00f, 0.00f, PROJ_RECTILINEAR, 0.0f, 0.000f, 0.030f},
+
+    {"Test: Hexagonal Bokeh",
+     "6-blade aperture - look at out-of-focus highlights",
+     60.0f, 0.15f, 6, 0.0f, 1.0f, 0.00f, 0.00f, 0.00f, PROJ_RECTILINEAR, 0.0f, 0.000f, 0.000f},
+
+    {"Test: Barrel Distortion",
+     "Pinhole, wide FOV - straight lines bow outward",
+     90.0f, 0.00f, 0, 0.0f, 1.0f, 0.00f, -0.25f, 0.00f, PROJ_RECTILINEAR, 0.0f, 0.000f, 0.000f},
+
+    {"Test: Pincushion Distortion",
+     "Pinhole - straight lines pinch inward",
+     60.0f, 0.00f, 0, 0.0f, 1.0f, 0.00f, 0.25f, 0.00f, PROJ_RECTILINEAR, 0.0f, 0.000f, 0.000f},
+};
+const int LENS_TEST_PRESET_COUNT = sizeof(LENS_TEST_PRESETS) / sizeof(LENS_TEST_PRESETS[0]);
+#endif
+
+///Number of presets currently visible depending on debug mode
+inline int lensPresetCount() {
+#if LENS_TEST_PRESETS_DEBUG
+    return LENS_PRESET_COUNT + LENS_TEST_PRESET_COUNT;
+#else
+    return LENS_PRESET_COUNT;
+#endif
+}
+
+///Maps a combined UI index to the exact preset, regardless of debug flag
+inline const LensPreset& lensPresetAt(int idx) {
+#if LENS_TEST_PRESETS_DEBUG
+    if(idx >= LENS_PRESET_COUNT) return LENS_TEST_PRESETS[idx - LENS_PRESET_COUNT];
+#endif
+    return LENS_PRESETS[idx];
+}

@@ -751,6 +751,25 @@ void applyConfig() {
     printf("\n[RENDERER] Config applied, resetting accumulation\n");
 }
 
+///\brief Copies a LensPreset into config and applies it
+///\see LENS_PRESETS, applyConfig
+void applyLensPreset(int idx) {
+    const LensPreset& p = lensPresetAt(idx);
+    config.cam_fov = p.fov;
+    config.cam_aperture = p.aperture;
+    config.cam_aperture_blades = p.aperture_blades;
+    config.cam_blade_rotation = p.blade_rotation;
+    config.cam_anamorphic_squeeze = p.anamorphic_squeeze;
+    config.cam_cateye_strength = p.cateye_strength;
+    config.cam_distortion_k1 = p.distortion_k1;
+    config.cam_distortion_k2 = p.distortion_k2;
+    config.cam_projection_mode = p.projection_mode;
+    config.cam_tilt = p.tilt;
+    config.cam_lateral_ca = p.lateral_ca;
+    config.cam_axial_ca = p.axial_ca;
+    applyConfig();
+}
+
 void uploadCamera() {
     glUseProgram(renderer.active_id);
     glUniform3f(renderer.loc_cam_pos, camera.position.x, camera.position.y, camera.position.z);
@@ -1603,7 +1622,8 @@ void drawUI() {
         if(ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
             ImGui::Text("x = %.2f, y = %.2f, z = %.2f", camera.position.x, camera.position.y, camera.position.z);
 
-            changed |= ImGui::SliderFloat("FOV", &config.cam_fov, 10.0f, 100.0f, "%.1f°");
+            float fov_max = (config.cam_projection_mode == PROJ_RECTILINEAR) ? 100.0f : 179.0f;
+            changed |= ImGui::SliderFloat("FOV", &config.cam_fov, 10.0f, fov_max, "%.1f°");
             resetBtn("*##fov", config.cam_fov, render_defaults.cam_fov);
             ImGui::SetItemTooltip("Field of view (degrees)");
 
@@ -1775,6 +1795,19 @@ void drawUI() {
         ImGui::SetNextWindowSize(ImVec2(380, 560), ImGuiCond_Appearing);
 
         if(ImGui::Begin("Lens Studio", &show_lens_studio)) {
+            ImGui::SeparatorText("Presets");
+            static int selected_preset = 0;
+            int preset_count = lensPresetCount();
+            vector<const char*> preset_names(preset_count);
+            for (int i = 0; i < preset_count; i++) preset_names[i] = lensPresetAt(i).name;
+
+            ImGui::Combo("##lenspreset", &selected_preset, preset_names.data(), preset_count);
+            ImGui::SetItemTooltip("%s", lensPresetAt(selected_preset).description);
+            ImGui::SameLine();
+            if(ImGui::Button("Apply")) {
+                applyLensPreset(selected_preset);
+            }
+
             bool dof_enabled = (config.cam_aperture > 0.0f);
 
             ImGui::SeparatorText("Bokeh Shape");
