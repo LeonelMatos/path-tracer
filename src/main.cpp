@@ -1622,7 +1622,7 @@ void drawUI() {
         if(ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
             ImGui::Text("x = %.2f, y = %.2f, z = %.2f", camera.position.x, camera.position.y, camera.position.z);
 
-            float fov_max = (config.cam_projection_mode == PROJ_RECTILINEAR) ? 100.0f : 179.0f;
+            float fov_max = camFovCap(config.cam_projection_mode);
             changed |= ImGui::SliderFloat("FOV", &config.cam_fov, 10.0f, fov_max, "%.1f°");
             resetBtn("*##fov", config.cam_fov, render_defaults.cam_fov);
             ImGui::SetItemTooltip("Field of view (degrees)");
@@ -1880,7 +1880,11 @@ void drawUI() {
             }
 
             ImGui::SeparatorText("Distortion & Projection");
-            changed |= ImGui::Combo("Projection", &config.cam_projection_mode, CAM_PROJECTION_NAMES, CAM_PROJECTION_COUNT);
+            if(ImGui::Combo("Projection", &config.cam_projection_mode, CAM_PROJECTION_NAMES, CAM_PROJECTION_COUNT)) {
+                float cap = camFovCap(config.cam_projection_mode);
+                if(config.cam_fov > cap) config.cam_fov = cap;
+                changed = true;
+            }
             resetBtn("*##projmode", config.cam_projection_mode, 0);
             ImGui::SetItemTooltip("Rectilinear = normal lens (straight lines stay straight)\nFisheye modes cover a much wider FOV with curved lines");
 

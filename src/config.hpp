@@ -391,6 +391,11 @@ inline const char* CAM_PROJECTION_NAMES[] = {
 
 const int CAM_PROJECTION_COUNT = sizeof(CAM_PROJECTION_NAMES) / sizeof(CAM_PROJECTION_NAMES[0]);
 
+///Max FOV for a projection mode
+inline float camFovCap(int projection_mode) {
+    return (projection_mode == PROJ_RECTILINEAR) ? 100.0f : 179.0f;
+}
+
 /*----------------------------------------------------------
   Camera Lens Presets
 */

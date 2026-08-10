@@ -75,7 +75,7 @@ float polygonAperture(float angle, int blades) {
 }
 
 /**\brief Samples a point on the camera's aperture (lens disk)
-Shaped by CAM_APERTURE_BLADES/CAM_BLADE_ROTATION/CAM_ANAMORPHIC_SQEEZE, and
+Shaped by CAM_APERTURE_BLADES/CAM_BLADE_ROTATION/CAM_ANAMORPHIC_SQUEEZE, and
 is biased towards the frame edges (behaviour like mechanical vignette) by CAM_CATEYE_STRENGTH
 \param uv pixel coordinates [0,1], used only for cat's-eye
 \param angle random angle around the lens
