@@ -43,6 +43,7 @@
 # directories
 /bin/*
 /build/*
+/screenshot*
 
 /model/*
 /models/*

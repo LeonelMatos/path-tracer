@@ -72,6 +72,27 @@ add_executable(pathtracer
     src/texture.cpp
     common/shader.cpp)
 
+option(BUILD_TESTS "Build unit tests" OFF)
+if(BUILD_TESTS)
+#    include(FetchContent)
+#    FetchContent_Declare(
+#        doctest
+#        GIT_REPOSITORY https://github.com/doctest/doctest.git
+#        GIT_TAG v2.4.11
+#        GIT_SHALLOW TRUE
+#    )
+#    FetchContent_MakeAvailable(doctest)
+
+    add_executable(bvh_tests tests/bvh_tests.cpp src/bvh.cpp)
+    target_include_directories(bvh_tests PRIVATE . src)
+    target_include_directories(bvh_tests SYSTEM PRIVATE include)
+    target_link_libraries(bvh_tests PRIVATE OpenGL::GL GLEW::GLEW glm::glm)
+
+    enable_testing()
+    add_test(NAME bvh_tests COMMAND bvh_tests)
+endif()
+
+
 target_include_directories(pathtracer PRIVATE . src)
 target_include_directories(pathtracer SYSTEM PRIVATE include)
 
