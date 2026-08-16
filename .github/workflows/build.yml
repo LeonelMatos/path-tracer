@@ -43,9 +43,10 @@ jobs:
           mkdir -p /tmp/oidn
           tar -xzf oidn.tar.gz -C /tmp/oidn --strip-components=1
           ls /tmp/oidn
+          ls /tmp/oidn/lib/cmake
 
       - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_PATHTRACER=ON -DBUILD_TESTS=OFF
+        run: cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_PATHTRACER=ON -DBUILD_TESTS=OFF -DOIDN_ROOT=/tmp/oidn
 
       - name: Build
         run: cmake --build build --target pathtracer -j
