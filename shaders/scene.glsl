@@ -17,23 +17,18 @@ void intersects_mesh(const Ray ray, inout Hit h) {
 
     if(aabb_t >= h.t) return;
 
-    int stack[128];
+    ///BVH node stack
+    ///\note Reduced from 128, since the worst case scenario with millions of triangles will have a
+    ///depth of ~20-28 
+    int stack[32];
     int stack_top = 0;
-    stack[stack_top++] = 0;
+    int node_id = 0;
 
     int nodes_visited = 0, tris_tested = 0;
 
-    while(stack_top > 0) {
-        int node_id = stack[--stack_top];
+    while(true) {
         BVHNode node = bvh_nodes[node_id];
         nodes_visited++;
-
-        vec3 node_center = (node.aabb_min + node.aabb_max) * 0.5;
-        vec3 node_half_size = (node.aabb_max - node.aabb_min) * 0.5;
-        vec3 node_normal;
-        float node_t = boxTAxisAligned(ray, node_center, node_half_size, node_normal);
-
-        if (node_t >= h.t) continue;
 
         if (node.tri_count > 0) {
             tris_tested += node.tri_count;
@@ -90,24 +85,29 @@ void intersects_mesh(const Ray ray, inout Hit h) {
             bool hit_left = t_left < h.t;
             bool hit_right = t_right < h.t;
 
-            if(hit_left && hit_right) {
-                //Push the most distant first; the closest is passed first
-                if (t_left < t_right) {
-                    stack[stack_top++] = node.right_child;
-                    stack[stack_top++] = node.left_child;
-                }
-                else {
-                    stack[stack_top++] = node.left_child;
-                    stack[stack_top++] = node.right_child;
-                }
+            ///BVH descends directly to the nearer child, avoids stack traffic;
+            ///pushes only the farther one, only if it was hit too
+            int near_child = node.left_child, far_child = node.right_child;
+            bool hit_near = hit_left, hit_far = hit_right;
+
+            if(t_right < t_left) {
+                near_child = node.right_child;
+                far_child = node.left_child;
+                hit_near = hit_right;
+                hit_far = hit_left;
             }
-            else if (hit_left) {
-                stack[stack_top++] = node.left_child;
+            if (hit_near) {
+                if(hit_far) stack[stack_top++] = far_child;
+                node_id = near_child;
+                continue;
             }
-            else if (hit_right) {
-                stack[stack_top++] = node.right_child;
+            if (hit_far) {
+                node_id = far_child;
+                continue;
             }
         }
+        if(stack_top == 0) break;
+        node_id = stack[--stack_top];
     }
     
     if (USE_BVH_HEATMAP == 1) {
@@ -121,8 +121,8 @@ void intersects_mesh(const Ray ray, inout Hit h) {
         h.t         = max(aabb_t, 0.001);
         h.pos       = ray.origin + h.t * ray.direction;
         h.normal    = vec3(0.0, 1.0, 0.0);
-        h.albedo    = heatmap_color;
-        h.emission  = vec3(0.0);
+        h.albedo    = vec3(0.0);
+        h.emission  = heatmap_color;
         h.material  = MAT_DIFFUSE;
         h.ior       = 1.0;
     }
