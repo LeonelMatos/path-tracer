@@ -6,7 +6,7 @@ on:
 
 jobs:
   tests:
-    name: BVH unit tests
+    name: BVH unit tests1
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,7 +27,7 @@ jobs:
 
   full-build:
     name: Full renderer build
-    runs: ubuntu-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
