@@ -25,8 +25,8 @@ struct SceneModel {
     glm::vec3 position = glm::vec3(0.0f);
     glm::vec3 rotation = glm::vec3(0.0f);
     glm::vec3 scale = glm::vec3(1.0f);
-    int tri_count = 0;
-    int mat_count = 0;
+    std::atomic<int> tri_count = 0;
+    std::atomic<int> mat_count = 0;
 };
 
 struct RenderConfig {
@@ -161,8 +161,6 @@ struct Renderer {
     uint MAX_SAMPLES = 50;
 
     SceneModel current_model;
-
-    bool is_model_loading = false;
 
     ///Loaded model's world-space bounds, used for zoom-to-fit.
     ///Defines a small box around the origin fitting the model.

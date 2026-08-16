@@ -524,8 +524,11 @@ int main(void) {
 
             glNamedBufferData(renderer.material_ssbo, loader.pending_mats.size() * sizeof(GPUMaterial), loader.pending_mats.data(), GL_STATIC_DRAW);
 
+            loader.ui_cpu_mats = loader.pending_cpu_mats;
+            loader.ui_mats = loader.pending_mats;
+
             loader.upload_pending = false;
-            renderer.is_model_loading = false;
+            loader.is_loading = false;
             resetAccumulation();
         }
         //Suspend the rendering after completion to avoid useless GPU processing
@@ -880,16 +883,21 @@ void loadScene() {
         resetAccumulation();
         return;
     }
-    renderer.is_model_loading = true;
+    bool expected = false;
+    if(!loader.is_loading.compare_exchange_strong(expected, true)) {
+        printf("\n[LOADER] A model is already loading, ignoring this request\n");
+        return;
+    }
+
+    if(loader.worker.joinable()) loader.worker.join();
+
     loader.stage = STAGE_PARSING;
-    //keeps the program responsive while loading models
     setPreviewMode(true);
 
-    std::thread([]{
+    loader.worker = std::thread([]{
         vector<GPUTriangle> tris; vector<GPUMaterial> mats; vector<CPUMaterial> cpu_mats;
         SceneModel& model = renderer.current_model;
         MeshBounds bounds;
-
         
         //Hardcoded model position better facing the camera
         mat4 transform = translate(mat4(1.0f), model.position);
@@ -900,7 +908,7 @@ void loadScene() {
         transform = scale(transform, model.scale);
         
         if (!loadMesh(model.path, tris, mats, cpu_mats, transform, &bounds)) {
-            renderer.is_model_loading = false;
+            loader.is_loading = false;
             return;
         }
         
@@ -917,9 +925,9 @@ void loadScene() {
         loader.pending_bvh  = bvh_nodes;
         loader.pending_bounds = bounds;
         loader.upload_pending = true;
-        //is_model_loading stays true after ending this thread
-        //the main thread ends it
-    }).detach();
+        //loader.is_loading stays true after ending this thread
+        //the main thread clears it once the upload is given
+    });
 }
 
 void resetModel() {
@@ -980,6 +988,8 @@ bool transferDataToGPU(void) {
 }
 
 void cleanDataFromGPU() {
+    if(loader.worker.joinable()) loader.worker.join();
+
     glDeleteVertexArrays(1, &renderer.vao);
     glDeleteTextures(2, renderer.tex);
     glDeleteFramebuffers(2, renderer.fbo);
@@ -1768,13 +1778,13 @@ void drawUI() {
                 resetAccumulation();
             }
 
-            ImGui::Text("%d triangles", model.tri_count);
-            ImGui::Text("%d materials", model.mat_count);
+            ImGui::Text("%d triangles", model.tri_count.load());
+            ImGui::Text("%d materials", model.mat_count.load());
             ImGui::Text("%s", filesystem::path(model.path).filename().string().c_str());
         }
-        for (int i = 0; i < (int)loader.pending_cpu_mats.size(); i++) {
-            const CPUMaterial& cpu_mat = loader.pending_cpu_mats[i];
-            const GPUMaterial& gpu_mat = loader.pending_mats[i];
+        for (int i = 0; i < (int)loader.ui_cpu_mats.size(); i++) {
+            const CPUMaterial& cpu_mat = loader.ui_cpu_mats[i];
+            const GPUMaterial& gpu_mat = loader.ui_mats[i];
 
             const char* type_name = "Diffuse";
             if(gpu_mat.type == 1) type_name = "Mirror";
@@ -2212,8 +2222,7 @@ void drawUI() {
     ImVec2 screen = io.DisplaySize;
 
     //-- Model Loading Window -------------
-    if(renderer.is_model_loading) {
-
+    if(loader.is_loading) {
         ImGui::SetNextWindowPos(ImVec2(screen.x * 0.5f, screen.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
         ImGui::SetNextWindowSize(ImVec2(400, 100), ImGuiCond_Always);
         ImGui::SetNextWindowBgAlpha(0.80f);

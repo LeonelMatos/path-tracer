@@ -10,6 +10,7 @@
 #include "bvh.hpp"
 #include <atomic>
 #include <vector>
+#include <thread>
 
 ///\brief Stages of the async model load in order
 //\see ModelLoader::stage, loadScene
@@ -38,6 +39,14 @@ struct ModelLoader {
     std::atomic<bool> upload_pending = false;
     std::atomic<bool> is_loading = false;
     std::atomic<int> stage = STAGE_PARSING;
+
+    ///Handle of the current background load
+    std::thread worker;
+
+    ///UI-thread-only snapshot of the model's materials.
+    ///Written for the main thread
+    std::vector<CPUMaterial> ui_cpu_mats;
+    std::vector<GPUMaterial> ui_mats;
 };
 
 inline ModelLoader loader;
