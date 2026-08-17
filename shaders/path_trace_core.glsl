@@ -326,9 +326,6 @@ vec3 sampleEnvLight(Hit h, int bounce, int spp_index, uvec2 px) {
 
     vec3 r = rand3(bounce + 300, spp_index, px);
 
-    ///Geometric normal safeguard for hits that don't have geom_normal but are forced to use it
-    vec3 safe_geom_normal = length(h.geom_normal) > 0.1 ? h.geom_normal : h.normal;
-
     //Cosine-weighted hemisphere sampling
     float cosT = sqrt(r.x);
     float sinT = sqrt(1.0 - r.x);
@@ -339,19 +336,20 @@ vec3 sampleEnvLight(Hit h, int bounce, int spp_index, uvec2 px) {
     //Shadow ray to check occlusion
     float shadow_eps = length(mesh_aabb_max - mesh_aabb_min) * EPS_SHADOW;
     Ray shadow_ray;
-    shadow_ray.origin = h.pos + safe_geom_normal * shadow_eps;
+    shadow_ray.origin = h.pos + h.geom_normal * shadow_eps;
     shadow_ray.direction = world_dir;
 
     Hit shadow_hit;
-    if(intersects(shadow_ray, shadow_hit) && shadow_hit.material != MAT_SHADOW_CATCHER) return vec3(0);
 
-    //Cosine-weighted sampling PDF = cos(theta) / PI
-    float cos_theta = max(dot(h.normal, world_dir), 0.0);
-    float pdf = cos_theta / PI;
-    if (pdf < 1e-4) return vec3(0);
+    bool occluded = intersects(shadow_ray, shadow_hit) && shadow_hit.material != MAT_SHADOW_CATCHER;
+
+    if (occluded) return vec3(0);
 
     vec3 env_color = sampleEnvMap(world_dir);
-    return h.albedo * env_color * cos_theta / (PI * pdf);
+
+    //NEE and the diffuse BSDF sample the same cosine-weight hemisphere, so their PDFs are the same
+    //Means that the powerHeuristic is always 0.5 here
+    return h.albedo * env_color * 0.5;
 }
 
 //----------------------------------------------------------
@@ -409,8 +407,10 @@ vec4 pathTraceFromRay(Ray ray, int spp_index, uvec2 px, float disp_coeff) {
             }
 
             //Environment Mapping
-            if(USE_ENV_MAP == 1)
-                color += throughput * sampleEnvMap(ray.direction);
+            if(USE_ENV_MAP == 1) {
+                float mis_weight = (prev_bsdf_pdf >= 0.0 && b < 3) ? 0.5 : 1.0;
+                color += throughput * sampleEnvMap(ray.direction) * mis_weight;
+            }
             else {
                 //Background Alternative Colors
                 switch(BACKGROUND) {
