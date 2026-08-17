@@ -286,10 +286,15 @@ vec3 sampleEmissiveTriangles(Hit h, int bounce, int spp_index, uvec2 px) {
 
     //PDF sampling
     float area = triangleArea(light_tri.v0.position, light_tri.v1.position, light_tri.v2.position);
-    float pdf = (dist * dist) / (cos_light * area * float(light_count));
+    float pdf_light = trianglelightPDF(dist, cos_light, area);
+    if(pdf_light <= 0.0) return vec3(0);
+
+    //MIS weight
+    float pdf_bsdf = bsdfPDF_diffuse(h.normal, dir_light);
+    float weight = powerHeuristic(pdf_light, pdf_bsdf);
 
     //Direct contribution
-    return h.albedo * emission * cos_surface / (PI * pdf);
+    return h.albedo * emission * cos_surface / (PI * pdf_light);
 }
 
 /**
@@ -361,9 +366,9 @@ vec4 pathTraceFromRay(Ray ray, int spp_index, uvec2 px, float disp_coeff) {
 
     int diffuse_bounces = 0;
 
-    ///Tracks if NEE actually ran at the vertex this ray originated.
-    ///MIRROR/GLASS should not be treated as "already counted by NEE"
-    bool prev_vertex_used_nee = false;
+    ///PDF of the direction the BSDF sampler chose at the previous vertex. < 0 == no valid competing NEE strategy
+    ///Means that emission hit directly so it gets full weight instead of MIS-weighted
+    float prev_bsdf_pdf = -1.0;
 
     //foreach ray bounce
     for (int b = 0; b < DEPTH; b++) {
@@ -405,9 +410,16 @@ vec4 pathTraceFromRay(Ray ray, int spp_index, uvec2 px, float disp_coeff) {
         }
 
         //Avoids double counting with NEE for emission
+        //MIS, full weight for the primary ray or after specular bounce
+        //otherwise weighted against what NEE PDF would be for this hit
         if (dot(h.emission, h.emission) > 0.0) {
-            if(b == 0 || !prev_vertex_used_nee) 
-                color += throughput * h.emission;
+            float mis_weight = 1.0;
+            if(prev_bsdf_pdf >= 0.0) {
+                float cos_light = dot(h.geom_normal, -ray.direction);
+                float pdf_light = trianglelightPDF(h.t, cos_light, h.light_area);
+                mis_weight = (pdf_light > 0.0) ? powerHeuristic(prev_bsdf_pdf, pdf_light) : 1.0;
+            }
+            color += throughput * h.emission * mis_weight;
             break;
         }
 
@@ -427,8 +439,6 @@ vec4 pathTraceFromRay(Ray ray, int spp_index, uvec2 px, float disp_coeff) {
         if (USE_NEE == 1 && h.material == MAT_DIFFUSE && USE_ENV_MAP == 1 && b < 2) {
             color += throughput * sampleEnvLight(h, b, spp_index, px);
         }
-        
-        prev_vertex_used_nee = (USE_NEE == 1 && h.material == MAT_DIFFUSE);
 
         vec3 r = rand3(b, spp_index, px);
 
@@ -452,12 +462,14 @@ vec4 pathTraceFromRay(Ray ray, int spp_index, uvec2 px, float disp_coeff) {
                 ray.direction = onb(h.normal) * vec3(sinT*cos(phi), sinT*sin(phi), cosT);
                 throughput *= h.albedo;
                 ray.origin = h.pos + h.normal * EPS_TRI;
+                prev_bsdf_pdf = bsdfPDF_diffuse(h.normal, ray.direction);
                 break;
             }
             case MAT_MIRROR: {
                 ray.direction = reflect(ray.direction, h.normal);
                 throughput *= h.albedo;
                 ray.origin = h.pos + h.normal * EPS_TRI;
+                prev_bsdf_pdf = -1.0;
                 break;
             }
             case MAT_GLASS: {
@@ -487,11 +499,13 @@ vec4 pathTraceFromRay(Ray ray, int spp_index, uvec2 px, float disp_coeff) {
                     ray.origin = h.pos - normal * EPS_TRI;
                 }
                 throughput *= h.albedo;
+                prev_bsdf_pdf = -1.0;
                 break;
             }
             case MAT_TINTED_GLASS: { //ray passes directly, no Fresnel reflection
                 throughput *= h.albedo;
                 ray.origin = h.pos + ray.direction * EPS_TRI;
+                prev_bsdf_pdf = -1.0;
                 break;
             }
             case MAT_SHADOW_CATCHER: {

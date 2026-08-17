@@ -167,6 +167,7 @@ struct Hit {
     vec3 albedo, emission;
     int material;
     float ior;
+    float light_area; //Used for MIS
 };
 
 uniform int DEPTH;

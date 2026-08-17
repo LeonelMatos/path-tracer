@@ -58,6 +58,7 @@ void intersects_mesh(const Ray ray, inout Hit h) {
                         h.material = FORCE_MATERIAL;
                     }
                     h.ior = gpu_materials[m_id].ior;
+                    h.light_area = triangleArea(triangles[i].v0.position, triangles[i].v1.position, triangles[i].v2.position);
 
                     //Texture sample
                     if(USE_TEXTURES == 1 && gpu_materials[m_id].tex_index >= 0) {
@@ -137,6 +138,7 @@ bool intersects(const Ray ray, out Hit h) {
     h.emission  = vec3(0);
     h.material  = MAT_DIFFUSE;
     h.ior       = 0.0;
+    h.light_area = 0.0;
 
     if(SCENE_PRESET == 1 || SCENE_PRESET == 2)
         intersects_cornell(ray, h);

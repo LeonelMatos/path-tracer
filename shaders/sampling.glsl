@@ -37,3 +37,26 @@ vec3 sampleTriangle(vec3 v0, vec3 v1, vec3 v2, vec2 rnd) {
 float triangleArea(vec3 v0, vec3 v1, vec3 v2) {
     return 0.5 * length(cross(v1 - v0, v2 - v0));
 }
+
+///Power Heuristic for combining two sampling strategies
+///Returns the MIS weight for pdf_a 
+float powerHeuristic(float pdf_a, float pdf_b) {
+    float a2 = pdf_a * pdf_a;
+    float b2 = pdf_b * pdf_b;
+    float denom = a2 + b2;
+    return denom > 0.0 ? a2 / denom : 0.0;
+}
+
+///PDF (solid-angle) of a cosine-weighted hemisphere for the diffuse BSDF
+///\note Isolated on purpose: GGX only needs to replace this implementation, not the MIS logic
+float bsdfPDF_diffuse(vec3 normal, vec3 dir) {
+    return max(dot(normal, dir), 0.0) / PI;
+}
+
+///Converts triangle-light sampling into a solid-angle measure PDF at the shading point.
+///Same formula sampleEmissiveTriangle() uses when it picks the light
+float trianglelightPDF(float dist, float cos_light, float area) {
+    if(cos_light <= 0.0 || area <= 0.0) return 0.0;
+    return (dist * dist) / (cos_light * area * float(light_count));
+}
+
