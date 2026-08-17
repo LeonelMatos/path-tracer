@@ -38,6 +38,25 @@ float triangleArea(vec3 v0, vec3 v1, vec3 v2) {
     return 0.5 * length(cross(v1 - v0, v2 - v0));
 }
 
+///Uniformly samples a direction inside a cone of half-angle theta_max around the axis
+///Used for the sun's angular disk
+///\param axis Cone central direction (unit vector)
+///\param theta_max Cone half-angle in radians
+///\param rnd Two uniform random numbers [0,1[
+vec3 sampleCone(vec3 axis, float theta_max, vec2 rnd) {
+    float cos_theta_max = cos(theta_max);
+    float cos_theta = mix(1.0, cos_theta_max, rnd.x);
+    float sin_theta = sqrt(max(0.0, 1.0 - cos_theta * cos_theta));
+    float phi = TWO_PI * rnd.y;
+    vec3 local_dir = vec3(sin_theta * cos(phi), sin_theta * sin(phi), cos_theta);
+    return onb(axis) * local_dir;
+}
+
+float conePDF(float theta_max) {
+    float solid_angle = TWO_PI * (1.0 - cos(theta_max));
+    return solid_angle > 0.0 ? 1.0 / solid_angle : 0.0;
+}
+
 ///Power Heuristic for combining two sampling strategies
 ///Returns the MIS weight for pdf_a 
 float powerHeuristic(float pdf_a, float pdf_b) {

@@ -183,6 +183,7 @@ vec3 sampleAnalyticLight(Hit h, int bounce, int spp_index, uvec2 px) {
     vec3 to_light;
     float dist;
     float attenuation = 1.0;
+    float pdf_dir = 1.0; //Directional-density PDF. 1.0 = delta (point/spot or directional with radius=0)
 
     switch (light.type) {
         case LIGHT_POINT: {
@@ -200,7 +201,14 @@ vec3 sampleAnalyticLight(Hit h, int bounce, int spp_index, uvec2 px) {
             break;
         }
         case LIGHT_DIRECTIONAL: {
-            to_light = -light.direction.xyz;
+            vec3 sun_dir = -light.direction.xyz;
+            if(light.radius > 0.0) {
+                to_light = sampleCone(sun_dir, light.radius, rnd.yz);
+                pdf_dir = conePDF(light.radius);
+            }
+            else {
+                to_light = sun_dir;
+            }
             dist = 1e10;
             attenuation = 1.0;
             break;
@@ -236,9 +244,21 @@ vec3 sampleAnalyticLight(Hit h, int bounce, int spp_index, uvec2 px) {
 
     if (occluded) return vec3(0);
 
-    float pdf = 1.0 / float(analytic_light_count);
+    float pdf_select = 1.0 / float(analytic_light_count);
+    float pdf_light = pdf_select * pdf_dir;
+    if (pdf_light <= 0.0) return vec3(0);
+
+    ///MIS only applies where a BSDF sampled ray could land here
+    ///Like a directional light with real angular extent. Delta light (point, spot, 0-radius sun)
+    ///get full weight
+    float weight = 1.0;
+    if(light.type == LIGHT_DIRECTIONAL && light.radius > 0.0) {
+        float pdf_bsdf = bsdfPDF_diffuse(h.normal, dir_light);
+        weight = powerHeuristic(pdf_light, pdf_bsdf);
+    }
+
     //Direct contribution
-    return h.albedo * light.emission.rgb * cos_surface * attenuation / (PI * pdf);
+    return h.albedo * light.emission.rgb * cos_surface * weight / (PI * pdf_light);
 }
 
 vec3 sampleEmissiveTriangles(Hit h, int bounce, int spp_index, uvec2 px) {
@@ -378,8 +398,14 @@ vec4 pathTraceFromRay(Ray ray, int spp_index, uvec2 px, float disp_coeff) {
                 GPULight light = analytic_lights[li];
                 if(light.type != LIGHT_DIRECTIONAL) continue;
                 float cos_angle = dot(ray.direction, -light.direction.xyz);
-                if(cos_angle > cos(light.radius))
-                    color += throughput * light.emission.rgb;
+                if(cos_angle > cos(light.radius)) {
+                    float mis_weight = 1.0;
+                    if (light.radius > 0.0 && prev_bsdf_pdf >= 0.0) {
+                        float pdf_light = conePDF(light.radius) / float(analytic_light_count);
+                        mis_weight = powerHeuristic(prev_bsdf_pdf, pdf_light);
+                    }
+                    color += throughput * light.emission.rgb * mis_weight;
+                }
             }
 
             //Environment Mapping
