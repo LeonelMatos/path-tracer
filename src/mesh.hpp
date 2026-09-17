@@ -1,3 +1,13 @@
+/**
+ * \file mesh.hpp
+ * \author Leonel Matos
+ * \brief Loads 3D models through ASSIMP into CPU-side geometry and material data,
+ * defines the GPUVertex/GPUTriangle/GPUMaterial layouts shared with the shader
+ * \see globals.glsl for the mirrored std430 structs 
+ * @date 2026-09-10
+ * @copyright Copyright (c) 2026
+ */
+
 #pragma once
 
 #include <vector>
@@ -16,6 +26,9 @@ extern Renderer renderer;
   Triangles/Material structs
 */
 
+///\warning Adding tangent here increases GPUTriangle from 160 to 208 bytes.
+///This will increase VRAM usage by ~30%.
+///\todo Might as well use the pre-calculated size to warn if the GPU can't handle it.
 struct GPUVertex {
     glm::vec3 position;
     float _pad0;
@@ -23,9 +36,13 @@ struct GPUVertex {
     float _pad1;
     glm::vec2 texcoord;
     glm::vec2 _pad2;
+    ///Stored vertex tangents, xyz = tangent direction,
+    ///w = handedness sign for bitangent (= cross(normal, tan.xyz) * tan.w)
+    ///Needed to shade correctly across mirrored UV islands
+    glm::vec4 tangent;
 };
 
-static_assert(sizeof(GPUVertex) == 48, "GPUVertex must match the std430 layout in globals.glsl");
+static_assert(sizeof(GPUVertex) == 64, "GPUVertex must match the std430 layout in globals.glsl");
 
 struct GPUTriangle {
     GPUVertex v0, v1, v2;
@@ -33,27 +50,39 @@ struct GPUTriangle {
     float _pad[3];
 };
 
-static_assert(sizeof(GPUTriangle) == 160, "GPUTriangle must match the std430 layout in globals.glsl");
+static_assert(sizeof(GPUTriangle) == 208, "GPUTriangle must match the std430 layout in globals.glsl");
 
 ///\note vec4, alpha value used only as padding for std430
 struct GPUMaterial {
     glm::vec4 albedo;
     glm::vec4 emission;
-    int type; //material
+    ///\todo Add uv_scale implementation to reduce texture unused size (here and globals), remove _pad
+    //glm::vec2 uv_scale; ///< fraction of the array layer holding the texture data
+    int type; ///< Material type
     float ior;
-    //-1 = no texture
-    int tex_index;
-    float _pad;
+    int tex_index; ///< -1 = no albedo texture
+    int normal_tex_index; ///< -1 = no normal map
+    float roughness; ///< 0 = smooth like mirror, 1 = full rough
+    float metallic; ///< 0 = dielectric, 1 = metal
+    glm::vec2 _pad;
 };
 
-struct CPUMaterial {
+static_assert(sizeof(GPUMaterial) == 64, "GPUMaterial must match the std430 layout in globals.glsl");
+
+///Describes one texture slot (any albedo, normal, rough...) as loaded from source file.
+///Can be either a path from disk to load, or already-decoded embedded data.
+///\note Extended and generalized from the old single-tex CPUMaterial.
+struct CPUTextureSlot {
     int has_texture = 0;
     string tex_path = "";
-    int embedded_index = -1;
-    //Embedded texture data
     std::vector<unsigned char> embedded_data;
     int embedded_width = 0;
     int embedded_height = 0;
+};
+
+struct CPUMaterial {
+    CPUTextureSlot albedo_tex;
+    CPUTextureSlot normal_tex;
 };
 
 ///\brief Mesh light storage to pass emissive triangles
@@ -76,6 +105,7 @@ struct MeshBounds {
 */
 /**
 \note vec4 used for padding on the ssbo (w-value not used)
+\todo Replace type hardcoded number to light definitions ex. LIGHT_POINT
  */
 struct GPULight {
     vec4 position;

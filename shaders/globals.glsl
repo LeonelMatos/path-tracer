@@ -237,6 +237,8 @@ struct GPUVertex {
     vec3 normal;
     float _pad1;
     vec2 texcoord;
+    vec2 _pad2;
+    vec4 tangent;
 };
 
 struct GPUTriangle {
@@ -251,10 +253,13 @@ struct GPUMaterial {
     int type;
     float ior;
     int tex_index;
-    float _pad;
+    int normal_tex_index;
+    float roughness;
+    float metallic;
 };
 
 uniform sampler2DArray tex_albedo;
+uniform sampler2DArray tex_normal;
 
 uniform int USE_TEXTURES;
 

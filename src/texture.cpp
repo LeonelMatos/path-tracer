@@ -4,6 +4,7 @@
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include "stb_image_resize2.h"
 #include <algorithm>
+#include <functional>
 
 using namespace std;
 
@@ -40,45 +41,65 @@ bool loadEnvMap(const string& path, Renderer& r) {
 
 /**
  *\brief Reads width/height of a texture without decoding it (fast path for on-disk files)
- *Embedded textures are already decoded in CPUMaterial, so it's readed directly
+ *Embedded textures are already decoded in CPUTextureSlot, so it's readed directly
  *\param out_w Width output
  *\param out_h Height output
  *\return true File dimensions read successfully
  */
-static bool getTextureDimensions(const CPUMaterial& mat, int& out_w, int& out_h) {
-    if(!mat.embedded_data.empty()) {
-        out_w = mat.embedded_width;
-        out_h = mat.embedded_height;
+static bool getTextureDimensions(const CPUTextureSlot& slot, int& out_w, int& out_h) {
+    if(!slot.embedded_data.empty()) {
+        out_w = slot.embedded_width;
+        out_h = slot.embedded_height;
         return true;
     }
     int channels;
-    if(!stbi_info(mat.tex_path.c_str(), &out_w, &out_h, &channels)) {
-        printf("\n[TEXTURES] Failed to read dimensions of %s\n", mat.tex_path.c_str());
+    if(!stbi_info(slot.tex_path.c_str(), &out_w, &out_h, &channels)) {
+        printf("\n[TEXTURES] Failed to read dimensions of %s\n", slot.tex_path.c_str());
         return false;
     }
     return true;
 }
 
-bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>& gpu_materials, Renderer& r) {
+/**
+ *\brief Packs one texture slot (albedo or normal) across all materials into a single
+ GL_TEXTURE_2D_ARRAY, writing the resolved layer index back to the corresponding GPUMaterial field.
+ *\note Previous uploadTexture()
+ \param get_slot Selects which CPUTextureSlot to read (albedo or normal)
+ \param write_index Writes the resolved layer (or -1) into the right GPUMaterial field
+ \param internal_format GL_SRGB8_ALPHA8 for color data (albedo); GL_RGBA8 for vector-encoded data (normals)
+ \param label Short name used only in log output (ex. "albedo", "normal")
+ */
+bool packTextureArray(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>& gpu_materials,
+ GLuint& out_array, GLenum internal_format, const char* label,
+ std::function<const CPUTextureSlot&(const CPUMaterial&)> get_slot,
+ std::function<void(GPUMaterial&, int)> write_index) {
+
+    bool is_srgb = (internal_format == GL_SRGB8_ALPHA8);
+
     //Only allocate array layers for materials that actually have a texture
     vector<int> mat_to_layer(cpu_materials.size(), -1);
     int tex_count = 0;
     for (int i = 0; i < (int)cpu_materials.size(); i++) {
-        if(cpu_materials[i].has_texture)
+        if(get_slot(cpu_materials[i]).has_texture)
             mat_to_layer[i] = tex_count++;
     }
 
+    for(int i = 0; i < (int)gpu_materials.size(); i++)
+        write_index(gpu_materials[i], -1);
+
     if (tex_count == 0) {
         printf("\n[TEXTURES] Model has no textures to upload\n");
+        if(out_array) { glDeleteTextures(1, &out_array); out_array = 0; }
         return false;
     }
 
     //Size the array to the largest texture present
     int max_dim = MIN_TEX_SIZE;
     for(auto& m : cpu_materials) {
-        if(!m.has_texture) continue;
+        const CPUTextureSlot& slot = get_slot(m);
+        if(!slot.has_texture) continue;
         int w, h;
-        if(!getTextureDimensions(m, w, h)) continue;
+        if(!getTextureDimensions(slot, w, h)) continue;
         max_dim = std::max({max_dim, w, h});
     }
     max_dim = std::min(max_dim, MAX_TEX_SIZE);
@@ -89,30 +110,30 @@ bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>
     const int MAX_LAYERS = tex_count;
     int mip_levels = 1 + (int)floor(std::log2(tex_size));
 
-    if(r.tex_array)
-        glDeleteTextures(1, &r.tex_array);
+    if(out_array)
+        glDeleteTextures(1, &out_array);
 
     size_t est_bytes_per_layer = (size_t)tex_size * tex_size * 4;
     size_t est_total = (size_t)(est_bytes_per_layer * (4.0/3.0)) * MAX_LAYERS;
-    printf("[TEXTURES] Estimated array VRAM: %.1f MB (%dx%d, %d layers)\n", est_total / 1e6, tex_size,
+    printf("[TEXTURES] Estimated %s array VRAM: %.1f MB (%dx%d, %d layers)\n", label, est_total / 1e6, tex_size,
         tex_size, MAX_LAYERS);
 
-    glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &r.tex_array);
-    glTextureStorage3D(r.tex_array, mip_levels, GL_SRGB8_ALPHA8, tex_size, tex_size, MAX_LAYERS);
-    glTextureParameteri(r.tex_array, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTextureParameteri(r.tex_array, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTextureParameteri(r.tex_array, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTextureParameteri(r.tex_array, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &out_array);
+    glTextureStorage3D(out_array, mip_levels, internal_format, tex_size, tex_size, MAX_LAYERS);
+    glTextureParameteri(out_array, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTextureParameteri(out_array, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTextureParameteri(out_array, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTextureParameteri(out_array, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
     //Anisotropic filtering
     GLfloat max_aniso = 0.0f;
     glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &max_aniso);
-    glTextureParameterf(r.tex_array, GL_TEXTURE_MAX_ANISOTROPY, max_aniso);
+    glTextureParameterf(out_array, GL_TEXTURE_MAX_ANISOTROPY, max_aniso);
 
     stbi_set_flip_vertically_on_load(false);
 
     for (int i = 0; i < (int)cpu_materials.size(); i++) {
-        const CPUMaterial& cpu_mat = cpu_materials[i];
+        const CPUTextureSlot& slot = get_slot(cpu_materials[i]);
         int layer = mat_to_layer[i];
         if (layer < 0) continue;
 
@@ -121,18 +142,18 @@ bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>
         unsigned char* to_free = nullptr;
 
         //data already decoded at CPUMaterial
-        if(!cpu_mat.embedded_data.empty()) {
-            data = const_cast<unsigned char*>(cpu_mat.embedded_data.data());
-            w = cpu_mat.embedded_width;
-            h = cpu_mat.embedded_height;
+        if(!slot.embedded_data.empty()) {
+            data = const_cast<unsigned char*>(slot.embedded_data.data());
+            w = slot.embedded_width;
+            h = slot.embedded_height;
         }
         //external texture, load from disk
         else {
             int channels;
-            data = stbi_load(cpu_mat.tex_path.c_str(), &w, &h, &channels, 4);
+            data = stbi_load(slot.tex_path.c_str(), &w, &h, &channels, 4);
             to_free = data;
             if(!data) {
-                printf("\n[TEXTURES] Failed to load %s\n", cpu_mat.tex_path.c_str());
+                printf("\n[TEXTURES] Failed to load %s: %s\n", label, slot.tex_path.c_str());
                 continue;
             }
         }
@@ -142,31 +163,53 @@ bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>
         unsigned char* resized = nullptr;
 
         if (w != tex_size || h != tex_size) {
-            resized = (unsigned char*)malloc(tex_size * tex_size * 4);
-            stbir_resize_uint8_srgb(data, w, h, 0, resized, tex_size, tex_size, 0, STBIR_RGBA);
+            resized = (unsigned char*)malloc((size_t)tex_size * tex_size * 4);
+            if(is_srgb)
+                stbir_resize_uint8_srgb(data, w, h, 0, resized, tex_size, tex_size, 0, STBIR_RGBA);
+            else
+                stbir_resize_uint8_linear(data, w, h, 0, resized, tex_size, tex_size, 0, STBIR_RGBA);
+            
             upload_data = resized;
         }
 
         //Load to array to layer i
-        glTextureSubImage3D(r.tex_array, 0, 0, 0, layer, tex_size, tex_size, 1, GL_RGBA, GL_UNSIGNED_BYTE, upload_data);
-
-        //connects mat index to layer
-        gpu_materials[i].tex_index = layer;
+        glTextureSubImage3D(out_array, 0, 0, 0, layer, tex_size, tex_size, 1, GL_RGBA, GL_UNSIGNED_BYTE, upload_data);
+        write_index(gpu_materials[i], layer);
 
         if(to_free) stbi_image_free(to_free);
         if(resized) free(resized);
 
-        printf("[TEXTURES] Loaded %d → layer %d: %s (%dx%d)\n", i, layer, cpu_mat.tex_path.c_str(), w, h);
+        printf("[TEXTURES] Loaded %s %d → layer %d (%dx%d)\n", label, i, layer, w, h);
     }
 
-    glGenerateTextureMipmap(r.tex_array);
+    glGenerateTextureMipmap(out_array);
 
-    //Texture bind
-    glBindTextureUnit(3, r.tex_array);
-    glUseProgram(r.active_id);
-    glUniform1i(r.loc_tex_array, 3);
-
-    printf("[TEXTURES] Uploaded %d textures to array (%dx%d, %d layers)\n", tex_count, tex_size, tex_size, MAX_LAYERS);
     return true;
 }
 
+bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>& gpu_materials, Renderer& r) {
+    bool albedo_ok = packTextureArray(
+        cpu_materials, gpu_materials, r.tex_array, GL_SRGB8_ALPHA8, "albedo",
+        [](const CPUMaterial& m) -> const CPUTextureSlot& { return m.albedo_tex; },
+        [](GPUMaterial& g, int layer) { g.tex_index = layer; }
+    );
+
+    bool normal_ok = packTextureArray(
+        cpu_materials, gpu_materials, r.tex_normal_array, GL_RGBA8, "normal",
+        [](const CPUMaterial& m) -> const CPUTextureSlot& { return m.albedo_tex; },
+        [](GPUMaterial& g, int layer) { g.tex_index = layer; }
+    );
+
+    if(albedo_ok) {
+        glBindTextureUnit(3, r.tex_array);
+        glUseProgram(r.active_id);
+        glUniform1i(r.loc_tex_array, 3);
+    }
+    if(normal_ok) {
+        glBindTextureUnit(4, r.tex_normal_array);
+        glUseProgram(r.active_id);
+        glUniform1i(r.loc_tex_normal, 4);
+    }
+
+    return albedo_ok;
+}

@@ -67,6 +67,57 @@ static void collectMeshTransforms(const aiNode* node, aiMatrix4x4 parent_transfo
     }
 }
 
+static void loadTextureSlot(const aiScene* scene, aiMaterial* mat, aiTextureType tex_type, const string& model_path, CPUTextureSlot& slot) {
+    aiString tex_path;
+    if(mat->GetTextureCount(tex_type) == 0 || mat->GetTexture(tex_type, 0, &tex_path) != AI_SUCCESS)
+        return;
+
+    // * = embedded texture (glb base64/binary chunk)
+    if(tex_path.data[0] == '*') {
+        int idx = atoi(tex_path.C_Str() + 1);
+        const aiTexture* tex = scene->mTextures[idx];
+
+        //compressed png/jpg
+        if(tex->mHeight == 0) {
+            int width, heigth, channels;
+            unsigned char* decoded = stbi_load_from_memory((unsigned char*)tex->pcData, tex->mWidth, &width, &heigth, &channels, 4);
+            if(decoded) {
+                slot.embedded_data = vector<unsigned char>(decoded, decoded + width * heigth * 4);
+                slot.embedded_width = width;
+                slot.embedded_height = heigth;
+                slot.has_texture = 1;
+                stbi_image_free(decoded);
+            }
+            else {
+                printf("[MODEL] loadTextureSlot() failed to decode embedded texture %d\n", idx);
+            }
+        }
+        //raw rgba
+        else {
+            int size = tex->mWidth * tex->mHeight * 4;
+            slot.embedded_data = vector<unsigned char>((unsigned char*)tex->pcData, (unsigned char*)tex->pcData + size);
+            slot.embedded_width = tex->mWidth;
+            slot.embedded_height = tex->mHeight;
+            slot.has_texture = 1;
+        }
+    }
+    //external texture
+    else {
+        filesystem::path model_dir = filesystem::path(model_path).parent_path();
+        string relative_path = tex_path.C_Str();
+        std::replace(relative_path.begin(), relative_path.end(), '\\', '/');
+
+        filesystem::path full_tex_path = model_dir / relative_path;
+
+        //since stb doesn't support .dds, converts to .png (hardcoded, but works)
+        if(full_tex_path.extension() == ".dds" || full_tex_path.extension() == ".DDS")
+            full_tex_path.replace_extension(".png");
+        
+        slot.tex_path = full_tex_path.string();
+        slot.has_texture = 1;
+    }
+}
+
 bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMaterial>& materials, vector<CPUMaterial>& cpu_materials, 
     mat4 transform, MeshBounds* bounds) {
     //Initialize bounds
@@ -77,7 +128,7 @@ bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMate
 
     Assimp::Importer importer;
     const aiScene* scene = importer.ReadFile(path,
-         aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_FlipUVs | aiProcess_JoinIdenticalVertices | aiProcess_FixInfacingNormals);
+         aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_FlipUVs | aiProcess_JoinIdenticalVertices | aiProcess_FixInfacingNormals | aiProcess_CalcTangentSpace);
 
     if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
         fprintf(stderr, "ASSIMP error loading path '%s': %s\n", path.c_str(), importer.GetErrorString());
@@ -99,6 +150,7 @@ bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMate
         gpu_mat.type = MAT_DIFFUSE;
         gpu_mat.ior = 1.5f;
         gpu_mat.tex_index = -1;
+        gpu_mat.normal_tex_index = -1;
 
         //Material type + properties
 
@@ -145,72 +197,39 @@ bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMate
         printf("\tMaterial %d   ( type=%d ior=%.2f emission=(%.2f,%.2f,%.2f) )\n", m, gpu_mat.type, gpu_mat.ior, gpu_mat.emission.r, gpu_mat.emission.g, gpu_mat.emission.b);
 
         //Get material texture
-        aiString tex_path;
-        aiTextureType tex_type = aiTextureType_NONE;
+
+        //Albedo texture
+        aiTextureType albedo_type = aiTextureType_NONE;
 
         if(mat->GetTextureCount(aiTextureType_BASE_COLOR) > 0)
-            tex_type = aiTextureType_BASE_COLOR;
+            albedo_type = aiTextureType_BASE_COLOR;
         else if (mat->GetTextureCount(aiTextureType_DIFFUSE) > 0)
-            tex_type = aiTextureType_DIFFUSE;
+            albedo_type = aiTextureType_DIFFUSE;
+        if(albedo_type != aiTextureType_NONE)
+            loadTextureSlot(scene, mat, albedo_type, path, cpu_mat.albedo_tex);
 
-        if(tex_type != aiTextureType_NONE && mat->GetTexture(tex_type, 0, &tex_path) == AI_SUCCESS) {
-            string full_path;
-
-            //embedded texture glfw base 64
-            if(tex_path.data[0] == '*') {
-                int idx = atoi(tex_path.C_Str() + 1);
-                const aiTexture* tex = scene->mTextures[idx];
-
-                if (tex->mHeight == 0) {
-                    //Compressed png or jpg (jpg? jpeg?)
-                    int width, height, channels;
-                    unsigned char* decoded = stbi_load_from_memory((unsigned char*)tex->pcData, tex->mWidth,
-                                        &width, &height, &channels, 4);
-                    if (decoded) {
-                        cpu_mat.embedded_data = vector<unsigned char>(decoded, decoded + width * height * 4);
-                        cpu_mat.embedded_width = width;
-                        cpu_mat.embedded_height = height;
-                        cpu_mat.has_texture = 1;
-                        stbi_image_free(decoded);
-                    }
-                    else {
-                        printf("[MODEL] loadMesh() failed to decode embedded texture %d\n", idx);
-                    }
-                }
-                else {
-                    //Raw RGBA
-                    int size = tex->mWidth * tex->mHeight * 4;
-                    cpu_mat.embedded_data = vector<unsigned char>((unsigned char* )tex->pcData, (unsigned char*)tex->pcData + size);
-                    cpu_mat.embedded_width = tex->mWidth;
-                    cpu_mat.embedded_height = tex->mHeight;
-                    cpu_mat.has_texture = 1;
-                }
-                
-            }
-            //external texture
-            else {
-                filesystem::path model_dir = filesystem::path(path).parent_path();
-                string relative_path = tex_path.C_Str();
-                std::replace(relative_path.begin(), relative_path.end(), '\\', '/');
-
-                filesystem::path full_tex_path = model_dir / relative_path;
-
-                //stb doesn't support stupid .dds, converts to .png (hardcoded, but works)
-                if(full_tex_path.extension() == ".dds" || full_tex_path.extension() == ".DDS")
-                    full_tex_path.replace_extension(".png");
-
-                cpu_mat.tex_path = full_tex_path.string();
-                cpu_mat.has_texture = 1;
-            }
-        }
+        //Normal map
+        //gltf/newer-FBX use aiTextureType_NORMALS. OBJ .mlt bump maps are aiTextureType_HEIGHT via Assimp's
+        //legacy mapping mode.
+        aiTextureType normal_type = aiTextureType_NONE;
+        
+        if(mat->GetTextureCount(aiTextureType_NORMALS) > 0)
+            normal_type = aiTextureType_NORMALS;
+        else if(mat->GetTextureCount(aiTextureType_HEIGHT) > 0)
+            normal_type = aiTextureType_HEIGHT;
+        if(normal_type != aiTextureType_NONE)
+            loadTextureSlot(scene, mat, normal_type, path, cpu_mat.normal_tex);
 
         materials.push_back(gpu_mat);
         cpu_materials.push_back(cpu_mat);
     }
+    //fallback for 0 materials
     if(materials.empty()) {
         GPUMaterial default_mat{};
         default_mat.albedo = vec4(0.8f, 0.8f, 0.8f, 1.0f);
         default_mat.type = MAT_DIFFUSE;
+        default_mat.tex_index = -1;
+        default_mat.normal_tex_index = -1;
         materials.push_back(default_mat);
     }
 
@@ -225,6 +244,7 @@ bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMate
         mat4 node_transform = aiToGlm(mesh_node_transform[m]);
         mat4 final_transform = transform * node_transform;
         mat3 normal_mat = transpose(inverse(mat3(final_transform)));
+        mat3 tangent_mat = mat3(final_transform);
 
         for(unsigned f = 0; f < mesh->mNumFaces; f++) {
             aiFace& face = mesh->mFaces[f];
@@ -241,13 +261,31 @@ bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMate
                 //normal validation
                 if(mesh->HasNormals()) {
                     vec3 n = normal_mat * vec3(mesh->mNormals[idx].x, mesh->mNormals[idx].y, mesh->mNormals[idx].z);
-
                     float len = length(n);
                     verts[v]->normal = (len > 1e-6f && !isnan(len)) ? n / len : vec3(0, 0, 1);
                 }
                 
                 if(mesh->HasTextureCoords(0))
                     verts[v]->texcoord = vec2(mesh->mTextureCoords[0][idx].x, mesh->mTextureCoords[0][idx].y);
+
+                if(mesh->HasTangentsAndBitangents()) {
+                    vec3 n = verts[v]->normal;
+                    vec3 t = tangent_mat * vec3(mesh->mTangents[idx].x, mesh->mTangents[idx].y, mesh->mTangents[idx].z);
+                    t = t - n * dot(t, n); //re-orthogonalize
+                    float len = length(t);
+                    vec3 tangent = (len > 1e-6f && !isnan(len)) ? t / len : vec3(1, 0, 0);
+
+                    vec3 bitangent = tangent_mat * vec3(mesh->mBitangents[idx].x, mesh->mBitangents[idx].y, mesh->mBitangents[idx].z);
+                    float handedness = dot(cross(n, tangent), bitangent) < 0.0f ? -1.0f : 1.0f;
+
+                    verts[v]->tangent = vec4(tangent, handedness);
+                }
+                //No UVs, or Assimp couldn't derive tangents
+                else {
+                    vec3 n = verts[v]->normal;
+                    vec3 up = abs(n.x) > 0.9f ? vec3(0,1,0) : vec3(1,0,0);
+                    verts[v]->tangent = vec4(normalize(cross(up, n)), 1.0f);
+                }
 
                 if(bounds) {
                     bounds->min_bound = min(bounds->min_bound, verts[v]->position);

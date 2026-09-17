@@ -697,6 +697,8 @@ void initUniforms() {
     renderer.loc_use_env_map = glGetUniformLocation(active, "USE_ENV_MAP");
 
     renderer.loc_tex_array = glGetUniformLocation(active, "tex_albedo");
+    renderer.loc_tex_normal = glGetUniformLocation(active, "tex_normal");
+
     renderer.loc_use_textures = glGetUniformLocation(active, "USE_TEXTURES");
 
     renderer.loc_force_material = glGetUniformLocation(active, "FORCE_MATERIAL");   
@@ -1792,8 +1794,10 @@ void drawUI() {
             if(gpu_mat.type == 3) type_name = "Tinted Glass";
 
             ImGui::Text("[%d] %s | tex:%d | ior:%.2f", i, type_name, gpu_mat.tex_index, gpu_mat.ior);
-            if(cpu_mat.has_texture)
-                ImGui::TextDisabled("  %s", cpu_mat.tex_path.c_str());
+            if(cpu_mat.albedo_tex.has_texture)
+                ImGui::TextDisabled("  albedo: %s", cpu_mat.albedo_tex.tex_path.c_str());
+            if(cpu_mat.normal_tex.has_texture)
+                ImGui::TextDisabled(" normal: %s", cpu_mat.normal_tex.tex_path.c_str());
         }
     }
     ImGui::End();

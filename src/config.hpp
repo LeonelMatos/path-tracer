@@ -255,6 +255,8 @@ struct Renderer {
     //Textures
     GLuint tex_array = 0;
     GLint loc_tex_array;
+    GLuint tex_normal_array = 0;
+    GLint loc_tex_normal;
     GLint loc_use_textures;
 
     //Materials

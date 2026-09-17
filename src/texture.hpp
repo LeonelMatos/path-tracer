@@ -1,16 +1,16 @@
 /**
- * @file texture.hpp
- * @author Leonel Matos
- * @brief HDRI environment map and material texture array
- * @date 2026-07-02
- * @copyright Copyright (c) 2026
+ * \file texture.hpp
+ * \author Leonel Matos
+ * \brief Uploads CPU-decoded texture arrays. Has no knowledge of ASSIMP or the 
+ * format of the model's source file - that's on mesh.hpp
+ * \note Using nvtop to profile program VRAM/GPU usage
+ * \date 2026-07-02
+ * \copyright Copyright (c) 2026
  */
 #include <string>
 #include <vector>
 #include "config.hpp"
 #include "mesh.hpp"
-
-//Using nvtop to profile program VRAM/GPU usage
 
 ///Maximum texture array size. Limits VRAM usage forcing large textures to
 ///fit to a maximum value.
