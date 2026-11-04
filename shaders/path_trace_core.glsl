@@ -335,7 +335,7 @@ vec3 sampleEmissiveTriangles(Hit h, int bounce, int spp_index, uvec2 px) {
     float weight = powerHeuristic(pdf_light, pdf_bsdf);
 
     //Direct contribution
-    return h.albedo * emission * cos_surface / (PI * pdf_light);
+    return h.albedo * emission * cos_surface * weight / (PI * pdf_light);
 }
 
 /**
