@@ -1,5 +1,6 @@
 #include "mesh.hpp"
 #include <stdio.h>
+#include <cmath>
 
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
@@ -268,24 +269,32 @@ bool loadMesh(const string& path, vector<GPUTriangle>& triangles, vector<GPUMate
                 if(mesh->HasTextureCoords(0))
                     verts[v]->texcoord = vec2(mesh->mTextureCoords[0][idx].x, mesh->mTextureCoords[0][idx].y);
 
+                vec3 n = verts[v]->normal;
+                vec3 fallback_up = abs(n.x) > 0.9f ? vec3(0,1,0) : vec3(1,0,0);
+                vec3 fallback_tangent = normalize(cross(fallback_up, n));
+
+                bool tangent_ok = false;
+                vec3 tangent;
+                float handedness = 1.0f;
+
                 if(mesh->HasTangentsAndBitangents()) {
-                    vec3 n = verts[v]->normal;
                     vec3 t = tangent_mat * vec3(mesh->mTangents[idx].x, mesh->mTangents[idx].y, mesh->mTangents[idx].z);
                     t = t - n * dot(t, n); //re-orthogonalize
                     float len = length(t);
-                    vec3 tangent = (len > 1e-6f && !isnan(len)) ? t / len : vec3(1, 0, 0);
 
-                    vec3 bitangent = tangent_mat * vec3(mesh->mBitangents[idx].x, mesh->mBitangents[idx].y, mesh->mBitangents[idx].z);
-                    float handedness = dot(cross(n, tangent), bitangent) < 0.0f ? -1.0f : 1.0f;
+                    if(len > 1e-6f && !std::isnan(len) && !std::isinf(len)) {
+                        tangent = t / len;
+                        vec3 bitangent = tangent_mat * vec3(mesh->mBitangents[idx].x, mesh->mBitangents[idx].y, mesh->mBitangents[idx].z);
+                        handedness = dot(cross(n, tangent), bitangent) < 0.0f ? -1.0f : 1.0f;
+                        tangent_ok = true;
+                    }
 
-                    verts[v]->tangent = vec4(tangent, handedness);
+                    //else: Assimp produced a zero-length or NaN tangent for the vertex
+                    //This can happen on complex UV-island meshes when its tangent solver hits
+                    //a singular case. Falls to the fallback below instead of storing useless stuff
                 }
-                //No UVs, or Assimp couldn't derive tangents
-                else {
-                    vec3 n = verts[v]->normal;
-                    vec3 up = abs(n.x) > 0.9f ? vec3(0,1,0) : vec3(1,0,0);
-                    verts[v]->tangent = vec4(normalize(cross(up, n)), 1.0f);
-                }
+
+                verts[v]->tangent = tangent_ok ? vec4(tangent, handedness) : vec4(fallback_tangent, 1.0f);
 
                 if(bounds) {
                     bounds->min_bound = min(bounds->min_bound, verts[v]->position);

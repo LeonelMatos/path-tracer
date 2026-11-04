@@ -196,8 +196,8 @@ bool uploadTexture(const vector<CPUMaterial>& cpu_materials, vector<GPUMaterial>
 
     bool normal_ok = packTextureArray(
         cpu_materials, gpu_materials, r.tex_normal_array, GL_RGBA8, "normal",
-        [](const CPUMaterial& m) -> const CPUTextureSlot& { return m.albedo_tex; },
-        [](GPUMaterial& g, int layer) { g.tex_index = layer; }
+        [](const CPUMaterial& m) -> const CPUTextureSlot& { return m.normal_tex; },
+        [](GPUMaterial& g, int layer) { g.normal_tex_index = layer; } 
     );
 
     if(albedo_ok) {

@@ -60,6 +60,24 @@ void intersects_mesh(const Ray ray, inout Hit h) {
                     h.ior = gpu_materials[m_id].ior;
                     h.light_area = triangleArea(triangles[i].v0.position, triangles[i].v1.position, triangles[i].v2.position);
 
+                    //NORMAL MAPPING (perturbs h.normal for shading)
+                    //h.geom_normal stays the pure flat face normal,
+                    //being used for shadow-rays, so don't change that one
+                    if(USE_TEXTURES == 1 && gpu_materials[m_id].normal_tex_index >= 0) {
+                        vec4 tangent_interp = triangles[i].v0.tangent * tri_bary.z + triangles[i].v1.tangent * tri_bary.x + triangles[i].v2.tangent * tri_bary.y;
+                        vec3 N = h.normal;
+                        vec3 T = normalize(tangent_interp.xyz - N * dot(tangent_interp.xyz, N));
+                        vec3 B = cross(N, T) * tangent_interp.w;
+
+                        ///\note Assumes OpenGL-convention normal maps (+Y up)
+                        ///If an asset looks inverted on one axis, it was made for
+                        ///DirectX and needs to flip the G channel
+                        vec3 sampled = texture(tex_normal, vec3(uv, float(gpu_materials[m_id].normal_tex_index))).rgb;
+                        vec3 tangent_space_normal = normalize(sampled * 2.0 - 1.0);
+
+                        h.normal = normalize(mat3(T, B, N) * tangent_space_normal);
+                    }
+
                     //Texture sample
                     if(USE_TEXTURES == 1 && gpu_materials[m_id].tex_index >= 0) {
                         h.albedo = texture(tex_albedo, vec3(uv, float(gpu_materials[m_id].tex_index))).rgb;
@@ -70,7 +88,7 @@ void intersects_mesh(const Ray ray, inout Hit h) {
                 }
             }
         }
-        else {
+        else { //BVH magic
             BVHNode left_node = bvh_nodes[node.left_child];
             BVHNode right_node = bvh_nodes[node.right_child];
 

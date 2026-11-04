@@ -344,3 +344,20 @@ uniform int USE_BVH_HEATMAP;
 uniform int BVH_HEATMAP_SCALE;
 
 ///\}
+
+//----------------------------------------------------------
+///\defgroup debug_view Debug View
+///Replaces the path tracer with flat data from the primary hit
+///\see pathTraceDebugs
+///\{
+
+uniform int DEBUG_VIEW;
+const int DEBUG_VIEW_OFF = 0;
+
+///smoothed + normal mapped (h.normal)
+const int DEBUG_VIEW_SHADING_NORMALS = 1;
+
+///flat face normal (h.geom_normal)
+const int DEBUG_VIEW_GEOM_NORMALS = 2;
+
+///\}

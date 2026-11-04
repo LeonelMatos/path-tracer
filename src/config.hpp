@@ -32,6 +32,9 @@ struct SceneModel {
 struct RenderConfig {
     int scene_preset = 0;
 
+    ///0 off, 1 shading normals, 2 geometric normals \see DEBUG_VIEW
+    int debug_view = 0;
+
     int depth = 5;
     int samples_per_pixel = 1;
     int rr_min_bounces = 2;
@@ -205,6 +208,7 @@ struct Renderer {
     bool show_grid = false;
     GLProgram grid_id;
     GLint grid_loc_view, grid_loc_proj, grid_loc_near, grid_loc_far, grid_loc_cam_pos;
+    GLint loc_debug_view = -1;
 
     ///Photo framing overlay (viewfinder, screen-space only)
     ///\note 0=off, 1=thirds, 2=golden ration, 3=center cross, 4=diagonal

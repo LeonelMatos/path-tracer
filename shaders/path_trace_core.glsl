@@ -364,7 +364,9 @@ vec4 pathTraceDebug(vec2 uv, int spp_index, uvec2 px) {
     Ray ray = cameraRayDOF(uv, spp_index, px);
     Hit h;
     if(!intersects(ray, h)) return vec4(0.0, 0.0, 0.0, 1.0);
-    return vec4(h.normal * 0.5 + 0.5, 1.0);
+
+    vec3 n = normalize(DEBUG_VIEW == DEBUG_VIEW_GEOM_NORMALS ? h.geom_normal : h.normal);
+    return vec4(n * 0.5 + 0.5, 1.0);
 }
 
 
@@ -594,6 +596,10 @@ vec4 pathTraceFromRay(Ray ray, int spp_index, uvec2 px, float disp_coeff) {
 }
 
 vec4 pathTrace(vec2 uv, int spp_index, uvec2 px) {
+    //Uniform branch: same for every invocation, no divergence
+    if(DEBUG_VIEW != DEBUG_VIEW_OFF)
+        return pathTraceDebug(uv, spp_index, px);
+        
     if(CAM_LATERAL_CA <= 0.0 && CAM_AXIAL_CA <= 0.0 && GLASS_DISPERSION <= 0.0) {
         Ray ray = cameraRayDOF(uv, spp_index, px);
         return pathTraceFromRay(ray, spp_index, px, 0.0);

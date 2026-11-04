@@ -49,7 +49,7 @@
 #include "texture.hpp"
 #include "denoiser.hpp"
 
-#define VERSION "1.7.3"
+#define VERSION "1.8.0"
 #define VERSION_NOTE ""
 
 using namespace std;
@@ -628,6 +628,8 @@ void reloadShaders() {
 void initUniforms() {
     GLuint active = renderer.active_id;
 
+    renderer.loc_debug_view = glGetUniformLocation(active, "DEBUG_VIEW");
+
     renderer.loc_res = glGetUniformLocation(active, "resolution");
     renderer.loc_frame = glGetUniformLocation(active, "frame_id");
     renderer.loc_tile_offset = glGetUniformLocation(active, "tile_offset");
@@ -715,6 +717,7 @@ void initUniforms() {
 void uploadConfig() {
     GLuint active = renderer.active_id;
     glUseProgram(active);
+    glUniform1i(renderer.loc_debug_view, config.debug_view);
     glUniform1i(renderer.loc_depth, config.depth);
     glUniform1i(renderer.loc_spp, config.samples_per_pixel);
     glUniform1i(renderer.loc_rr_min, config.rr_min_bounces);
@@ -1793,7 +1796,7 @@ void drawUI() {
             if(gpu_mat.type == 2) type_name = "Glass";
             if(gpu_mat.type == 3) type_name = "Tinted Glass";
 
-            ImGui::Text("[%d] %s | tex:%d | ior:%.2f", i, type_name, gpu_mat.tex_index, gpu_mat.ior);
+            ImGui::Text("[%d] %s | tex:%d | normal:%d | ior:%.2f", i, type_name, gpu_mat.tex_index, gpu_mat.normal_tex_index, gpu_mat.ior);
             if(cpu_mat.albedo_tex.has_texture)
                 ImGui::TextDisabled("  albedo: %s", cpu_mat.albedo_tex.tex_path.c_str());
             if(cpu_mat.normal_tex.has_texture)
@@ -2056,6 +2059,13 @@ void drawUI() {
                 }
                 ImGui::SetItemTooltip("Number of BVH nodes intersected per ray");
             }
+            const char* debug_view_names[] = {"Off", "Shading Normals", "Geometric Normals"};
+            if(ImGui::Combo("Debug View", &config.debug_view, debug_view_names, IM_ARRAYSIZE(debug_view_names))) {
+                glUseProgram(renderer.active_id);
+                glUniform1i(renderer.loc_debug_view, config.debug_view);
+                resetAccumulation();
+            }
+            ImGui::SetItemTooltip("Shows primary-hit normals as color (RGB = XYZ)\nShading: smoothed + normal maps, toggle Textures to compare\nGeometric: flat face normal");
         }
         //----- RENDER -------------
         if(ImGui::CollapsingHeader("Render", ImGuiTreeNodeFlags_DefaultOpen)) {
