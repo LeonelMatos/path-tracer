@@ -169,6 +169,27 @@ vec3 sampleEnvMap(vec3 dir) {
 }
 
 //----------------------------------------------------------
+//Ray origins
+
+/**
+\brief Scene-relative epsilon for ray origins, avoids self-intersection
+\note EPS_TRI (1e-10) is far below float precision at scene coordinates, it can't be used as an offset
+*/
+float rayEps() {
+    return max(EPS, length(mesh_aabb_max - mesh_aabb_min) * EPS_SHADOW);
+}
+
+/**\brief Origin for any ray leaving an opaque surface on the side it was hit from
+(diffuse/mirror bounces and every NEE shadow ray).
+Replaces old hardcoded fixed EPS
+Lifted off the flat triangle (shadow terminator) and pushed along the geometric normal
+\see terminatorLift, rayEps
+*/
+vec3 surfaceOrigin(Hit h) {
+    return h.pos + h.lift + h.geom_normal * rayEps();
+}
+
+//----------------------------------------------------------
 //Next Event Estimation
 
 vec3 sampleAnalyticLight(Hit h, int bounce, int spp_index, uvec2 px) {
@@ -236,7 +257,7 @@ vec3 sampleAnalyticLight(Hit h, int bounce, int spp_index, uvec2 px) {
     float shadow_eps = length(mesh_aabb_max - mesh_aabb_min) * EPS_SHADOW;
 
     Ray shadow_ray;
-    shadow_ray.origin = h.pos + h.geom_normal * shadow_eps;
+    shadow_ray.origin = surfaceOrigin(h);
     shadow_ray.direction = dir_light;
 
     Hit shadow_hit;
@@ -295,7 +316,7 @@ vec3 sampleEmissiveTriangles(Hit h, int bounce, int spp_index, uvec2 px) {
 
     //check occlusion of shadow rays
     Ray shadow_ray;
-    shadow_ray.origin = h.pos + h.geom_normal * shadow_eps;
+    shadow_ray.origin = surfaceOrigin(h);
     shadow_ray.direction = dir_light;
 
     Hit shadow_hit;
@@ -334,9 +355,8 @@ vec3 sampleEnvLight(Hit h, int bounce, int spp_index, uvec2 px) {
     vec3 world_dir = onb(h.normal) * local_dir;
 
     //Shadow ray to check occlusion
-    float shadow_eps = length(mesh_aabb_max - mesh_aabb_min) * EPS_SHADOW;
     Ray shadow_ray;
-    shadow_ray.origin = h.pos + h.geom_normal * shadow_eps;
+    shadow_ray.origin = surfaceOrigin(h);
     shadow_ray.direction = world_dir;
 
     Hit shadow_hit;
@@ -489,20 +509,22 @@ vec4 pathTraceFromRay(Ray ray, int spp_index, uvec2 px, float disp_coeff) {
                 float phi = TWO_PI * r.y;
                 ray.direction = onb(h.normal) * vec3(sinT*cos(phi), sinT*sin(phi), cosT);
                 throughput *= h.albedo;
-                ray.origin = h.pos + h.normal * EPS_TRI;
+                ray.origin = surfaceOrigin(h);
                 prev_bsdf_pdf = bsdfPDF_diffuse(h.normal, ray.direction);
                 break;
             }
             case MAT_MIRROR: {
                 ray.direction = reflect(ray.direction, h.normal);
                 throughput *= h.albedo;
-                ray.origin = h.pos + h.normal * EPS_TRI;
+                ray.origin = surfaceOrigin(h);
                 prev_bsdf_pdf = -1.0;
                 break;
             }
             case MAT_GLASS: {
                 bool h_entering = dot(ray.direction, h.normal) < 0.0;
                 vec3 normal = h_entering ? h.normal : -h.normal;
+                //Geometric normal facing the incoming ray, offsets the new origin to the correct side
+                vec3 ng_in = dot(h.geom_normal, ray.direction) < 0.0 ? h.geom_normal : -h.geom_normal;
 
                 //Dispersion. This trace is dedicated to a channel's wavelength
                 //so every refraction it does uses the respective channel's IOR, same idea as cameraRayDOFChannel(),
@@ -520,19 +542,22 @@ vec4 pathTraceFromRay(Ray ray, int spp_index, uvec2 px, float disp_coeff) {
 
                 if (total_reflect || r.z < fresnel) {
                     ray.direction = reflect(ray.direction, normal);
-                    ray.origin = h.pos + normal * EPS_TRI;
+                    ray.origin = h.pos + ng_in * rayEps();
                 }
                 else {
                     ray.direction = refract(ray.direction, normal, eta);
-                    ray.origin = h.pos - normal * EPS_TRI;
+                    ray.origin = h.pos - ng_in * rayEps();
                 }
                 throughput *= h.albedo;
                 prev_bsdf_pdf = -1.0;
                 break;
             }
+            ///DEPRECATED
             case MAT_TINTED_GLASS: { //ray passes directly, no Fresnel reflection
                 throughput *= h.albedo;
-                ray.origin = h.pos + ray.direction * EPS_TRI;
+                //Continues through the surface: start on the far side of the geometric plane
+                vec3 ng_in = dot(h.geom_normal, ray.direction) < 0.0 ? h.geom_normal : -h.geom_normal;
+                ray.origin = h.pos - ng_in * rayEps();
                 prev_bsdf_pdf = -1.0;
                 break;
             }

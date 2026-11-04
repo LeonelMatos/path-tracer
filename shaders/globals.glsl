@@ -167,7 +167,8 @@ struct Hit {
     vec3 albedo, emission;
     int material;
     float ior;
-    float light_area; //Used for MIS
+    float light_area; ///<Used for MIS
+    vec3 lift; ///<Offset from the flat triangle to the smooth surface, for rays leaving it \see terminatorLift
 };
 
 uniform int DEPTH;

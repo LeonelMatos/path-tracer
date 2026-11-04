@@ -213,3 +213,18 @@ float triangleT(Ray ray, vec3 v0, vec3 v1, vec3 v2, out vec3 out_normal) {
    vec3 bary;
    return triangleT(ray, v0, v1, v2, out_normal, bary);
 }
+
+/**
+\brief Shadow terminator lifts a hit from the flat triangle onto the smooth
+surface implied by the vertex normals. p is projected onto each vertex's tangent
+plane it lies under (convex areas only) and the projections are blended with the barycentrics
+\note See J. Hanika, "Hacking the Shadow Terminator", Ray Tracing Gems II, ch. 4, 2021
+\param w barycentric weights matching a, b, c
+\param na,nb,nc vertex normals, on the same side as the geometric normal
+\return offset to add to p for rays leaving the surface, zero on flat or concave areas
+*/
+vec3 terminatorLift(vec3 p, vec3 a, vec3 b, vec3 c, vec3 na, vec3 nb, vec3 nc, vec3 w) {
+   return - w.x * min(0.0, dot(p - a, na)) * na
+          - w.y * min(0.0, dot(p - b, nb)) * nb
+          - w.z * min(0.0, dot(p - c, nc)) * nc;
+}

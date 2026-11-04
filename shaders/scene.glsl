@@ -60,23 +60,51 @@ void intersects_mesh(const Ray ray, inout Hit h) {
                     h.ior = gpu_materials[m_id].ior;
                     h.light_area = triangleArea(triangles[i].v0.position, triangles[i].v1.position, triangles[i].v2.position);
 
+                    //tri_normal already faces the incoming ray (triangleT flips it), the vertex normals
+                    //may not: back faces of open meshes, inverted parts.
+                    //side = +1 when they agree, -1 when the ray hit the surface from behind
+                    float side = dot(h.normal, tri_normal) < 0.0 ? -1.0 : 1.0;
+
                     //NORMAL MAPPING (perturbs h.normal for shading)
+                    //Done in the asset's own (outward) frame, before the side flip below.
                     //h.geom_normal stays the pure flat face normal,
                     //being used for shadow-rays, so don't change that one
                     if(USE_TEXTURES == 1 && gpu_materials[m_id].normal_tex_index >= 0) {
                         vec4 tangent_interp = triangles[i].v0.tangent * tri_bary.z + triangles[i].v1.tangent * tri_bary.x + triangles[i].v2.tangent * tri_bary.y;
                         vec3 N = h.normal;
-                        vec3 T = normalize(tangent_interp.xyz - N * dot(tangent_interp.xyz, N));
-                        vec3 B = cross(N, T) * tangent_interp.w;
 
-                        ///\note Assumes OpenGL-convention normal maps (+Y up)
-                        ///If an asset looks inverted on one axis, it was made for
-                        ///DirectX and needs to flip the G channel
-                        vec3 sampled = texture(tex_normal, vec3(uv, float(gpu_materials[m_id].normal_tex_index))).rgb;
-                        vec3 tangent_space_normal = normalize(sampled * 2.0 - 1.0);
+                        //T collapses when interpolating between nearly opposite tangents
+                        vec3 T_raw = tangent_interp.xyz - N * dot(tangent_interp.xyz, N);
+                        float T_len = length(T_raw);
 
-                        h.normal = normalize(mat3(T, B, N) * tangent_space_normal);
+                        if(T_len > 1e-6) {
+                            vec3 T = T_raw / T_len;
+                            //w is +-1 per vertex, but interpolated across a mirror seam it can approach 0
+                            vec3 B = cross(N, T) * (tangent_interp.w < 0.0 ? -1.0 : 1.0);
+
+                            ///\note Assumes OpenGL-convention normal maps (+Y up)
+                            ///If an asset looks inverted on one axis, it was made for
+                            ///DirectX and needs to flip the G channel
+                            vec3 sampled = texture(tex_normal, vec3(uv, float(gpu_materials[m_id].normal_tex_index))).rgb;
+                            vec3 mapped = mat3(T, B, N) * (sampled * 2.0 - 1.0);
+                            float m_len = length(mapped);
+
+                            //A mapped normal below the flat triangle would send most bounces into the surface
+                            if(m_len > 1e-6 && dot(mapped, side * tri_normal) > 0.0)
+                                h.normal = mapped / m_len;
+                        }
                     }
+
+                    //Opaque surfaces are shaded on the side the ray came from.
+                    //Glass keeps the outward normal, it's how it knows if it's entering or leaving
+                    if(h.material != MAT_GLASS && h.material != MAT_TINTED_GLASS)
+                        h.normal *= side;
+
+                    //Shadow terminator: rays leaving the surface start on the smooth surface, not the flat triangle
+                    h.lift = terminatorLift(h.pos,
+                        triangles[i].v0.position, triangles[i].v1.position, triangles[i].v2.position,
+                        side * triangles[i].v0.normal, side * triangles[i].v1.normal, side * triangles[i].v2.normal,
+                        vec3(tri_bary.z, tri_bary.x, tri_bary.y)); //same weights as smooth_normal
 
                     //Texture sample
                     if(USE_TEXTURES == 1 && gpu_materials[m_id].tex_index >= 0) {
@@ -144,6 +172,7 @@ void intersects_mesh(const Ray ray, inout Hit h) {
         h.emission  = heatmap_color;
         h.material  = MAT_DIFFUSE;
         h.ior       = 1.0;
+        h.lift      = vec3(0);
     }
 }
 
@@ -157,9 +186,12 @@ bool intersects(const Ray ray, out Hit h) {
     h.material  = MAT_DIFFUSE;
     h.ior       = 0.0;
     h.light_area = 0.0;
+    h.lift      = vec3(0);
 
-    if(SCENE_PRESET == 1 || SCENE_PRESET == 2)
+    if(SCENE_PRESET == 1 || SCENE_PRESET == 2) {
         intersects_cornell(ray, h);
+        h.lift = vec3(0); //"out Hit" rewrites the whole struct; analytic planes have nothing to lift
+    }
     if(SCENE_PRESET == 0 || SCENE_PRESET == 1 || SCENE_PRESET == 3)
         intersects_mesh(ray, h);
 
@@ -174,6 +206,7 @@ bool intersects(const Ray ray, out Hit h) {
                 h.pos = hit_plane;
                 h.normal = vec3(0,0,1);
                 h.geom_normal = vec3(0,0,1);
+                h.lift = vec3(0);
                 h.albedo = vec3(GROUND_ALBEDO);
                 h.emission = vec3(0);
                 h.material = (GROUND_SHADOW_CATCHER == 1) ? MAT_SHADOW_CATCHER : MAT_DIFFUSE;
